@@ -1,0 +1,125 @@
+{
+  "status": "ok",
+  "sources": [
+    {
+      "candidate_id": "local:papers-gkaa275-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-gkaa275-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-gkaa275-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/gkaa275.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 1
+    },
+    {
+      "candidate_id": "local:papers-s12033-024-01133-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-s12033-024-01133-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-s12033-024-01133-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/s12033-024-01133-6.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 2
+    },
+    {
+      "candidate_id": "local:papers-medicinal-research-reviews-2020-meng",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-medicinal-research-reviews-2020-meng.tex",
+      "prepared_path": "raw/tmp/papers/papers-medicinal-research-reviews-2020-meng.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/Medicinal Research Reviews - 2020 - Meng - Drug design targeting active posttranslational modification protein isoforms.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 3
+    },
+    {
+      "candidate_id": "local:papers-s42256-021-00418-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-s42256-021-00418-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-s42256-021-00418-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/s42256-021-00418-8.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 4
+    },
+    {
+      "candidate_id": "local:papers-nrc-2017-105-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-nrc-2017-105-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-nrc-2017-105-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/nrc.2017.105.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 5
+    },
+    {
+      "candidate_id": "local:papers-s41467-017-00299-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-s41467-017-00299-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-s41467-017-00299-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/s41467-017-00299-9.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 6
+    },
+    {
+      "candidate_id": "local:papers-s41594-022-00910-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-s41594-022-00910-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-s41594-022-00910-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/s41594-022-00910-8.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 7
+    },
+    {
+      "candidate_id": "local:papers-gkad1011-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-gkad1011-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-gkad1011-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/gkad1011.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 8
+    },
+    {
+      "candidate_id": "local:papers-nature04209-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-nature04209-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-nature04209-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/nature04209.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 9
+    },
+    {
+      "candidate_id": "local:papers-s41586-021-03819-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-s41586-021-03819-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-s41586-021-03819-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/s41586-021-03819-2.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 10
+    },
+    {
+      "candidate_id": "local:papers-s41586-021-04101-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-s41586-021-04101-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-s41586-021-04101-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/s41586-021-04101-1.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 11
+    },
+    {
+      "candidate_id": "local:papers-s41586-024-07487-pdf",
+      "origin": "user_local",
+      "canonical_ingest_path": "raw/tmp/papers/papers-s41586-024-07487-pdf.tex",
+      "prepared_path": "raw/tmp/papers/papers-s41586-024-07487-pdf.tex",
+      "discovered_path": null,
+      "source_path": "raw/papers/s41586-024-07487-w.pdf",
+      "ingest_format": "tex",
+      "shortlist_rank": 12
+    }
+  ]
+}

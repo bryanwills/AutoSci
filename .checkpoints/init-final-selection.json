@@ -1,0 +1,27 @@
+{
+  "topic": "medpredict",
+  "mode": "seeded",
+  "allow_introduction": true,
+  "shortlist_count": 12,
+  "final_count": 12,
+  "exception_applied": "user supplied >10 parseable papers; bypass 8-10 trim rule per skill",
+  "external_introductions": 0,
+  "discovery_warnings": [
+    "search_s2: Connection reset by peer",
+    "search_deepxiv: Invalid or expired token"
+  ],
+  "final_candidate_ids": [
+    "local:papers-gkaa275-pdf",
+    "local:papers-s12033-024-01133-pdf",
+    "local:papers-medicinal-research-reviews-2020-meng",
+    "local:papers-s42256-021-00418-pdf",
+    "local:papers-nrc-2017-105-pdf",
+    "local:papers-s41467-017-00299-pdf",
+    "local:papers-s41594-022-00910-pdf",
+    "local:papers-gkad1011-pdf",
+    "local:papers-nature04209-pdf",
+    "local:papers-s41586-021-03819-pdf",
+    "local:papers-s41586-021-04101-pdf",
+    "local:papers-s41586-024-07487-pdf"
+  ]
+}

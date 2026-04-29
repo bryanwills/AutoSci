@@ -1,0 +1,1193 @@
+\title{Geometric deep learning on molecular representations}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Review Article https://doi.org/10.1038/s42256-021-00418-8 1Department of Chemistry and Applied Biosciences, RETHINK, ETH Zurich, Zurich, Switzerland. 2Department of Biomedical Engineering, Eindhoven University of Technology, Eindhoven, the Netherlands. 3ETH Singapore SEC Ltd, Singapore, Singapore. 4These authors contributed equally: Kenneth Atz, Francesca Grisoni. ✉e-mail: f.grisoni@tue.nl; gisbert@ethz.ch R ecent advances in deep learning, an instance of neural network-based artificial intelligence (AI)1,2, have led to pio- neering applications in the molecular sciences, for example, in drug discovery3, quantum chemistry4 and structural biology5. Two characteristics of deep learning render it promising when applied to molecules. First, deep learning methods can cope with ‘unstruc- tured’ data representations such as text sequences6, speech signals7, images8 and graphs9. This ability seems particularly useful for molecular systems, for which chemists have developed molecular representations that capture molecular properties at varying levels of abstraction (Fig. 1). Second, deep learning can perform feature extraction (or feature learning) from the input data; that is, produce data-driven features from the input representation. These two char- acteristics of deep learning complement ‘classical’ machine learning applications (such as quantitative structure–activity relationships (QSAR)), in which molecular features (that is, ‘molecular descrip- tors’10) are encoded a priori wi
+\end{abstract}
+
+\section{Recovered Text}
+Review Article
+https://doi.org/10.1038/s42256-021-00418-8
+1Department of Chemistry and Applied Biosciences, RETHINK, ETH Zurich, Zurich, Switzerland. 2Department of Biomedical Engineering, Eindhoven
+University of Technology, Eindhoven, the Netherlands. 3ETH Singapore SEC Ltd, Singapore, Singapore. 4These authors contributed equally: Kenneth Atz,
+Francesca Grisoni. ✉e-mail: f.grisoni@tue.nl; gisbert@ethz.ch
+R
+ecent advances in deep learning, an instance of neural
+network-based artificial intelligence (AI)1,2, have led to pio-
+neering applications in the molecular sciences, for example, in
+drug discovery3, quantum chemistry4 and structural biology5. Two
+characteristics of deep learning render it promising when applied
+to molecules. First, deep learning methods can cope with ‘unstruc-
+tured’ data representations such as text sequences6, speech signals7,
+images8 and graphs9. This ability seems particularly useful for
+molecular systems, for which chemists have developed molecular
+representations that capture molecular properties at varying levels
+of abstraction (Fig. 1). Second, deep learning can perform feature
+extraction (or feature learning) from the input data; that is, produce
+data-driven features from the input representation. These two char-
+acteristics of deep learning complement ‘classical’ machine learning
+applications (such as quantitative structure–activity relationships
+(QSAR)), in which molecular features (that is, ‘molecular descrip-
+tors’10) are encoded a priori with rule-based algorithms. This capa-
+bility of multi-layered neural networks to learn from unstructured
+data and extract higher-order molecular features has led to numer-
+ous applications of deep learning in the molecular sciences.
+Geometric deep learning (GDL) is an emerging concept of
+AI. GDL is an umbrella term encompassing emerging techniques
+that generalize neural networks to Euclidean and non-Euclidean
+domains, such as graphs, manifolds, meshes or string representa-
+tions9. In general, GDL includes approaches that incorporate a
+geometric prior—that is, information on the structure space and
+symmetry properties of input signals, such as representations of
+molecular structures. The geometric prior is leveraged to improve
+the quality of the model, for example its predictive accuracy.
+Although GDL has been increasingly applied to molecular model-
+ling4,11–13, its full potential in the field is still untapped.
+The aim of this Review is to (1) provide a structured and har-
+monized overview of prominent applications of GDL in molecu-
+lar systems, (2) delineate the main research directions in the field
+and (3) attempt a critical forecast of the potential future impact of
+GDL. Three fields of application are highlighted, namely drug dis-
+covery, quantum chemistry and computer-aided synthesis planning
+(CASP). A glossary of selected terms can be found in Box 1.
+Principles of GDL
+The term GDL was coined in 20179. Although GDL was originally
+used for methods applied to non-Euclidean data9, it now extends
+to all deep learning methods that incorporate geometric priors14.
+Symmetry is a crucial concept in GDL, as it encompasses the prop-
+erties of the system with respect to manipulations (transformations),
+such as the ones covered by the Euclidean group E(3) (Box 2). Other
+relevant transformations for molecules include scale separation (for
+example, coarse and fine graining of a grid) or permutation (that is,
+different ordering of the atoms in a molecule).
+Symmetry is often recast in terms of invariance and equivariance
+to express the behaviour of any mathematical function with respect
+to a transformation T  (for example rotation, translation, reflection
+or permutation) of an acting symmetry group15. Here, the mathe-
+matical function is a neural network F applied to a given molecular
+input X. F(X) can therein transform equivariantly, invariantly or
+non-equivariantly with respect to T , as described below:
+•
+Equivariance. A neural network F applied to an input X
+is equivariant to a transformation T  if the transforma-
+tion of X commutes with the transformation of F(X) via a
+transformation T ′ of the same symmetry group, such that:
+F(T (X)) = T ′F(X). Neural networks are therefore equivari-
+ant to the actions of a symmetry group on their inputs if, and
+only if, each layer of the network ‘equivalently’ transforms under
+any transformation of that group.
+•
+Invariance. Invariance is a special case of equivariance where
+F(X) is invariant to T  if T ′ is the trivial group action (that is,
+identity): F(T (X)) = T ′F(X) = F(X).
+•
+Non-equivariance. F(X) is neither equivariant nor invariant to
+T  when the transformation of X does not commute with the
+transformation of F(X): F(T (X)) ̸= T ′F(X).
+The symmetry properties of a neural network architecture vary
+depending on the network type and the symmetry group of inter-
+est, and are individually discussed in the following sections. Readers
+can find in-depth treatments of equivariance and group equivariant
+layers in neural networks elsewhere16,17.
+Geometric deep learning on molecular
+representations
+Kenneth Atz   1,4, Francesca Grisoni   1,2,4 ✉ and Gisbert Schneider   1,3 ✉
+Geometric deep learning (GDL) is based on neural network architectures that incorporate and process symmetry information.
+GDL bears promise for molecular modelling applications that rely on molecular representations with different symmetry prop-
+erties and levels of abstraction. This Review provides a structured and harmonized overview of molecular GDL, highlighting
+its applications in drug discovery, chemical synthesis prediction and quantum chemistry. It contains an introduction to the
+principles of GDL, as well as relevant molecular representations, such as molecular graphs, grids, surfaces and strings, and
+their respective properties. The current challenges for GDL in the molecular sciences are discussed, and a forecast of future
+opportunities is attempted.
+Nature Machine Intelligence | VOL 3 | December 2021 | 1023–1032 | www.nature.com/natmachintell
+1023
+Review Article
+NaTuRe MachIne In TeLLIGence
+The concept of equivariance and invariance can also be used in
+reference to the molecular features obtained from a given molecular
+representation (X), depending on their behaviour when a transfor-
+mation is applied to X. For instance, many molecular descriptors are
+invariant to the rotation and translation of the molecular represen-
+tation by design10, for example, the Moriguchi octanol–water parti-
+tioning coefficient18, which relies only on the occurrence of specific
+molecular substructures for calculation. The symmetry properties
+of molecular features extracted by a neural network depend on the
+symmetry properties of both the input molecular representation
+and the utilized neural network.
+Many relevant molecular properties (for example, equilibrium
+energies, atomic charges or physicochemical properties such as per-
+meability, lipophilicity or solubility) are invariant to certain sym-
+metry operations (Box 2). For applications in chemistry it can thus
+be desirable to design neural networks that transform equivariantly
+under the actions of predefined symmetry groups. Exceptions occur
+if the targeted property changes following a symmetry transforma-
+tion of the molecules (for example, chiral properties that change
+under inversion of the molecule or vector properties that change
+under rotation of the molecule). In such cases, the inductive bias
+(learning bias) of equivariant neural networks would not allow for
+the differentiation of symmetry-transformed molecules.
+Whereas neural networks can be considered as universal func-
+tion approximators19, incorporating prior knowledge such as rea-
+sonable geometric information (geometric priors) has evolved as a
+core design principle of neural network modelling14. By incorpo-
+rating geometric priors, GDL allows the quality of the model to be
+increased and bypasses several bottlenecks related to the need to
+force the data into Euclidean geometries (for example, by feature
+engineering). Moreover, GDL provides novel modelling opportuni-
+ties, such as data augmentation in low-data regimes.
+Molecular GDL
+The application of GDL to molecular systems is challenging, partly
+because there are multiple valid ways of representing the same
+molecular entity. Molecular representations can be categorized on
+the basis of their different levels of abstraction and the physicochem-
+ical and geometrical aspects they capture. Importantly, all of these
+representations are models of the same reality and are thus suitable
+for some purposes, not for others20. GDL provides the opportunity
+to experiment with different representations of the same molecule
+and leverages their intrinsic geometrical features to improve the
+quality of the model. Moreover, GDL has repeatedly proved useful in
+providing insights into relevant molecular properties for the task at
+hand thanks to its feature extraction (feature learning) capabilities.
+In the following sections, we delineate the most prevalent molecu-
+lar GDL approaches (see Table 1 for an overview) and their applica-
+tions in chemistry, grouped according to the respective molecular
+representations used for deep learning: molecular graphs and point
+clouds, grids, surfaces and string notations. To avoid confusion with
+other usages of the word ‘representation’ in deep learning, we will use
+the term ‘feature’ whenever we refer to any numerical description of
+molecules, obtained either with rule-based algorithms (molecular
+descriptors) or learned (extracted) by neural networks.
+Learning on molecular graphs. Molecular graphs. Graphs are
+among the most intuitive ways to represent molecular struc-
+tures21. Any molecule can be thought of as a mathematical graph
+G = (V, E) (where G refers to the molecular graph, V to the set of
+vertices and E to the set of adjacent edges), whose vertices (vi ∈V)
+represent atoms, and whose edges (eij ∈E) constitute their connec-
+tion (Fig. 3a). In many deep learning applications, molecular graphs
+can be further characterized by a set of vertex and edge features.
+3D molecular structures are commonly represented as 3D graphs
+G3D = (V, E, R) or 3D point clouds P3D = (V, R), where in addi-
+tion to vertex and potential edge features (vi ∈V and eij ∈E,
+respectively), information on the vertex position in a 3D coordinate
+system (ri ∈R) is encoded (where R refers to the set of coordi-
+nates). 3D point clouds are a special case of 3D graphs in which no
+edges or edge features are predefined, and the interacting vertices
+are either specified through a given radius or the complete edge set.
+GNNs. Deep learning methods that handle graphs as input are com-
+monly referred to as GNNs21–23. When applied to molecular graphs,
+GNNs perform feature extraction by progressively aggregating
+information from atoms and their molecular environments (Fig. 2a;
+refs. 24,25). Different architectures of GNNs have been introduced14,26,
+the most popular of which fall under the umbrella term of message
+passing neural networks4,25. Such networks iteratively update the
+vertex features of the lth network layer (vl
+i →vl+1
+i
+) via message pass-
+ing operations, using at least two learnable functions ψ and ϕ, and a
+local permutation-invariant aggregation operator ⨁ (for example,
+sum, mean or maximum): vl+1
+i
+= ϕ
+(
+vl
+i, ⊕
+j∈N (i)ψ (vl
+i, vl
+j
+))
+.
+Since their introduction as a means to predict quantum chemi-
+cal properties of small molecules at the DFT level4, GNNs have
+found many applications in quantum chemistry27,28, drug discov-
+ery29–31, CASP32,33 and molecular property prediction34,35. When
+applied to quantum chemistry tasks, GNNs can use 3D informa-
+tion by including radial and angular information in the edge fea-
+tures of the graph28,36,37, which has proved beneficial for estimating
+quantum chemical energies and other properties of equilibrium and
+non-equilibrium molecular conformations, as in the case of SchNet38
+and PaiNN37. SchNet-like architectures were used to predict quan-
+tum mechanical wavefunctions in the form of Hartree–Fock and
+DFT density matrices39, and differences in quantum properties
+obtained by DFT and coupled cluster level-of-theory calculations40.
+GNNs for molecular property prediction have been shown to
+outperform models based on human-engineered molecular descrip-
+tors for certain biologically relevant properties41. Although includ-
+ing 3D information into molecular graphs generally improved the
+prediction of drug-relevant properties, there was no marked differ-
+ence between using single or multiple molecular conformations for
+network training42. GNN models seem suitable for explainable AI43,
+CC1(C)[C@H](C(O)=O)N2[C@@H](CC2)S1
+c
+a
+b
+d
+e
+Fig. 1 | Exemplary molecular representations for a selected molecule.
+The penam substructure of penicillin is shown. a, 2D depiction (Kekulé
+structure). b, Molecular graph (2D) composed of vertices (atoms) and edges
+(bonds). c, Simplified molecular input line entry system (SMILES) string84, in
+which atom type, bond type and connectivity are specified by alphanumeric
+characters. d, 3D graph composed of vertices (atoms), their positions (x,
+y, z coordinates) in 3D space and edges (bonds). e, Molecular surface
+represented as a mesh coloured according to the respective atom types.
+Nature Machine Intelligence | VOL 3 | December 2021 | 1023–1032 | www.nature.com/natmachintell
+1024
+Review Article
+NaTuRe MachIne In TeLLIGence
+which was used to interpret models predicting molecular properties
+of preclinical relevance44 and quantum chemical properties45. GNNs
+have also been used for molecular fingerprinting, albeit with mixed
+results22,46,47.
+It is also possible to generate molecules de novo with GNNs48–51,
+for example by adding graph vertices (atoms) and edges (bonds) to
+an initial vertex48, or in combination with variational autoencod-
+ers49,50,52 and reinforcement learning51,53,54. Finally, GNNs have been
+applied to CASP32,33,55. However, current approaches are limited to
+chemical transformations in which one bond is removed between
+the products and the reactants.
+Graph isomorphism is an active research topic in graph-based
+machine learning56–59. When considering only topological infor-
+mation (that is, the number of edges and vertices, and vertex adja-
+cency), message passing neural networks have been shown to be
+unable to distinguish selected examples of non-isomorphic graphs25
+(that is, they are learning identical features for two different graphs).
+This aspect is relevant for molecular pattern recognition (for exam-
+ple property prediction) when two different molecules should result
+in distinctive learned features. Encoding angular and radial features
+allows GNNs to capture geometric shapes (such as pentagons or
+hexagons), thereby enabling them to distinguish between a broader
+spectrum of non-isomorphic molecular graphs28.
+One recent area of development of graph-based methods is SE(3)-
+and E(3)-equivariant GNNs (equivariant message passing networks),
+which deal with the absolute coordinate systems of 3D graphs60
+(Fig. 2b) by exploiting relevant Euclidean symmetries (Box 2). This
+ability is enabled by defining a respective network architecture. By
+using E(3)-equivariant61 and SE(3)-equivariant60,62 convolutions, such
+networks have demonstrated high accuracy for predicting several
+quantum chemical properties, including energies37,62–65, interatomic
+potentials for molecular dynamics simulations61,64,66 and wavefunc-
+tions67. Such SE(3)-equivariant neural networks do not commute
+with reflections of the input (that is, they are non-equivariant to
+reflections), and thereby enable SE(3)-equivariant models to dis-
+tinguish between stereoisomers of chiral molecules including enan-
+tiomers60. By contrast, E(3)-equivariant neural networks transform
+equivariantly with reflections, which allows E(3)-equivariant mod-
+els to distinguish between diastereomers but not enantiomers. SE(3)
+neural networks are computationally expensive due to their use of
+spherical harmonics and Wigner D-matrices to compute learnable
+weight kernels60. E(3)-equivariant neural networks are computation-
+ally more efficient and have been shown to perform as well as, or bet-
+ter than, SE(3)-equivariant networks; for example, for the modelling
+of quantum chemical properties and dynamic systems37,61. Recent
+applications of SE(3)-equivariant neural networks led to scoring
+Box 1 | |Glossary of selected terms
+CoMFA and CoMS IA. Comparative molecular field analysis
+(CoMFA)72 and comparative molecular similarity indices analysis
+(CoMSIA)73 are 3D QSAR methods developed in the 1980s and
+1990s in which 3D grids are used to capture the distributions of
+molecular features (such as the steric, hydrophobic and electro-
+static properties). The molecular descriptors obtained serve as in-
+puts to a regression model for quantitative bioactivity prediction.
+Convolution. An operation within a neural network that
+transforms a feature space into a new feature space and thereby
+captures the local information found in the data. Convolutions
+were originally introduced for pixels in images145, but the term
+is also used for neural network architectures covering a variety
+of data structures such as graphs, point clouds, spheres, grids or
+manifolds.
+Density functional theory (DFT). A quantum mechanical
+modelling approach used to investigate the electronic structure of
+molecules.
+Data augmentation. Artificial increase of the data volume available
+for model training, often achieved by leveraging symmetrical
+properties of the input data that are not captured by the model (for
+example, rotation or permutation).
+Feature. An individually measurable or computationally obtainable
+characteristic of a given sample (for example, a molecule), often in
+the form of a scalar. In this Review, the term refers to a numeric
+value characterizing a molecule. Such molecular features can be
+computed with rule-based algorithms (molecular descriptors)
+or generated automatically by deep learning from a molecular
+representation (‘hidden’ or ‘learned’ features).
+Geometric prior. An inductive bias incorporating information
+on the symmetric nature of the system of interest into the neural
+network architecture. Also known as a symmetry prior.
+Graph isomorphism. Two graphs are considered isomorphic if
+there exists a one-to-one correspondence between their vertices
+(bijection) that preserves the corresponding adjacency and
+non-adjacency. In other words, isomorphic graphs have the same
+number of elements (vertices and edges) and the same vertex
+adjacency.
+Inductive bias. A set of assumptions that a learning algorithm
+(such as a neural network) uses to learn the target function and to
+make predictions on previously unseen data points.
+One-hot encoding. Method for representing categorical variables
+as numerical arrays by obtaining a binary variable (0, 1) for each
+category. It is often used to convert sequences (for example,
+SMILES strings) into numerical matrices that are suitable inputs
+to and/or outputs of deep learning models (such as chemical
+language models).
+Quantitative Structure-Activity Relationship QSAR. Machine
+learning techniques that aim to find an empirical relationship
+between the molecular structure (usually encoded as molecular
+descriptors) and experimentally determined molecular properties,
+such as physicochemical properties or bioactivity.
+Reinforcement learning. A technique used to steer the output
+of a machine learning algorithm towards user-defined regions of
+optimality via a predefined reward function146.
+Transfer learning. The transfer of knowledge from an existing
+deep learning model to a related task for which fewer training
+samples are available147.
+Unstructured data. Data that are not arranged as vectors of
+features. Examples of unstructured data include graphs, images
+and meshes. Molecular representations are typically unstructured,
+whereas numerical molecular descriptors (such as molecular
+properties and molecular ‘fingerprints’) are examples of structured
+data.
+Voxel. Element of a regularly spaced three-dimensional (3D) grid
+(equivalent to a pixel in two-dimensional (2D) space).
+Nature Machine Intelligence | VOL 3 | December 2021 | 1023–1032 | www.nature.com/natmachintell
+1025
+Review Article
+NaTuRe MachIne In TeLLIGence
+functions for folded 3D structures of ribonucleic acid11. Equivariant
+message passing networks have also been applied to predicting the
+quantum mechanical wavefunctions of nucleus- and electron-based
+representations68–70. However, such networks are limited at present
+to small molecular systems because of the large size of the learned
+matrices, which scale quadratically with the number of electrons in
+the system.
+Learning on grids. Grids capture the properties of a system at regu-
+larly spaced intervals. Depending on the number of dimensions
+included in the system, grids can be 1D (for example, sequences), 2D
+(RGB images), 3D (cubic lattices) or higher-dimensional. Grids are
+defined by a Euclidean geometry and can be considered as a graph
+with a special adjacency, where (1) each vertex has an identical num-
+ber of adjacent edges (that is, identical neighbourhood structure),
+and is therefore indistinguishable from all other vertices structure
+wise, and (2) the vertices have a fixed ordering that is defined by the
+spatial dimensions of the grid14. These two properties render local
+convolutions applied to a grid inherently permutation invariant, and
+provide a strong geometric prior for translation equivariance (for
+example, by weight sharing in convolutions) as well as scale separa-
+tion (for example, by pooling operations)14. These grid properties
+have critically determined the success of CNNs in computer vision8.
+Molecular grids. Molecules can be represented as grids in different
+ways. 2D grids (for example, molecular structure drawings, Kekulé
+structures) are generally more useful for visualization than predic-
+tion, with few exceptions71. In analogy to some popular pre-deep
+learning approaches, such as CoMFA72 and CoMSIA73, 3D grids
+are often used to capture the spatial distribution of the properties
+within one (or more) molecular conformer. Such representations
+are then used as input to the 3D CNNs. 3D CNNs are character-
+ized by a greater resource efficiency than equivariant GNNs, which
+until now have mainly been applied to molecules with fewer than
+approximately 1,000 atoms. Thus, 3D CNNs have often been the
+method of choice when the protein structure has to be considered—
+for example, for protein–ligand binding affinity prediction74,75 or
+active site recognition76.
+Learning on molecular surfaces. Molecular surfaces can be defined
+by the surface enclosing the 3D structure of a molecule at a certain
+distance from each atom centre. Each point on such a continuous
+Box 2 | | Euclidean symmetries in molecular systems
+Molecular systems (and 3D representations thereof) can be con-
+sidered as objects in Euclidean space. In such a space, one can
+apply several symmetry operations (transformations) that are
+performed with respect to three symmetry elements (that is,
+line, plane, point) and rigid (that is, they preserve the Euclidean
+distance between all pairs of atoms (isometry)). The Euclidean
+transformations are as follows:
+•
+Rotation. Movement of an object with respect to the radial
+orientation to a given point.
+•
+Translation. Movement of every point of an object by the
+same distance in a given direction.
+•
+Reflection. Mapping of an object to itself through a point
+(inversion), a line or a plane (mirroring).
+All three transformations and their arbitrary finite
+combinations are included in the Euclidean group [E(3)]. The
+special Euclidean group [SE(3)] comprises only translations and
+rotations.
+Molecules are always symmetric in the SE(3) group; that is, their
+intrinsic properties (for example, biological and physicochemical
+properties and equilibrium energy) are invariant to coordinate
+rotation and translation and combinations thereof. Several
+molecules are chiral: some of their (chiral) properties depend on
+the absolute configuration of their stereogenic centres, and are
+thus non-invariant to molecule reflection. Chirality plays a key
+role in chemical biology; relevant examples of chiral molecules
+are DNA, and several drugs whose enantiomers exhibit markedly
+different pharmacological and toxicological properties148.
+Table 1 | Summary of selected GDL approaches for molecular
+modelling
+GDL approach
+Molecular
+representation(s)
+Applications
+Graph neural
+network (GNN)
+2D and 3D molecular
+graphs and 3D point
+clouds
+Molecular property
+prediction in drug
+discovery29,44 and in
+quantum chemistry for
+energies61–63, forces37,61,64 and
+wavefunctions 67, CASP33,144
+and generative molecular
+design 51,52.
+3D convolutional
+neural network
+(3D CNN)
+3D grid
+Structure-based drug design
+and property prediction74,75.
+Mesh
+convolutional
+neural network
+(geodesic CNN or
+3D GNN)
+Surfaces (meshes)
+encoded as a 2D grids
+or 3D graphs
+Protein–protein interaction
+prediction and ligand-pocket
+fingerprinting12.
+Recurrent neural
+network (RNN)
+String notations (1D
+grid)
+Generative molecular
+design13,108, synthesis
+planning87, protein structure
+prediction112 and prediction
+of properties in drug
+discovery110,111.
+Transformers
+String notations
+encoded as a graphs
+Synthesis planning117,
+prediction of reaction
+yields121, generative molecular
+design125, prediction of
+properties in drug discovery123
+and protein structure
+prediction5,126.
+For each approach, the utilized molecular representation(s) and selected applications are reported.
+Original
+Rotation
+Translation
+Reflection (mirroring)
+Reflection (inversion)
+Nature Machine Intelligence | VOL 3 | December 2021 | 1023–1032 | www.nature.com/natmachintell
+1026
+Review Article
+NaTuRe MachIne In TeLLIGence
+surface can be further characterized by its chemical (for example,
+hydrophobic, electrostatic) and geometric (such as local shape, cur-
+vature) features. From a geometric perspective, molecular surfaces
+are considered as 3D meshes; that is, a set of polygons (faces) that
+describe how the mesh coordinates exist in the 3D space77. Their ver-
+tices can be represented by a 2D grid structure (where four vertices
+on the mesh define a pixel) or by a 3D graph structure. The grid- and
+graph-based structures of meshes enable applications of 2D CNNs,
+geodesic CNNs and GNNs to learn on mesh-based molecular sur-
+faces. Recently, geodesic (2D) CNNs have been applied to learn on
+mesh-based representations of protein surfaces to predict protein–
+protein interactions and recognize corresponding binding sites12.
+This approach generated data-driven fingerprints that are relevant
+for specific biomolecular interactions. Approaches like 2D CNNs
+applied to meshes come with certain limitations, such as the need for
+rotational data augmentation (due to their non-equivariance to rota-
+tions) and the need to enforce a homogeneous mesh resolution (that
+is, uniform spacing of all the points in the mesh). Recently introduced
+GNNs for mesh-based representations have been shown to incorpo-
+rate rotational equivariance into their network architecture and allow
+for heterogeneous mesh resolution78. Such GNNs are computation-
+ally efficient and have potential for modelling macromolecular struc-
+tures; however, they have not yet found applications in molecular
+systems. Other studies have used 3D voxel-based surface representa-
+tions of (macro)molecules as inputs to 3D CNNs, for example, for
+protein–ligand affinity79 and protein binding-site80 prediction.
+Learning on string representations. Molecular strings. Molecules
+can be represented as molecular strings—that is, linear sequences
+of alphanumeric symbols. Molecular strings were originally devel-
+oped as manual ciphering tools to complement systematic chemi-
+cal nomenclature81 and later became suitable for data storage and
+retrieval. Some of the most popular string-based representations are
+the Wiswesser line notation82, the International Chemical Identifier
+(InChI)83 and SMILES84.
+Each type of linear representation can be considered as a ‘chemi-
+cal language’. In fact, such notations possess a defined syntax; that
+is, not all possible combinations of alphanumeric characters will
+lead to a ‘chemically valid’ molecule. Furthermore, these notations
+possess semantic properties: depending on how the elements of the
+string are combined, the corresponding chemical compound will
+have different physicochemical and biological properties. These
+characteristics extend the deep learning methods developed for lan-
+guage and sequence modelling to the analysis of molecular strings
+for ‘chemical language modelling’85,86. Before the actual model
+building, molecular strings are usually preprocessed as either 1D
+molecular grids or as molecular graphs, thereby inheriting the geo-
+metric prior of the corresponding representation.
+SMILES strings—in which letters are used to represent atoms,
+whereas symbols and numbers encode bond types, connectiv-
+ity, branching and stereochemistry (Fig. 3a)—are frequently used
+for sequence-based deep learning13,87. Different SMILES strings
+can be obtained for a given molecule depending on the starting
+non-hydrogen atom and direction in the molecular graph (Fig. 3a),
+while preserving the chemical information captured. Several algo-
+rithms have been proposed to obtain ‘canonical’ SMILES88,89; that is,
+strings that are invariant to the order in which atoms are presented.
+Whereas several other string representations have been tested
+in combination with deep learning, such as InChI90, DeepSMILES91
+and self-referencing embedded strings (SELFIES)92, SMILES strings
+remain the de facto representation of choice for chemical language
+modelling, probably due to their widespread usage in chemistry
+and certain advantages for generative modelling93. String repre-
+sentations such as SELFIES are receiving increasing attention from
+the scientific community and are in continuous development. The
+next section introduces the most prominent chemical language
+Feature labelling
+= (ν,ε,   )
+r  = (ρ ,θ ,φ )
+e
+v  ∈       υ
+Feature updates
+Aggregation
+Molecular property
+Atomic property
+Bond property
+Message passing
+a
+b
+Molecular property
+Atomic property
+Equivariant message passing
+Feature labelling
+Feature updates
+Aggregation
+vT
+vT
+e
+y
+y
+y
+x
+y
+x
+y
+v  ∈
+∈
+= (ν,ε)
+,
+,
+,
+υ
+Fig. 2 | Deep learning on molecular graphs. a, Message passing GNNs applied to 2D molecular graphs. A 2D molecular graph G = (V, E) is shown with its
+labelled vertex (atom) features (vi ∈Rdv) and edge (bond) features (eij ∈Rde), where R refers to the set of real numbers, and dv and de (as a superscript
+of R) refer to the d-dimensional set of real numbers for vertex and edge features, respectively. Vertex features are updated by iterative message passing
+for a defined number of time steps T across each pair of vertices vi and vj, connected via an edge ej,i. After the last message passing convolution, the
+final vertex vt
+i can be (1) mapped to a bond (yij) or atom (yi) property or (2) aggregated to form molecular features (that can be mapped to a molecular
+property y). b, E(3)-equivariant message passing GNNs applied to 3D molecular graphs. 3D graphs G3D = (V, E, R) that are labelled with atom features
+(vi ∈Rdv), their absolute coordinates in 3D space (ri ∈R3, where ri refers to the spherical coordinates ρ, θ and ϕ) and their edge features (eij ∈Rde) are
+shown. Iterative spherical convolutions are used to obtain data-driven atomic features (vt
+i), which can be mapped to atomic properties or aggregated and
+mapped to molecular properties (yi and y, respectively).
+Nature Machine Intelligence | VOL 3 | December 2021 | 1023–1032 | www.nature.com/natmachintell
+1027
+Review Article
+NaTuRe MachIne In TeLLIGence
+modelling methods, along with selected examples of their applica-
+tion to chemistry.
+Chemical language models. Chemical language models are machine
+learning methods that can handle molecular sequences as inputs
+and/or outputs. The most common algorithms for chemical lan-
+guage modelling are RNNs and transformers:
+•
+RNNs (Fig. 3b)94 are neural networks that process sequence data
+as Euclidean structures, usually via one-hot-encoding. RNNs
+model a dynamic system in which the hidden state (ht) of the
+network at any tth time point (that is, at any tth position in the
+sequence) depends on both the current observation (st) and the
+previous hidden state (ht−1). RNNs can process sequence inputs
+of arbitrary lengths and provide outputs of arbitrary lengths.
+RNNs are often used in an ‘auto-regressive’ fashion, that is, to
+predict the probability distribution over the next possible ele-
+ments (tokens) at the time step t + 1, given the current ht and the
+preceding portions of the sequence. Several RNN architectures
+have been proposed to solve the gradient vanishing or exploding
+problems of ‘vanilla’ RNNs95, such as long short-term memory96
+and gated recurrent units97.
+•
+Transformers (Fig. 3c) process sequence data as non-Euclidean
+structures, by encoding sequences as either (1) a fully connected
+graph or (2) a sequentially connected graph, where each token is
+only connected to the previous tokens in the sequence. The for-
+mer approach is often used for feature extraction in general (for
+example, in a transformer-encoder), whereas the latter is used for
+next-token prediction (for example, in a Transformer-decoder).
+The positional information of tokens is usually encoded by posi-
+tional embedding or sinusoidal positional encoding6. Trans-
+formers combine graph-like processing with the so-called
+attention layers. Attention layers allow transformers to focus
+on (‘pay attention to’) the perceived relevant tokens for each
+prediction. Transformers have been particularly successful in
+sequence-to-sequence tasks, such as language translation.
+Extending early studies13,98, RNNs for next-token prediction
+have been routinely applied to the de novo generation of molecules
+with desired biological or physicochemical properties, in combina-
+tion with transfer13,99,100 or reinforcement learning101,102. In this con-
+text, RNNs have shown remarkable capability to learn the SMILES
+syntax13,99, and capture high-level molecular features (‘semantics’),
+such as physicochemical13,99 and biological properties98,100,103. In
+this context, data augmentation based on non-canonical SMILES
+string enumeration104,105 or bidirectional learning106 has efficiently
+improved the quality of the chemical language learned by RNNs.
+Most published studies have used SMILES strings or derivative
+representations. One-letter amino acid sequences have been used
+for peptide design107–109. RNNs have also been applied to predict
+ligand–protein interactions and the pharmacokinetic properties of
+drugs110,111, protein secondary structure112 and the temporal evolu-
+tion of molecular trajectories113. RNNs for molecular feature extrac-
+tion114,115 outperformed both traditional molecular descriptors and
+graph-convolution methods for virtual screening and property
+prediction in certain benchmarks114. The Fréchet ChemNet dis-
+tance116, which is based on the physicochemical and biological fea-
+tures learned by an RNN model, has become the de facto reference
+method to capture molecular similarity in this context.
+Molecular transformers have also been applied to CASP, which
+can be cast as a sequence-to-sequence translation task in which the
+string representations of the reactants are mapped to those of the cor-
+responding product, or vice versa. Since their initial applications117,
+transformers have been used to predict multi-step syntheses118, regio-
+and stereoselective reactions119, enzymatic reaction outcomes120,
+reaction yields and classes121,122 and other molecular properties123,124.
+Transformers have also been used for de novo molecule design
+by learning to translate the target protein sequence into SMILES
+strings of the corresponding ligands125. Furthermore, transform-
+ers have recently been combined with E(3)- and SE(3)-equivariant
+layers to learn the 3D structures of proteins from their amino
+acid sequences5,126. These equivariant transformers achieved
+state-of-the-art performance in protein structure prediction.
+a
+b
+c
+Graph
+Residual attention blocks
+Feature labelling
+Sequence
+Feature updates
+st+1
+=
+h
+h1
+h2
+hT
+t
+st
+s1
+s2
+s3
+sT
+s3
+s1
+s2
+s5
+s4
+s6
+s7
+sT
+s1
+s2
+st
+sT–1
+s2
+s3
+sT
+pi  ∈    dυ
+T
+vi  ∈    dυ
+CC1(C)[C@H] (C(O)=O)N2[C@@H](CC2) S1
+N12[C@@H](CC1)SC(C)(C)[C@@H]2 (C(O)=O)
+O=C(O)C [C@@H]1N2[C@@H](CC2) SC1(C)(C)
+Fig. 3 | Chemical language modelling. a, SMILES strings, in which atom types are represented by their element symbols and bond types and branching
+are indicated by other predefined alphanumeric symbols. For each molecule, via the SMILES algorithm, a string of T symbols (tokens) is obtained
+(s = \{s1, s2, …, sT\}), which encodes the molecular connectivity, herein illustrated via the colour that indicates the corresponding atomic position in the graph
+(left) and string (right). A molecule can be encoded via different SMILES strings depending on the chosen starting non-hydrogen atom and the direction of
+string construction along the molecular graph. Three SMILES strings obtained from different starting atoms and capturing identical molecular information
+are presented. b, Recurrent neural networks at any sequence position, t, learn to predict the next token st+1 of a sequence s given the current sequence
+(\{s1, s2, …, st\}) and hidden state ht. c. Transformer-based language models in which the input sequence is structured as a graph are shown. Vertices are
+featurized according to their token identity (for example, via token embedding, vi ∈Rdv) and their position in the sequence (for example, via sinusoidal
+positional encoding, pi ∈Rdv). During transformer learning, the vertices are updated via residual attention blocks. After passing T attention layers, an
+individual feature representation sT
+t  for each token is obtained.
+Nature Machine Intelligence | VOL 3 | December 2021 | 1023–1032 | www.nature.com/natmachintell
+1028
+Review Article
+NaTuRe MachIne In TeLLIGence
+Other deep learning approaches rely on string-based repre-
+sentations for de novo design; for example, conditional generative
+adversarial networks127 and variational autoencoders128. Most of
+these models, however, seem to have limited or equivalent abili-
+ties to automatically learn SMILES syntax compared with RNNs.
+One-dimensional CNNs129,130 and self-attention networks131 have
+been used with SMILES for property prediction. Recently, deep
+learning on amino acid sequences for property prediction was shown
+to perform on par with approaches based on human-engineered
+features132.
+Conclusions and outlook
+GDL in chemistry has allowed researchers to leverage the symme-
+tries of unstructured molecular representations, thereby increasing
+the flexibility and versatility of computational models for molecu-
+lar structure generation and property prediction. Such approaches
+complement chemoinformatics that are based on molecular
+descriptors or other human-engineered features. For modelling
+tasks that are usually characterized by the need for engineered rules
+(for example, molecule construction for de novo design and reactive
+site specification for CASP), GDL extends the existing methodolog-
+ical repertoire. In published applications of GDL, each molecular
+representation has shown characteristic strengths and weaknesses.
+Molecular strings, such as SMILES, have proved particularly
+suited to generative deep learning tasks, such as de novo design
+and CASP. This success may be attributed to the straightforward
+syntax of this chemical language, which facilitates next-token and
+sequence-to-sequence prediction. For molecular property predic-
+tion, SMILES strings might be limited due to their non-univocity.
+Molecular graphs have proved useful for property predic-
+tion, partly because of their human interpretability and the ease
+of inclusion of desired edge and node features. The incorpora-
+tion of 3D information (for example, with E(3)-invariant or
+SE(3)/E(3)-equivariant message passing) facilitates quantum
+chemistry-related modelling, whereas in drug discovery appli-
+cations this approach has often failed to clearly outbalance the
+increased complexity of the model. E(3)-equivariant GNNs have
+also been applied to conformation-aware de novo design133,134, but
+are awaiting experimental validation.
+Molecular grids have long been the standard 3D representa-
+tion for learning tasks on large and static molecular systems, such
+as proteins. Their ability to capture information at a user-defined
+resolution (voxel density) and the Euclidean structure of the input
+grid render 3D CNNs efficient and applicable to proteins and other
+macromolecules. However, recent advances in Transformer net-
+works5,126, GNNs11 and geodesic CNNs12 have led to models that
+achieved state-of-the-art performance.
+Finally, molecular surfaces are at the forefront of GDL at pres-
+ent. We expect many interesting applications of GDL on molecular
+surfaces in the near future.
+To further the application and impact of GDL in chemistry,
+an evaluation of the optimal trade-off between algorithmic com-
+plexity, performance and model interpretability will be required.
+These aspects are crucial for reconciling the ‘two QSARs’135 and
+connecting the computer science and chemistry communities. We
+encourage GDL practitioners to include aspects of interpretability
+in their models (for example, via explainable AI43) whenever pos-
+sible, and transparently communicate with domain experts. The
+feedback from domain experts will also be crucial to develop new
+‘chemistry-aware’ architectures and enable concrete prospective
+applications.
+The potential of GDL for molecular feature extraction has not
+yet been fully explored. Several studies have shown the benefits of
+learned representations compared with classical molecular descrip-
+tors, but in other cases GDL failed to live up to its promise in terms
+of superior learned features. Deriving useful data-driven features for
+downstream applications might be challenging, as it requires expert
+knowledge of both the algorithms and the respective domains of
+application, favouring interdisciplinary collaborations. Although
+there are benchmarks for evaluating machine learning models for
+property prediction136,137 and molecule generation138,139, at present
+there is no such framework to enable the systematic evaluation of
+the usefulness of data-driven features learned by AI. Such bench-
+marks and systematic studies, including prospective applications,
+Box 3 | | Structure–activity landscape visualization with GDL
+This example shows how GDL can be used to interpret the struc-
+ture–activity landscape learned by a trained model. Starting from
+a publicly available molecular dataset containing oestrogen recep-
+tor binding information 149, we trained an E(3)-equivariant graph
+neural network (six hidden layers, 128 hidden neurons per layer)
+and analysed the learned features and their relationship to ligand
+binding to the oestrogen receptor. The figure shows an analysis of
+the learned molecular features (third hidden layer, analysed via
+principal component analysis; the first two principal components
+are shown), and how these features relate to the density of active
+and inactive molecules in the chemical space. The features en-
+coded in this particular intermediate network layer captured both
+experimental bioactivity and structural molecular features (for ex-
+ample, atom scaffolds150).
+O
+HO
+OH
+S
+HO
+OH
+O
+O
+N
+OH
+HO
+F
+O
+S
+O
+N
+OH
+HO
+..
+High
+Low
+Atom scaffold
+Density of actives
+Nature Machine Intelligence | VOL 3 | December 2021 | 1023–1032 | www.nature.com/natmachintell
+1029
+Review Article
+NaTuRe MachIne In TeLLIGence
+are indispensable for obtaining an unvarnished assessment of deep
+representation learning. Moreover, investigating the relationships
+between the learned features and the physicochemical and biologi-
+cal properties of the input molecules will augment the interpret-
+ability and applicability of GDL to modelling structure–function
+relationships such as structure–activity landscapes (Box 3), for
+example.
+Compared with conventional QSAR approaches in which the
+assessment of the applicability domain (that is, the region of the
+chemical space where model predictions are considered reliable)
+has been routinely performed, contemporary GDL studies lack such
+an assessment. This apparent gap might constitute one of the lim-
+iting factors on the more widespread use of GDL approaches for
+prospective studies. Thorough assessment of a model’s applicability
+domain will help reduce the risk of unreliable predictions, for exam-
+ple, for molecules with mechanisms of action, functional groups or
+physicochemical properties that are different from the training data.
+It is advisable to develop ‘geometry-aware’ approaches for applica-
+bility domain assessment.
+Another opportunity will be to leverage less-explored molecu-
+lar representations for GDL. For instance, the electronic structure
+of molecules has potential for tasks such as CASP, molecular prop-
+erty prediction and the prediction of macromolecular interactions
+(for example, protein–protein interactions). Although accurate sta-
+tistical and quantum mechanical simulations are computationally
+expensive, modern quantum machine learning models140,141 trained
+on large quantum data collections142,143 allow quantum chemical
+properties to be accessed much faster with high accuracy. This
+aspect could enable quantum and electronic featurization of exten-
+sive molecular datasets to be used as input molecular representa-
+tions for the task of interest.
+Deep learning can be applied to a multitude of biological and
+chemical representations. The corresponding deep neural net-
+work models have the potential to augment human creativity,
+paving the way for scientific studies that were previously unfea-
+sible. However, research has only explored the tip of the iceberg.
+One of the most important catalysts for the integration of deep
+learning in molecular sciences may be the responsibility of aca-
+demic institutions and other organizations to foster interdisci-
+plinary education, collaboration and communication. Picking
+the ‘high-hanging fruits’ will only be possible with a deep under-
+standing of both chemistry and computer science, along with
+out-of-the-box thinking and collaborative creativity. In such a
+setting, we expect molecular GDL to increase our understanding
+of molecular systems and biological phenomena.
+Received: 23 July 2021; Accepted: 26 October 2021;
+Published online: 15 December 2021
+References
+	1.
+LeCun, Y., Bengio, Y. \& Hinton, G. Deep learning. Nature 521,
+436–444 (2015).
+	2.
+Schmidhuber, J. Deep learning in neural networks: an overview. Neur. Netw.
+61, 85–117 (2015).
+	3.
+Gawehn, E., Hiss, J. A. \& Schneider, G. Deep learning in drug discovery.
+Mol. Inform. 35, 3–14 (2016).
+	4.
+Gilmer, J., Schoenholz, S. S., Riley, P. F., Vinyals, O. \& Dahl, G. E. Neural
+message passing for quantum chemistry. In International Conference on
+Machine Learning Vol. 34, 1263–1272 (2017).
+	5.
+Jumper, J. et al. Highly accurate protein structure prediction with
+AlphaFold. Nature 596, 583–589 (2021).
+	6.
+Vaswani, A. et al. Attention is all you need. In Advances in Neural
+Information Processing Systems Vol. 30, 5998–6008 (2017).
+	7.
+Hinton, G. et al. Deep neural networks for acoustic modeling in speech
+recognition: the shared views of four research groups. IEEE Signal Proces.
+Mag. 29, 82–97 (2012).
+	8.
+Krizhevsky, A., Sutskever, I. \& Hinton, G. E. Imagenet classification with
+deep convolutional neural networks. In Advances in Neural Information
+Processing Systems Vol. 25, 1097–1105 (2012).
+	9.
+Bronstein, M. M., Bruna, J., LeCun, Y., Szlam, A. \& Vandergheynst, P.
+Geometric deep learning: going beyond euclidean data. IEEE Signal Process.
+Mag. 34, 18–42 (2017).
+	10.
+Todeschini, R. \& Consonni, V. Molecular Descriptors for Chemoinformatics
+Vols I–II (John Wiley \& Sons, 2009).
+	11.
+Townshend, R. J. et al. Geometric deep learning of RNA structure. Science
+373, 1047–1051 (2021).
+	12.
+Gainza, P. et al. Deciphering interaction fingerprints from protein molecular
+surfaces using geometric deep learning. Nat. Methods 17, 184–192 (2020).
+	13.
+Segler, M. H., Kogej, T., Tyrchan, C. \& Waller, M. P. Generating focused
+molecule libraries for drug discovery with recurrent neural networks. ACS
+Centr. Sci. 4, 120–131 (2018).
+	14.
+Bronstein, M. M., Bruna, J., Cohen, T. \& Veličković, P. Geometric deep
+learning: grids, groups, graphs, geodesics, and gauges. Preprint at https://
+arxiv.org/abs/2104.13478 (2021).
+	15.
+Mumford, D., Fogarty, J. \& Kirwan, F. Geometric Invariant Theory Vol. 34
+(Springer Science \& Business Media, 1994).
+	16.
+Cohen, T. S. \& Welling, M. Group equivariant convolutional networks. In
+International Conference on Machine Learning Vol. 33, 2990–2999 (2016).
+	17.
+Kondor, R. \& Trivedi, S. On the generalization of equivariance and
+convolution in neural networks to the action of compact groups. In
+International Conference on Machine Learning Vol. 35, 2747–2755 (2018).
+	18.
+Moriguchi, I., Hirono, S., Liu, Q., Nakagome, I. \& Matsushita, Y. Simple
+method of calculating octanol/water partition coefficient. Chem.
+Pharmaceut. Bull. 40, 127–130 (1992).
+	19.
+Cybenko, G. Approximation by superpositions of a sigmoidal function.
+Math. Control Signals Syst. 2, 303–314 (1989).
+	20.
+Hoffmann, R. \& Laszlo, P. Representation in chemistry. Angew. Chem. Int.
+Ed. Engl. 30, 1–16 (1991).
+	21.
+Kipf, T. N. \& Welling, M. Semi-supervised classification with graph
+convolutional networks. In International Conference on Learning
+Representations Vol 5. (2017).
+	22.
+Duvenaud, D. et al. Convolutional networks on graphs for learning
+molecular fingerprints. In International Conference on Neural Information
+Processing Systems, Vol. 28, 2224–2232 (2015).
+	23.
+Monti, F. et al. Geometric deep learning on graphs and manifolds using
+mixture model CNNs. In Proc. IEEE Conference on Computer Vision and
+Pattern Recognition 5115–5124 (2017).
+	24.
+Battaglia, P. et al. Interaction networks for learning about objects, relations
+and physics. In Advances in Neural Information Processing Systems Vol. 29,
+4502–4510 (2016).
+	25.
+Battaglia, P. W. et al. Relational inductive biases, deep learning, and graph
+networks. Preprint at https://arxiv.org/abs/1806.01261 (2018).
+	26.
+Zhou, J. et al. Graph neural networks: a review of methods and
+applications. AI Open 1, 57–81 (2020).
+	27.
+Schütt, K. T., Arbabzadah, F., Chmiela, S., Müller, K. R. \& Tkatchenko, A.
+Quantum-chemical insights from deep tensor neural networks. Nat.
+Commun. 8, 13890 (2017).
+	28.
+Klicpera, J., Groß, J. \& Günnemann, S. Directional message passing for
+molecular graphs. In International Conference on Learning Representations
+Vol. 8 (2020).
+	29.
+Feinberg, E. N. et al. PotentialNet for molecular property prediction. ACS
+Central Science 4, 1520–1530 (2018).
+	30.
+Torng, W. \& Altman, R. B. Graph convolutional neural networks for
+predicting drug-target interactions. J. Chem. Inf. Model. 59, 4131–4149
+(2019).
+	31.
+Stokes, J. M. et al. A deep learning approach to antibiotic discovery. Cell
+180, 688–702 (2020).
+	32.
+Somnath, V. R., Bunne, C., Coley, C. W., Krause, A. \& Barzilay, R. Learning
+graph models for retrosynthesis prediction. In Advances in Neural
+Information Processing Systems Vol. 34 (2021).
+	33.
+Coley, C. W. et al. A graph-convolutional neural network model for the
+prediction of chemical reactivity. Chem. Sci. 10, 370–377 (2019).
+	34.
+Li, J., Cai, D. \& He, X. Learning graph-level representation for drug
+discovery. Preprint at https://arxiv.org/abs/1709.03741 (2017).
+	35.
+Liu, K. et al. Chemi-Net: a molecular graph convolutional network for
+accurate drug property prediction. Int. J. Mol. Sci. 20, 3389 (2019).
+	36.
+Unke, O. T. \& Meuwly, M. PhysNet: a neural network for predicting
+energies, forces, dipole moments, and partial charges. J. Chem. Theory
+Comput. 15, 3678–3693 (2019).
+	37.
+Schütt, K. T., Unke, O. T. \& Gastegger, M. Equivariant message passing for
+the prediction of tensorial properties and molecular spectra. Preprint at
+https://arxiv.org/abs/2102.03150 (2021).
+	38.
+Schütt, K. T., Sauceda, H. E., Kindermans, P.-J., Tkatchenko, A. \& Müller,
+K.-R. SchNet–a deep learning architecture for molecules and materials. J.
+Chem. Phys. 148, 241722 (2018).
+	39.
+Schütt, K., Gastegger, M., Tkatchenko, A., Müller, K.-R. \& Maurer, R. J.
+Unifying machine learning and quantum chemistry with a deep neural
+network for molecular wavefunctions. Nat. Commun. 10, 5024 (2019).
+Nature Machine Intelligence | VOL 3 | December 2021 | 1023–1032 | www.nature.com/natmachintell
+1030
+Review Article
+NaTuRe MachIne In TeLLIGence
+	40.
+Bogojeski, M., Vogt-Maranto, L., Tuckerman, M. E., Müller, K.-R. \& Burke,
+K. Quantum chemical accuracy from density functional approximations via
+machine learning. Nat. Commun. 11, 5223 (2020).
+	41.
+Yang, K. et al. Analyzing learned molecular representations for property
+prediction. J. Chem. Inf. Model. 59, 3370–3388 (2019).
+	42.
+Axelrod, S. \& Gomez-Bombarelli, R. Molecular machine learning with
+conformer ensembles. Preprint at https://arxiv.org/abs/2012.08452 (2020).
+	43.
+Jiménez-Luna, J., Grisoni, F. \& Schneider, G. Drug discovery with
+explainable artificial intelligence. Nat. Mach. Intell. 2, 573–584 (2020).
+	44.
+Jiménez-Luna, J., Skalic, M., Weskamp, N. \& Schneider, G. Coloring
+molecules with explainable artificial intelligence for preclinical relevance
+assessment. J. Chem. Inf. Model. 61, 1083–1094 (2021).
+	45.
+Schnake, T. et al. Xai for graphs: explaining graph neural network
+predictions by identifying relevant walks. Preprint at https://arxiv.org/
+abs/2006.03589 (2020).
+	46.
+Sun, M., Xing, J., Wang, H., Chen, B. \& Zhou, J. MoCL: data-driven
+molecular fingerprint via knowledge-aware contrastive learning from
+molecular graph. In Proc. 27th ACM SIGKDD Conference on Knowledge
+Discovery and Data Mining 3585–3594 (Association for Computing
+Machinery, 2021); https://doi.org/10.1145/3447548.3467186
+	47.
+Coley, C. W., Barzilay, R., Green, W. H., Jaakkola, T. S. \& Jensen, K. F.
+Convolutional embedding of attributed molecular graphs for physical
+property prediction. J. Chem. Inf. Model. 57, 1757–1772 (2017).
+	48.
+Li, Y., Vinyals, O., Dyer, C., Pascanu, R. \& Battaglia, P. Learning deep
+generative models of graphs. Preprint at https://arxiv.org/abs/1803.03324
+(2018).
+	49.
+Simonovsky, M. \& Komodakis, N. GraphVAE: towards generation of small
+graphs using variational autoencoders. In International Conference on
+Artificial Neural Networks Vol. 27, 412–422 (2018).
+	50.
+De Cao, N. \& Kipf, T. MolGAN: An implicit generative model for small
+molecular graphs. Preprint at https://arxiv.org/abs/1805.11973 (2018).
+	51.
+Zhou, Z., Kearnes, S., Li, L., Zare, R. N. \& Riley, P. Optimization of
+molecules via deep reinforcement learning. Sci. Rep. 9, 10752 (2019).
+	52.
+Jin, W., Barzilay, R. \& Jaakkola, T. Junction tree variational autoencoder for
+molecular graph generation. In International Conference on Machine
+Learning Vol. 35, 2323–2332 (2018).
+	53.
+You, J., Liu, B., Ying, Z., Pande, V. \& Leskovec, J. Graph convolutional
+policy network for goal-directed molecular graph generation. In Advances
+in Neural Information Processing Systems Vol. 31, 6410–6421 (2018).
+	54.
+Jin, W., Barzilay, R. \& Jaakkola, T. Multi-objective molecule generation
+using interpretable substructures. In International Conference on Machine
+Learning Vol. 37, 4849–4859 (2020).
+	55.
+Lei, T., Jin, W., Barzilay, R. \& Jaakkola, T. Deriving neural architectures
+from sequence and graph kernels. In International Conference on Machine
+Learning Vol. 34, 2024-2033 (2017).
+	56.
+Xu, K., Hu, W., Leskovec, J. \& Jegelka, S. How powerful are graph neural
+networks? Preprint at https://arxiv.org/abs/1810.00826 (2018).
+	57.
+Chen, Z., Chen, L., Villar, S. \& Bruna, J. Can graph neural networks count
+substructures? In Advances in Neural Information Processing Systems Vol. 33,
+10383–10395 (2020).
+	58.
+Bouritsas, G., Frasca, F., Zafeiriou, S. \& Bronstein, M. M. Improving graph
+neural network expressivity via subgraph isomorphism counting. Preprint
+at https://arxiv.org/abs/2006.09252 (2020).
+	59.
+Bodnar, C. et al. Weisfeiler and Lehman go topological: message passing
+simplicial networks. In International Conference on Learning
+Representations: Workshop on Geometrical and Topological Representation
+Learning (2021).
+	60.
+Thomas, N. et al. Tensor field networks: rotation-and translation-equivariant
+neural networks for 3D point clouds. Preprint at https://arxiv.org/abs/1802.
+08219 (2018).
+	61.
+Satorras, V. G., Hoogeboom, E. \& Welling, M. E(n) equivariant graph
+neural networks. Preprint at https://arxiv.org/abs/2102.09844 (2021).
+	62.
+Anderson, B., Hy, T. S. \& Kondor, R. Cormorant: covariant molecular
+neural networks. In Advances in Neural Information Processing Systems Vol.
+32, 14537–14546 (2019).
+	63.
+Miller, B. K., Geiger, M., Smidt, T. E. \& Noé, F. Relevance of rotationally
+equivariant convolutions for predicting molecular properties. Preprint at
+https://arxiv.org/abs/2008.08461 (2020).
+	64.
+Fuchs, F., Worrall, D., Fischer, V. \& Welling, M. SE(3)-transformers: 3D
+roto-translation equivariant attention networks. In Advances in Neural
+Information Processing Systems Vol. 33 (2020).
+	65.
+Unke, O. T. et al. SpookyNet: Learning force fields with electronic degrees
+of freedom and nonlocal effects. Preprint at https://arxiv.org/abs/2105.00304
+(2021).
+	66.
+Batzner, S. et al. SE(3)-equivariant graph neural networks for data-efficient
+and accurate interatomic potentials. Preprint at https://arxiv.org/abs/2101.
+03164 (2021).
+	67.
+Unke, O. T. et al. SE(3)-equivariant prediction of molecular wavefunctions
+and electronic densities. Preprint at https://arxiv.org/abs/2106.02347 (2021).
+	68.
+Hermann, J., Schätzle, Z. \& Noé, F. Deep-neural-network solution of the
+electronic Schrödinger equation. Nat. Chem. 12, 891–897 (2020).
+	69.
+Pfau, D., Spencer, J. S., Matthews, A. G. \& Foulkes, W. M. C. Ab initio
+solution of the many-electron Schrödinger equation with deep neural
+networks. Phys. Rev. Res. 2, 033429 (2020).
+	70.
+Choo, K., Mezzacapo, A. \& Carleo, G. Fermionic neural-network states for
+ab-initio electronic structure. Nat. Commun. 11, 2368 (2020).
+	71.
+Rajan, K., Zielesny, A. \& Steinbeck, C. Decimer: towards deep learning for
+chemical image recognition. J. Cheminform. 12, 65 (2020).
+	72.
+Cramer, R. D., Patterson, D. E. \& Bunce, J. D. Comparative molecular field
+analysis (comfa). 1. effect of shape on binding of steroids to carrier
+proteins. J. Am. Chem. Soc. 110, 5959–5967 (1988).
+	73.
+Klebe, G. in 3D QSAR in Drug Design (eds. Kubinyi, H. et al.) 87–104
+(Springer, 1998).
+	74.
+Jiménez, J., Skalic, M., Martinez-Rosell, G. \& De Fabritiis, G. KDEEP:
+protein–ligand absolute binding affinity prediction via 3d-convolutional
+neural networks. J. Chem. Inf. Model. 58, 287–296 (2018).
+	75.
+Ragoza, M., Hochuli, J., Idrobo, E., Sunseri, J. \& Koes, D. R. Protein–ligand
+scoring with convolutional neural networks. J. Chem. Inf. Model. 57,
+942–957 (2017).
+	76.
+Jiménez, J., Doerr, S., Martinez-Rosell, G., Rose, A. S. \& De Fabritiis, G.
+DeepSite: protein-binding site predictor using 3d-convolutional neural
+networks. Bioinformatics 33, 3036–3042 (2017).
+	77.
+Ahmed, E. et al. A survey on deep learning advances on different 3d data
+representations. Preprint at https://arxiv.org/abs/1808.01462 (2018).
+	78.
+Pfaff, T., Fortunato, M., Sanchez-Gonzalez, A. \& Battaglia, P. Learning
+mesh-based simulation with graph networks. In International Conference on
+Learning Representations Vol. 8 (2020).
+	79.
+Liu, Q. et al. OctSurf: efficient hierarchical voxel-based molecular surface
+representation for protein-ligand affinity prediction. J. Molec. Graph. Model.
+105, 107865 (2021).
+	80.
+Mylonas, S. K., Axenopoulos, A. \& Daras, P. DeepSurf: a surface-based
+deep learning approach for the prediction of ligand binding sites on
+proteins. Preprint at https://arxi
+\end{document}

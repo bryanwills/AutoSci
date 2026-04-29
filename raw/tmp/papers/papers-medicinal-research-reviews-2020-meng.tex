@@ -1,0 +1,664 @@
+\title{Drug design targeting active posttranslational modification protein isoforms}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Modern drug design aims to discover novel lead com- pounds with attractable chemical profiles to enable further exploration of the intersection of chemical space and bio- logical space. Identification of small molecules with good ligand efficiency, high activity, and selectivity is crucial toward developing effective and safe drugs. However, the intersection is one of the most challenging tasks in the pharmaceutical industry, as chemical space is almost in- finity and continuous, whereas the biological space is very limited and discrete. This bottleneck potentially limits the discovery of molecules with desirable properties for lead optimization. Herein, we present a new direction lever- aging posttranslational modification (PTM) protein Med Res Rev. 2021;41:1701–1750. wileyonlinelibrary.com/journal/med © 2020 Wiley Periodicals LLC | 1701 Abbreviations: ADME, absorption, distribution, metabolism, and excretion; Aβ, amyloid‐β; BCLAF1, BCL2‐associated transcription factor 1; BET, bro- modomain and extraterminal domain; BIDD, biologically inspired drug design; BIOS, biology‐oriented synthesis; BTK, Bruton's tyrosine kinase; B‐ALL, sensitizing acute lymphoblastic leukemia; CDK2, cyclin‐dependent kinase 2; CDK4, cyclin‐dependent kinase 4; CDK6, cyclin‐dependent kinase 6; ChIP, chromatin immune precipitation; CML, chronic myeloid leukaemia; CNN, convolutional neural network; CRBN, cereblon; CTCL, cutaneous T cell lym- phoma; CV, computer version; DCNN, deep convolutional neural net
+\end{abstract}
+
+\section{Recovered Text}
+Received: 24 September 2020 |
+Revised: 29 November 2020 |
+Accepted: 3 December 2020
+DOI: 10.1002/med.21774
+R E V I E W A R T I C L E
+Drug design targeting active posttranslational
+modification protein isoforms
+Fanwang Meng1,2
+|
+Zhongjie Liang3
+|
+Kehao Zhao4
+|
+Cheng Luo1
+1Drug Discovery and Design Center, the
+Center for Chemical Biology, State Key
+Laboratory of Drug Research, Shanghai
+Institute of Materia Medica, Chinese
+Academy of Sciences, Shanghai, China
+2Department of Chemistry and Chemical
+Biology, McMaster University, Hamilton,
+Ontario, Canada
+3Center for Systems Biology, Department of
+Bioinformatics, School of Biology and Basic
+Medical Sciences, Soochow University,
+Suzhou, China
+4School of Pharmacy, Key Laboratory of
+Molecular Pharmacology and Drug
+Evaluation (Yantai University), Ministry of
+Education, Collaborative Innovation Center
+of Advanced Drug Delivery System and
+Biotech Drugs in Universities of Shandong,
+Yantai University, Yantai, China
+Abstract
+Modern drug design aims to discover novel lead com-
+pounds with attractable chemical profiles to enable further
+exploration of the intersection of chemical space and bio-
+logical space. Identification of small molecules with good
+ligand efficiency, high activity, and selectivity is crucial
+toward developing effective and safe drugs. However, the
+intersection is one of the most challenging tasks in the
+pharmaceutical industry, as chemical space is almost in-
+finity and continuous, whereas the biological space is very
+limited and discrete. This bottleneck potentially limits the
+discovery of molecules with desirable properties for lead
+optimization. Herein, we present a new direction lever-
+aging
+posttranslational
+modification
+(PTM)
+protein
+Med Res Rev. 2021;41:1701–1750.
+wileyonlinelibrary.com/journal/med
+© 2020 Wiley Periodicals LLC | 1701
+Abbreviations: ADME, absorption, distribution, metabolism, and excretion; Aβ, amyloid‐β; BCLAF1, BCL2‐associated transcription factor 1; BET, bro-
+modomain and extraterminal domain; BIDD, biologically inspired drug design; BIOS, biology‐oriented synthesis; BTK, Bruton's tyrosine kinase; B‐ALL,
+sensitizing acute lymphoblastic leukemia; CDK2, cyclin‐dependent kinase 2; CDK4, cyclin‐dependent kinase 4; CDK6, cyclin‐dependent kinase 6; ChIP,
+chromatin immune precipitation; CML, chronic myeloid leukaemia; CNN, convolutional neural network; CRBN, cereblon; CTCL, cutaneous T cell lym-
+phoma; CV, computer version; DCNN, deep convolutional neural networks; DDR1, discoidin domain receptor 1; DEL, DNA‐encoded library; DFG, Asp‐
+Phe‐Gly; DOS, diversity‐oriented synthesis; DUB, deubiquitinase; ENM, elastic network models; EZH2, enhancer of zeste homolog 2; FBDD, fragment‐
+based drug design; FGFR, fibroblast growth factor receptor; GDB, generated databases; GENTRL, generative tensorial reinforcement learning; GPCR,
+G‐protein‐couple receptor; HCC, hepatocellular carcinoma; HDAC, histone deacetylase; HMM, hidden Markov model; lncRNA, long non‐coding RNA; MBT,
+malignant brain tumor; MCL‐1, myeloid cell leukemia 1; mCRPC, metastatic castration resistant prostate cancer; MD, molecular dynamics; MDM2, mouse
+double minute 2 homolog; ML, machine learning; MOA, mechanism of action; MoRF, molecular recognition feature; MR, mineralocorticoid receptor; MSM,
+Markov state models; NLP, natural language processing; NMA, normal mode analysis; NMR, nuclear magnetic resonance; NMT, N‐myristoyltransferase; NSCLC,
+non‐small‐cell lung cancer; PAR2, protease‐activated receptor 2; PARP, poly (ADP‐ribose) polymerase; PAT, palmitoyl acyltransferase; PB, protein block; PDB,
+Protein Data Bank; PD‐L1, programmed cell death 1 ligand 1; PK, pharmacokinetics; PKB, protein kinase B; PPI, protein‐protein interaction; PRC2, polycomb
+repressive complex 2; PROTAC, protein‐targeting chimeric molecule; PSN, protein structure network; PTCL, peripheral T‐cell lymphoma; PTM, posttransla-
+tional modification; PTMI‐DD, posttranslational modification inspired drug design; QC/MS, quantitative crosslinking/mass spectrometry; QM/MM, quantum
+mechanics/molecular mechanics; RBF, radial basis function; RCT, renal cell tumor; RFE, recursive feature elimination; RhoA, Ras homolog family member A;
+RhoGDI1, Rho GDP‐dissociation inhibitor 1; RIP1, receptor interacting protein 1; SBDD, structure‐based drug design; SCONP, structural classification of
+natural products; SDR, specificity determinant residue; SMYD2, SET and MYND domain containing 2; SNV, single nucleotide variant; SVM, support vector
+machine; TNKS, tankyrase; UPS, ubiquitin‐proteasome system; USP, ubiquitin‐specific protease; VP35, viral protein 35.
+Fanwang Meng and Zhongjie Liang contributed equally to this work.
+Correspondence
+Kehao Zhao, School of Pharmacy, Key
+Laboratory of Molecular Pharmacology and
+Drug Evaluation (Yantai University), Ministry
+of Education; Collaborative Innovation
+Center of Advanced Drug Delivery System
+and Biotech Drugs in Universities of
+Shandong, Yantai University, 264005 Yantai,
+China.
+Email: kehaozhao@gmail.com
+Cheng Luo, Drug Discovery and Design
+Center, the Center for Chemical Biology,
+State Key Laboratory of Drug Research,
+Shanghai Institute of Materia Medica,
+Chinese Academy of Sciences, 201203
+Shanghai, China.
+Email: cluo@simm.ac.cn
+Funding information
+National Natural Science Foundation of
+China, Grant/Award Numbers: 81821005,
+21877095, 81625022, 91853205; Science
+and Technology Commission of Shanghai
+Municipality, Grant/Award Numbers:
+18431907100, 19XD1404700; National
+Science and Technology Major Project,
+Grant/Award Number: 2018ZX09711002;
+Top Talents Program for One Case
+Discussion of Shandong Province; K. C. Wong
+Education Foundation; Key Research Project
+of Shandong Province, Grant/Award Number:
+2017GSF18177; Key Laboratory of Systems
+Biomedicine (Ministry of Education),
+Shanghai Center for Systems Biomedicine,
+Shanghai Jiao Tong University,
+Grant/Award Number: KLSB2019KF‐02;
+Taishan Scholar Foundation of Shandong
+Province; National Science \& Technology
+Major Project “Key New Drug Creation
+and Manufacturing Program”,
+Grant/Award Number: 2018ZX09711002‐008
+isoforms target space to inspire drug design termed as
+“Post‐translational
+Modification
+Inspired
+Drug
+Design
+(PTMI‐DD).” PTMI‐DD aims to extend the intersections of
+chemical space and biological space. We further rationa-
+lized and highlighted the importance of PTM protein iso-
+forms and their roles in various diseases and biological
+functions. We then laid out a few directions to elaborate
+the PTMI‐DD in drug design including discovering covalent
+binding inhibitors mimicking PTMs, targeting PTM protein
+isoforms with distinctive binding sites from that of wild‐
+type counterpart, targeting protein‐protein interactions
+involving PTMs, and hijacking protein degeneration by
+ubiquitination for PTM protein isoforms. These directions
+will lead to a significant expansion of the biological space
+and/or increase the tractability of compounds, primarily
+due to precisely targeting PTM protein isoforms or com-
+plexes which are highly relevant to biological functions.
+Importantly, this new avenue will further enrich the per-
+sonalized treatment opportunity through precision medi-
+cine targeting PTM isoforms.
+K E Y W O R D S
+allosteric inhibitor, covalent inhibitor, posttranslational
+modifications, precision medicine, PROTAC protein degradation,
+protein‐protein interactions, PTM protein isoforms, rational drug
+design
+1
+|
+INTRODUCTION
+The ideal drugs are presumed to be effective and safe, which are the two most sought‐after properties in modern
+drug discovery and development. In the early stage of drug discovery, identifying small molecules with high affinity,
+selectivity, and ligand efficiency is of great significance for optimization. The advancements of disease biology,
+systems biology, structural biology, medicinal chemistry, and other modern techniques such as artificial intelligence
+accelerated drug discovery have significantly strengthened our abilities to find potent bioactive molecules.
+However, the dearth of newly approved drugs in the past decade reflects the challenges faced by the pharma-
+ceutical industry, where lack of efficacy and/or toxicities are the major reasons for drug attrition. Selectivity is
+equally important to potency for a successful drug because toxicities could be attributed to poor selectivity related
+off‐target effects. Designing highly selective molecules largely remains a challenge, although numerous efforts have
+been made to improve the selectivity of biologically active molecules, such as targeting less‐conserved residues or
+1702 |
+MENG ET AL.
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+subdomains among the subfamilies, designing multitarget drugs for debilitating diseases,1 and targeting the al-
+losteric binding sites.2
+In addition to selectivity, the intersections between the target space and chemical space are very limited.
+Chemical space can be defined as all possible molecules and is continuous and almost infinite in theory.3,4 Indeed, it
+is estimated that there are more than 1060 compounds with molecular weight <500 Da. In contrast to this, the
+biological space (also termed as target space) features a smaller and discrete space, accounting for approximately
+30,000 disease‐modifying genes.5 The theoretical number of proteins with an average length of 300 amino‐acids, is
+about 20300 by using the 20 different types of natural amino acids as building blocks. However, the living systems
+can only make relatively limited number of molecules (typically <30,000 proteins) as functional components to
+build up the complexed but delicate biological processes.6,7 The intersection of biological space and chemical space,
+called biologically relevant chemical space8,9 or pharmacological space,10 is of great interest to modern pharma-
+ceutical industry. Importantly, all approved drugs fall into the subspace of biologically relevant chemical space,
+typically with Lipinski's rule of five drug‐like properties and favorable ADME (absorption, distribution, metabolism,
+and excretion) profiles. In contrast to infinity chemical space, there are only 2358 drugs have been approved,11
+suggesting a huge gap yet to be filled in drug development. To this end, extensive efforts have been made to build
+computational methods to navigate the chemical space for drug design, including the structural classification of
+natural products (SCONP),12 “target fishing” using 2D and 3D molecular descriptors,13 bioactivity‐guided map-
+ping,14 ligand efficiency indices analysis,15 chemical universe generated databases,16 chemical space visualization
+with molecular fingerprints' similarity,17 and other visualization methods.18,19 Experimentalists also tried to enrich
+the available chemical space in search of bioactive molecules by deeply exploring chemical space with the help of
+diversity‐oriented synthesis (DOS),20 biology‐oriented synthesis (BIOS),20,21 DNA‐encoded chemistry,22,23 and
+integration methods by combining computational chemical space analysis6,24–26 and chemical synthesis.14,27,28
+Those efforts have made significant contributions to expand the biologically relevant chemical space. For example,
+the allosteric antagonist of protease‐activated receptor 2, AZ3451, was identified with DNA‑encoded libraries
+(DELs).29 Other successful cases of obtaining bioactive compounds include GSK298277230 and GSK' 48131 for
+receptor interacting protein 1 kinase,30 the bromodomain BET‐BD1 inhibitor NUE20798 from Nuevolution,32 and
+some other examples as well33,34 (Figure SI‐1).
+Despite the above‐mentioned efforts, the expansion of biologically relevant chemical space (or pharmacolo-
+gical space) is very much limited by finite biological space. Indeed, the number of targets in biological space is
+reported to be around 667 unique human protein efficacy targets and 189 pathogen efficacy targets35 for FDA‐
+approved drugs. This is a very small number contrasting to 20,120 target development level categories for the
+druggable genome identified in the human genome project.36 Statistical analysis suggested that only ~7\% of
+biological space has been covered by small molecule probes, highlighting the fact that the biologically relevant
+chemical space is limited and poorly explicated.26,36 There are two factors contributing to the small biologically
+relevant chemical space, one is small overlap of biological space and chemical space, and the other is that some
+parts of biological space have not been populated by the chemical biology probes.21 A natural product‐oriented
+compound library, Canvass, has been developed to explore the biological space.37 Recently, a new international
+project, Target 2035,38 was initiated aiming at developing chemogenomic libraries, chemical probes, and/or
+functional antibodies for the entire proteome, which will expand the biological space. Nevertheless, progresses
+have been made to extend biological space, in particular, systems biology and omics‐technologies have been widely
+used to identify new targets with some success.39–41 Additionally, the biological space has been extended beyond
+protein to RNAs and DNA families, for example, many RNA binding small molecules have been discovered and
+some of them are in clinical trials.42,43 In this paper, we define the target space being inclusive containing protein,
+DNA, messenger RNA (mRNA), tRNA, and long noncoding RNA (lncRNA). Despite those progresses, the target
+space of approved drugs remains a small fraction (4.25\%) of the biological space in human genome.35 There could
+be more potential biological space to be explored to extend the therapeutic targets for drug design and
+development.
+MENG ET AL.
+| 1703
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+In addition, our knowledge of the binding site of biological space, particularly the de novo one is still limited.
+The dimension of biological space can be defined as the sites for the binding of active molecules, which can be the
+co‐factor/substrate‐binding pocket, the allosteric binding pocket, or protein‐protein interaction (PPI) interface.
+Among them, the allosteric pocket is a highly interesting dimension not only because of its novelty in binding and
+mechanism, but also its advantage in design of selective inhibitors. Indeed, inspired by some success of allosteric
+inhibitors,44,45 great efforts are being taken to build a more delicate diagram of biological space in various
+dimensions. Of note, efforts have been taken to enrich the biological space by approaches such as exploring
+potential new pockets,46 analyzing PPI networks, and predicting the allosteric effects and mechanism through
+combination of structural biology and computational methods. Despite those efforts, the number of allosteric
+mechanism‐based drug candidates remains to be small, primarily due to difficulties in identifying de novo allosteric
+sites which often require time‐consuming experimental high throughput compound screening and functional
+studies.
+Furthermore, because of limited biological space, it is difficult to identify potent biological active molecules
+with high selectivity. The mandatory property of high selectivity is one of the greatest challenges that must be
+overcome to develop a drug with better efficacy and safety profiles. On the other hand, the biological processes in
+human are precisely ordered and tightly regulated. This phenomenon promoted us to pay attention to emerging
+directions highly applicable to extend the intersection of biological space and chemical space.
+Posttranslational modifications (PTMs) of proteins reveal the multistates properties with high degree of
+correlations to various biological functions.47 Importantly, covalent modifications by PTMs are widely observed in
+biological systems and have been reported to be involved in the pathogenesis of various diseases, therefore
+providing great value to target space.48–50 On the other hand, an increasing number of PTM forms involving
+various chemical elements has been reported, including the well‐known phosphorylation, glycosylation, ubiquiti-
+nation, nitrosylation, methylation, and acetylation, which affect almost every stage of cell functions and patho-
+genesis.51–53 PTMs thus have enriched the proteome complexity to a great extent and clearly constitute a potential
+large subset of biological space. We, therefore, believe that PTMs can be a bridge linking the almost infinite
+chemical space and biological space in structure‐based drug design (SBDD; Figure 1).
+Herein, to partially resolve the challenges of small intersection of chemical space and biologic space, we
+highlighted a new direction of drug design mainly by taking advantage of the properties of PTM protein isoforms.
+Conceptionally, we termed this new direction as “Post‐translational Modification Inspired Drug Design (PTMI‐DD)”
+to denote the practical drug design against active biological species involved in PTMs. We will mainly focus on drug
+design targeting endogenous cofactor or substrate binding sites and adjacent region (including covalent inhibitor
+design), targeting allosteric binding sites, targeting protein‐protein interfaces, and targeting proteins for
+proteasome‐mediated degradation. It is certainly possible that this concept could be extended to chemically
+FIGURE 1
+Proposed PTMI‐DD could function as a bridge linking the infinite chemical space and finite biological
+space. Among, the covalent modulators, dynamics by PTMs, PPIs by PTMs, and protein degradation by PTMs, are
+four major bridge pillars for this effective connection. PPI, protein‐protein interaction; PTMI‐DD, posttranslational
+modifications inspired drug design; PTMs, posttranslational modifications [Color figure can be viewed at
+wileyonlinelibrary.com]
+1704 |
+MENG ET AL.
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+modified RNA or DNA (Figure 1). To elaborate the application of PTMI‐DD, we have further summarized strategies
+including covalent inhibition by mimicking PTMs, targeting novel binding sites induced by PTMs, targeting PPIs
+induced by PTMs, and hijacking the ubiquitin‐proteasome system (UPS) to induce protein degradation for “un-
+druggable” targets. Under the guidance of this strategy, the intersection of chemical space and biological space will
+be further extended. Using PTMI‐DD, we have identified a covalent inhibitor of Ras homolog family member A
+(RhoA) protein, which is believed to be undruggable target despite its crucial roles in biological functions and drug
+design.54 More importantly, due to the specific roles of PTM isoforms in regulating biological functions, small
+molecules targeting such isoforms will potentially have better selectivity profiles owning to not interfering with
+normal functions of the wild‐type counterpart. This will lead to increased success rate of drug design and devel-
+opment. Finally, this new direction will contribute to the precision medicine driven by PTM protein isoforms.
+2
+|
+TARGETING PTM PROTEIN ISOFORMS IN DRUG DESIGN
+PTMs introduce covalent modifications on macromolecules which then lead to precise regulations of macro-
+molecules. Roles of PTMs have been elaborated to be closely associated with pathogenesis of many diseases, such
+as cancers, neurodegenerations, and infections.51–53,55–58 Rapid advancements of OMICS science, computational
+biology, and structural biology along with other technologies have helped biologists and pharmacologists gain
+deeper understanding of biological and pathogenetic implications of PTMs. Concurrently, PTMs have been im-
+portant in drug discovery and many drugs targeting modification enzymes such as kinases, histone deacetylase
+(HDAC), and histone methyltransferase have been approved for disease treatment.59–61 It is well known that many
+gain‐of‐function mutations are highly associated with disease pathogenesis.62,63 PTM modifications are also well
+documented for their association with disease progression. For example, kinase activation requires phosphoryla-
+tion to transduce signal cascade and abnormal phosphorylation is often found to be associated with oncogenesis
+and other diseases.64 For example, tau protein phosphorylation recently has been found to be important in
+mediating fibril diversity of tau aggregation, a pathologic phenomenon in Alzheimer's disease.64,65 About 11\% of
+hepatocellular carcinoma (HCC) patients carry the HER2 H878Y mutation. Phosphorylation of this residue leads to
+stabilizing the active conformation of HER2, thereby enhancing its kinase activity.66 The Y705 phosphorylation of
+STAT3 by JAK3 kinase is a well‐established pathway in tumorigenesis.67 While STAT3 activation is transient in
+normal physiological conditions, it becomes persistently activated in many solid and hematopoietic malignancies,
+making STAT3 phosphorylated isoform an attractive therapeutic target.68
+In addition, epigenetic modifications such as methylation and acetylation regulate numerous cellular activities
+through modulating chromatin structure, and alteration of these activities may cause abnormal expression or
+silencing of genes contributing to many diseases.69,70 The histone H3K9me2/me3 methyltransferase G9a has
+automethylated lysine residues distal from the active site.71 Such methylation is required for forming complex with
+heterochromatin protein 1γ (HP1γ) to regulate gene expression. Importantly, increased G9a methylation enhances
+the G9a binding to HP1γ, sensitizing acute lymphoblastic leukemia (B‐ALL) cell line resistant to synthetic gluco-
+corticoids treatment.72 Another typical example is the epigenetic silencing complex polycomb repressive complex 2
+(PRC2) which is solely responsible for the trimethylation of histone H3K27. The automethylation of K510, K514,
+and K515 of EZH2, the catalytic subunit of PRC2, has been reported to increase PRC2 histone methyltransferase
+activity,73,74 a phenomenon highly associated with H3K27 methylation induced tumorigenesis.56 In addition, direct
+methylation of EZH2 K307 by SET and MYND domain containing 2 (SMYD2) improves the stability of EZH2 which
+may also contribute to PRC2 dependent cancer pathogenesis.75 Protein N‐myristoylation is an irreversible mod-
+ification specifically covalently attaching a myristoyl anchor to the ɑ‐amino group of an N‐terminal glycine
+residue of many eukaryotic and viral proteins.76 Protein N‐myristoylation is catalyzed by the enzyme
+N‐myristoyltransferase (NMT) which has been associated with the development and progression of diseases
+including cancer, Alzheimer's disease, and infections.77 Bcr–Abl fusion oncoprotein plays an essential role in the
+MENG ET AL.
+| 1705
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+pathogenesis and development of chronic myeloid leukaemia (CML). Gleevec and few other next‐generation drugs
+targeting the ATP binding pocket of the ABL1 kinase have improved the clinical outcomes for patients with CML.78
+Acquired resistance is commonly found in patients treated Gleevec or other ABL inhibitors. Interestingly, the
+N‐terminal myristoyl modification of ABL1 has been shown to regulate the ABL1 activity‐dependent cellular
+functions,79 suggesting myristoyl modification may have allosteric effects to Bcr‐Abl. ABL001 (asciminib) was
+developed as an allosteric inhibitor of Bcr‐Abl which binds to the myristoyl pocket of ABL1 and induces the
+formation of an inactive kinase conformation.80,81 ABL001 has recently reported positive phase III clinical trial
+results for CML and Philadelphia chromosome‐positive (Ph+) acute lymphoblastic leukemia, confirming its pro-
+mising benefits in treating tumor resistance occurred in ATP‐directing competition inhibitors. Another lipid moiety
+PTM is protein palmitoylation, which is a reversible process of the addition of a 16‐carbon fatty acid, palmitate, to
+proteins by palmitoyl acyltransferase.82 Dysregulated palmitoylation of proteins is implicated in various diseases,
+including Alzheimer's disease and cancer.83,84 Palmitoylation of immune checkpoint proteins PD‐1 and PD‐L1 has
+been shown to stabilize both proteins by preventing lysozyme‐dependent degradation.85 Inhibitors targeting PD‐1
+palmitoylation site may be attractive therapeutics in developing orally bioavailable small molecular drugs. Taken
+together, many PTM modified protein isoforms are highly associated with disease development and progression. It
+is therefore interesting to design drugs targeting disease relevant PTM protein isoforms. To further elaborate this
+idea, we highlighted the following unique advantages of PTMs which can further support our opinion in the
+applications of PTMI‐DD targeting PTM isoforms to extend biological space in drug design.
+2.1
+|
+Versatile modes of PTMs play diverse functions
+It is estimated that there are 20,500 human genes (https://www.genome.gov/12011238/an-overview-of-the-
+human-genome-project/) or even less, about 19,000,86 which can possibly transcribe into approximately 1 million
+proteins.87 Two factors contribute to the phenomenon of protein diversifications, mRNA splicing,88 and PTMs. The
+latter can convert the 15 natural amino acids into 140 building blocks by covalent modifications.89,90 There are
+more than 670* PTM modification types91,92 on about 909000 sites. Among, the well‐known examples include
+phosphorylation, acetylation, N‐linked glycosylation, O‐linked glycosylation, hydroxylation, methylation, and ubi-
+quitination (Figure 2A). Protein residues can be modified at one single site or multiple sites by the same or different
+PTMs. Meanwhile, different degrees of modifications at single site are also observed. The most well‐known ex-
+ample is the residue lysine in histone H3 or H4, which can be mono‐, di‐, tri‐methylated93 corresponding to
+different functionalities. For example, the degree of methylation on H3 Lys9 can alert chromatin structure, protein
+recruitment, and regulate gene expression levels.94 All those combinations create a higher complexity of biological
+space with dynamic properties, coordinating protein functions as well as PPIs.87,95 The diversity can also be proved
+by its existence in 9 different species. Besides, almost every biological process can be regulated directly or
+indirectly by PTMs on amino acid side chains, backbones, or termini.57
+Clinical studies have proved that protein PTMs are prevalent in various diseases (Figure 2A). Importantly,
+besides kinase inhibitors, targeting protein involving other PTM modifications has been successful in developing
+drugs for disease treatments.51,96,97 This is particularly the case in developing drugs against various epigenetic
+targets. For example, HDAC inhibitors, vorinostat, romidepsin, belinostat, and panobinostat have been approved
+by US FDA as for the treatment of cutaneous T cell lymphoma, and peripheral T‐cell lymphoma or relapse/
+refractory
+multiple
+myeloma.98–100
+Recently,
+tazemetostat,
+the
+first‐in‐class
+inhibitor
+of
+histone
+lysine
+n‐methyltransferase enhancer of zeste homolog 2 (EZH2), has been approved by FDA for the treatment of
+epithelioid sarcoma, a rare soft tissue cancer.101 Bromodomain and extraterminal domain (BET) proteins bind
+*Exact PTM types is 676 based on the release of Uniprot.org, 2020\_05 of October 7, 2020, https://www.uniprot.org/docs/ptmlist.txt.
+1706 |
+MENG ET AL.
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+specifically to acetylated histones and contribute to the pathogenesis of cancer and other diseases through their
+roles in transcription regulation. Many potent and selective inhibitors such as CPI‐0610, ABBV‐075 (Mivebresib),
+CC‐90010, and GSK525762 (Molibresib) have been developed.102–106 Some of them have been reported promising
+efficacy results in phase I or phase II clinical studies against multiple types of cancers.109,107,108 In addition to
+histone or nonhistone methylation, DNA and RNA methylation has recently been implicated in the development of
+many diseases such as cancers including leukemia, HCC, and lung cancers, and neurological diseases such as
+autism.56,112,110,111 In particular, N6‐methyladenosine (m6A) RNA modification has gained significant attention due
+to its role in leukemia,113–115 and many types of solid tumors.56,116 Accordingly, targeting N6‐methyladenine by
+downregulating DNA demethylase ALKBH1 inhibited tumor growth and extended survivor of mice bearing patient‐
+derived human glioblastoma,117 further supporting the notion of DNA N6‐methylation as a potential therapeutic
+target for glioblastoma. Protein ubiquitylation is a fundamental PTM critical for all cellular functions such as cell
+growth and apoptosis at both transcription and translation levels.118 Aberrant protein ubiquitination has been
+FIGURE 2
+Biological functions, disease relationships of PTMs, and PTM databases. (A) The biological functions
+and pathogenesis roles of PTMs. The well‐known examples of PTMs are listed in the middle panel. The common
+functions of PTMs are listed on the left while the disease pathogenesis in which PTMs are involved are listed on
+the right. (B) The PTM databases have largely enriched the PTMs related studies and discovery of disease‐relevant
+isoforms. PTM, posttranslational modification [Color figure can be viewed at wileyonlinelibrary.com]
+MENG ET AL.
+| 1707
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+associated with many diseases including cancer and Alzheimer's disease.119 Drugs targeting protein ubiquitylation
+systems such as bortezomib and Carfilzomib of proteasome inhibitors and thalidomide and its analogs of cereblon
+protein binders have been approved for multiple myeloma and other types of cancer treatment.120,121 Additionally,
+protein glycosylation is another important biological modification which is essential for many cellular functions
+such as signaling transduction, protein stability, transcription regulation, and cell survival.122–124 Glycans asso-
+ciated with the cell surface receptors could substantially influence the structure and function of proteins through
+conformational change, protein turnover modulation, and intermolecular interactions. Dysregulation in protein
+glycosylation has been associated with the progression of many diseases such as cancer, inflammation, and neu-
+rodegenerative diseases. With the advancement of glycosylation engineering against protein and cell lines, anti-
+bodies targeting glycosylated proteins or glycan now become a popular strategy in developing biologic drugs
+specifically interrogating tumor cells, immune cell,s or other disease cells.124
+In parallel to clinical advancement, basic research has uncovered the significant roles of PTMs in disease
+pathogenesis. To name a few, a very recent study just identified the MYST family protein acetyltransferase bound
+to ORC 1 (HBO1, also known as KAT7 or MYST2) as a novel maintainer of leukemia stem cells. HBO1 inhibition by
+a potent chemical probe, WM‐3835, reduced tumor growth in a broad range of human cell lines and primary AML
+cells from patients, suggesting the therapeutic potential of HBO1 for AML.125 The protein histidine phosphatase,
+LHPP (phospholysine phosphohistidine inorganic pyrophosphate phosphatase) was identified as a tumor sup-
+pressor in HCC, indicating certain histidine kinase inhibitors could be potential therapeutics for the treatment of
+liver cancer.126 Prenylation modifications by isoprenoid lipids lead to carboxyl terminal CAAX box proteins in
+which the cysteine residue is further modified by farnesyltransferase or geranylgeranyltransferase. Targeting
+prenylation with small molecule inhibitors has been proposed as a strategy to treat cancers, infectious diseases,
+and inflammation.127,128 PTM modifications can also regulate viral infection, making PTM related targets as a
+promising direction for developing novel anti‐infection drugs.129–132 Ebola's viral protein 35 (VP35) plays multiple
+functions important for virus replication and virulence. Its modifications such as glycosylation and phosphorylation
+have been reported to modulate the interactions with other virus proteins or human proteins critical for spreading
+and eroding host immunity.133 Recently, a novel allosteric site of VP35, which was believed to be undruggable, was
+identified with Markov state model (MSM) based molecular dynamics (MD) simulations and the experimental
+analysis, providing a new approach to develop anti‐Ebola drugs.134 Another very interesting and significant finding
+is the discovery of Plasmodium falciparum cyclin‐dependent–like kinase (PfCLK3) as a drug target for malarial
+elimination. PfCLK3 plays an important role in parasite RNA splicing and its inhibition by a highly selective inhibitor
+not only kills the live parasite but also prevents the infection of mosquitoes, suggesting CLK3 as a promising target
+potential for a cure of devastating malaria in the future.135 Together, proteins involving various PTM modifications
+related to disease pathogenesis are emerging targets toward new treatment directions for many diseases.
+Considering PTMs can covalently modify various proteins and through which to precisely regulate the func-
+tions of target proteins, we can reason that a specific PTM may display preference over some substrates than
+others.52,136 The PTMs can recognize a contiguous motif around the modification site by a consensus sequence,
+which is evolutional conserved across orthologs.137 Generally, PTMs preferred sites can be categorized into three
+major groups: well‐defined secondary structures; intrinsically disordered regions, where the microstate cannot be
+described by a single dominant one138–140 and PPI interfaces.141 The region for specific molecular recognition is
+denoted as specificity determinant residues (SDRs)137 or molecular recognition features.141 The SDRs of kinases
+are often mutated in cancer shedding lights on the design and discovery of selective inhibitors.137 In contrast, if we
+can restore the main functions of the PTMs in the targeting proteins, therapeutic purposes can be achieved as well.
+PTMs not only can regulate the protein's structure‐function diagram by changing intramolecular interactions,
+but also can affect PPI networks by influencing intermolecular interactions. Protein stability is also a property of
+great importance that can be affected by covalent modifications, providing a potential way to switch on or off some
+biological effects142 by introducing the covalent modifications. Moreover, PTMs have been reported to participate
+in disease pathogenesis. Taking the mostly studied histone methylation for example, studies have suggested the
+1708 |
+MENG ET AL.
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+strong correlation of histone methylation with various types of cancers, including prostate cancer, lung cancer,
+kidney cancer, pancreatic cancer, gastric adenocarcinoma cancer, ovarian cancer, lymphomas, and colon adeno-
+carcinomas.110 There are 26 ongoing clinical trials targeting DNA methylation or histone methylation as re-
+ported.56 Additionally, PTM enzymes themselves represent a large population of targeting proteins. For instance,
+the kinase family (known as phosphate group transfer) consists of 512 enzymes in human according to Uniprot
+Database143 as the date of October 7, 2020, which has become the second most important drug target family after
+G‐protein‐couple receptor (GPCR) for drug development.144 Conventionally, PTMs related drug design only fo-
+cuses on targeting PTM enzymes. However, PTM modified protein isoforms could come with much higher abun-
+dance with more diverse binding sites, potentially represent a larger biological space remaining to be explored. The
+PTMs, which are in charge of introducing or maintaining covalent modifications of various macromolecules, enable
+the delicate and precise regulations of the biological processes with the protein‐level isoforms. Compounds tar-
+geting PTM modifications or introducing covalent modifications will impact less normal biological processes and
+functions due to high selectivity. Therefore, small molecules hijacking the PTMs can expand the dimensions of
+biological space to a great extent.
+2.2
+|
+Predictable PTMs enable target profiling
+Owing to the importance of PTM isoforms in regulating biological processes, many databases have been proposed
+to characterize and identify substrate site of a specific PTM, which largely enriched the PTM research (Figure 2B).
+As the aberrant states of PTMs are frequently implicated in human diseases, a well‐curated database PTMD,
+containing PTMs that are associated with human diseases, provides valuable information for both academic re-
+search and clinical use.53 According to ActiveDriverDB, an estimated 21\% of disease‐associated amino acid sub-
+stitutions corresponding to missense single nucleotide variants are located in protein PTM sites.145 This database
+provides detailed visualization, filtering, browsing, and searching options for studying PTM‐associated mutations.
+As a comprehensive database of experimentally verified PTMs, dbPTM (http://dbptm.mbc.nctu.edu.tw/) summar-
+ized data from several databases with annotations of potential PTMs for all UniProtKB protein entries. It also
+compiled a nonhomologous benchmark data set, contributing to the evaluation of the predictive power of the
+increasing PTM prediction methods.146 Through mapping PTM sites from dbPTM database146 to proteins with
+available three‐dimensional (3D) structural information in the Protein Data Bank (PDB)147 (https://www.rcsb.org/),
+the integrated analytical platform CruxPTM76 (http://csb.cse.yzu.edu.tw/CruxPTM/) delineated the structural
+correlations between PTM sites and ligand‐binding or PPI sites. Indeed, an increasing number of studies are
+uncovering the evidence of PTMs in regulating drug–target interactions. As the most studied PTM, the phos-
+phorylation data available from the PhosphoSitePlus database148 (https://www.phosphosite.org/homeAction.
+action) was cross‐referenced with the 3D structures of target proteins. For nearly 30\% of those, the phosphor-
+ylation site is within 12 Å of the small molecule binding site, in which it would likely alter small molecule binding
+affinity to further provide directions for molecular optimization.149
+With the rapid development of PTM databases, many efforts have been devoted to the PTM predictions in the
+fields of proteomics and bioinformatics. A unified user interface for PTM prediction and a sequence‐based pre-
+diction method were proposed, respectively.150 The latter provided insights into the structure–function re-
+lationship within the context of multi‐PTMs interplays.141 Moreover, this study also supports the idea that the
+intrinsic disorder sequence plays a vital role in PPIs in eukaryotes, because of the positional biased preference of
+shared PTMs sites for disordered regions. Among various types of other PTM predictions, residue specific covalent
+predictions are also of great significance, especially when probing novel binding pocket for covalent inhibitors, and
+searching for disulfide bond formation to stabilize protein structure in structural biology and protein engineering.
+Cysteine is one of the least abundant natural residues and has special roles owing to its reactivity, polarizability,
+and high occurrence in active sites of proteins.151 All the databases and state of the art in the computational
+MENG ET AL.
+| 1709
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+methods enable the prediction of the possibility of PTM of macromolecules, paving a way for drug design and
+development.
+Conventional machine learning (ML) algorithms including support vector machine (SVM),152–158 radial basis
+function kernel,159,160 nearest neighbour,152,161,162 hidden Markov model163,164 and so on,165,166 have been uti-
+lized for PTMs modification type prediction as well as that of modification sites. Because of the tremendous
+success of ML algorithms in computer vision (CV), natural language processing (NLP),167,168 disease diag-
+nosis,169,170 robotics,171 physics,172,173 molecular science,174,175 and drug discovery,176,177 many ML models have
+been developed and widely used for PTMs site prediction apart from proteomics and bioinformatics studies. Due to
+the limitations of one specific ML algorithm, the ensemble learning methods are used to build the models, where
+the use of multiple learning algorithms other than standalone one could improve the predictive outcomes. Case
+studies have utilized, random forests157 or ensemble random forest,158 AdaBoost,178 light gradient boosting ma-
+chine,160 and bagging179 to gain better prediction performance. These ML algorithms have been successfully used
+to predict the binding site of acetylation,180 methylation,181 malonylation,55 and sumoylation.182 Recently, a deep
+learning based webserver, named as MusiteDeep, has provided a convolutional neural network (CNN) model for
+protein PTM site prediction and visualization with advantages in accuracy, speed, and scale.183 Several reasons are
+accounted for the success of ML in PTMs prediction. First, with the rapid development of mass spectrum, liquid
+chromatography, radioactive chemical method, chromatin immune precipitation, and other experimental techni-
+ques, the size and quality of data have been improved significantly. Importantly, the ML algorithms accuracy is
+promoted by more and more publicly accessible raw experimental databases. Second, the rapid development of ML
+algorithms within its ML community provides more flexible and powerful tools. Third, most methods/tools/plat-
+forms are accessible to PTMs research field as most of them are open source for most of the state‐of‐the‐art ML
+algorithms. This lowers the barrier of using ML algorithms for biologists without concerning the theoretical
+mathematical principles of algorithms.
+In addition to the above progress, manipulation and understanding the biological function of PTM protein
+isoform can be achieved through PTM site‐specific installation of covalent PTM modification on wild type pro-
+teins.184 Currently, chemical methods185,186 or genetic methods have been successfully developed to incorporate
+many different PTM modifications including phosphorylation,187,188 glycosylation,189,190 ubiquitination, lipidation,
+acetylation,191 methylation,192 ADP‐ribosylation, sulfation,193,194 SUMOylation,195 nitro alkylation,196 and oxida-
+tion of cysteines.197 There are three types of chemical biology methods allowing covalent modifications, especially
+for histone, namely chemical mutagenesis, protein semisynthesis, and genetic code expansion.198 The first way to
+install PTM tags on proteins is by chemical modification in a stepwise manner.199 Two complementary strategies of
+synthetic chemistry, namely convergent assembly and linear/segment assembly, have been used to incorporate
+phosphorylation, glycosylation, and prenylation.200 Regardless of its chemical accessibility, chemical synthesis
+methods are limited to 40–50 aa.200 The main challenge of introducing PTM covalent tags is the chemical se-
+lectivity, the ability to react with one or one type of residues while others remain unchanged,201 where reactivities
+and efficiencies also play significant role. Most of the current methods for PTM incorporation on proteins are
+based on metal‐catalyzed reactions, which result in the usability in cellular environments as metals can interfere
+physiological conditions/homeostatic. It has been proposed that bio‐orthogonal techniques can help with PTM tag
+incorporation185 which can increase its reaction selectivity and biocompatible in a native living environment with
+no cytotoxic byproducts produced.202–204 The second method, genetically directing the site‐specific incorporation
+of PTM tags,205 seems more promising which enables the in vivo chromatin biology. Various platforms, genetic
+code expansion methods or its variants have been developed to install sulfation,193 olefin,205 methylation,206 and
+phosphorylation.187,188,195 These approaches are efficient and site‐specific, providing powerful tools to study
+functions of a specific PTM protein isoform. Recently, a generalization strategy, posttranslational mutagen-
+esis,199,207,208 was proposed by using C(sp3)‐C(sp3) bond‐forming radical reactions.199 Posttranslational muta-
+genesis displays excellent site selectivity and regioselectivity (>98\% β γ), time efficiency, compatible with a board
+spectrum of macromolecules (all α, α/β folds, all β, receptor, enzyme, antibody) and untouching biological functional
+1710 |
+MENG ET AL.
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+groups.199,207,208 Now, these methods have been used in a chemical biology way to understand the biological
+functions of PTM isoforms209 through direct protein‐engineering.210 A widely used case is the installation of
+fluorescent dyes on proteins, allowing the measurements of physiological parameters with optical techniques.184
+The main therapeutic usage of protein modification is to improve the efficacy of recombinant protein therapeutics
+and case studies have been successfully reported on antibody conjugation for the delivery of cytotoxic drugs.184
+Together, the advancement of affordable chemical, regioselective, and site‐specific modification of proteins pro-
+vided powerful tools to investigate functions of PTM protein isoforms and their potential therapeutic applications.
+Importantly, the availability of large scale homogeneous recombinant PTM protein isoform can make in vitro high
+throughput compound library screen as a feasible approach in searching for selective and active chemical mole-
+cules against the isoform.
+2.3
+|
+PTMs induced dynamics adds new dimensions for drug discovery
+It is well known that protein dynamics is of great interest for biologists and medicinal chemists because protein
+functions through a plethora of conformational changes. The in‐depth characterization of protein structure and
+dynamics is fundamental to understand how the conformational diversity of these molecular machines plays roles
+in diverse functions in the living cell, such as allosteric regulation, signal transduction, PPIs, and even evolution.
+However, protein dynamics, mainly used to understand the atomic‐level mechanisms nowadays, is not directly or
+systematically considered in most cases of SBDD, or rational drug design. Without considering protein dynamics,
+SBDD, which only uses the energy minimized protein conformation from the X‐ray structure, may end up with
+similar scaffolds lacking chemical diversity. It is, therefore, challenging for medicinal chemists to improve the
+potency and selectivity of inhibitors based on the similar lead compounds. However, in living cells PTMs will alter
+the energy landscape of protein conformations by introducing covalent bound markers. PTMs could reflect both
+the specific location and time point of modifications on proteins in a specific biological process, adding a new
+dimension of time into the biological space. In addition, different chemical types of PTMs elicit different structural
+alterations, thus the effects of combinatorial codes of PTMs are vastly larger and under‐explored than previously
+believed. From an evolutionary standpoint, multiple PTM sites, types and combinations could be an advantageous
+route to expand proteome complexity with little evolutionary cost. PTMs can activate or inhibit enzymatic activity
+through allosteric conformational changes, facilitate the recognition of binding partners, promote protein‐protein
+association and dissociation, and induce order‐disorder transitions. Protein dynamics introduced by PTMs herein
+can be taken into the considerations to reform the static SBDD into a dynamic practice, therefore extremely
+enlarging the biological space. Thus, PTMI‐DD based on different PTM isoforms has the potential to provide much
+more diverse scaffolds for further drug development.
+From the standpoint of drug design, the PTM sites can be categorized into two classes based on the
+relationship between PTM locus and protein active sites, namely orthosteric PTMs which occur near the
+active sites, and allosteric PTMs which are far away from the active sites.211 Due to the presence of
+orthosteric PTMs, the shape of the active site, charge distributions, or other properties could bechanged,
+making the PTM isoforms more suitable for the substrate or repelling the substrate. By contrast, the
+allosteric PTMs affect protein activity with conformational fluctuations locally or globally, by perturbing the
+active sites through the distant modification sites. The covalent linkage of a large and often charged group
+perturbs the immediate molecular environment. The side chains of the surrounding residues must make
+rearrangement to accommodate the interactions by abandoning existing contacts and reforming new
+contacts. This effect could propagate to surrounding or even distal areas and lead to further structural
+rearrangement. In such a way, the allosteric effect owing from a PTM perturbation could be amplified to the
+whole structure. Eventually, the propagation induced by allosteric PTMs reaches the active site to
+specifically upregulate or downregulate the activity of the proteins.
+MENG ET AL.
+| 1711
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+Previous studies have investigated the effects introduced by PTMs on the protein conformational structures
+and dynamics using X‐ray data and nuclear magnetic resonance (NMR) data. Through the statistical analysis of local
+and global RMSDs between modified (with at least one PTM), and unmodified PDB chains of the same protein, it
+has been discovered that the N‐glycosylation and phosphorylation induce significant yet not extreme changes to
+protein structure, with a larger influence from phosphorylation.212,213 Meanwhile, it has been observed that
+disorder‐to‐order transition could be induced by the modifications of phosphor‐serine/‐threonine, mono‐/di‐/tri‐
+methyllysine, sulfotyrosine, 4‐carboxyglutamate, and potential 4‐hydroxyproline.214 By investigating the re-
+lationship between PTMs and the local backbone conformation changes of modified residues, it is indicated that
+PTMs could either stabilize or destabilize the backbone structure, at a local and global scale, depending on the
+PTM types.215 For example, by comparing with the structures of unmodified cyclin‐dependent kinase 2 (CDK2),
+phosphorylation at Thr160 would rigidify (potential stabilization) the backbone (lower Neq and lower B‐factor)
+locally yet increase the deformation (potential destabilization) of two other regions, near Tyr14‐Tyr15, and near
+Tyr39, three other phosphorylation sites related to CDK2 activity and subcellular localization, respectively. The
+observed rigidity in the backbone could be attributed to the new H‐bonds and salt bridges introduced by the
+phosphorylation in the local neighborhood, leading to a conformational shift of the lowest valley in the energy
+landscape of the protein. In contrast, the methylation at His75 in actin has an opposite effect. This methylation
+induces a local increase of the backbone diversity at the PTM site region, highlighting a higher deformation of this
+part of the protein. Concerning ubiquitin structure, Ser65 phosphorylation alters Ub structure and generates two
+conformations in solution. The major conformation resembles Ub but has altered surface properties, and the
+second phosphorylated Ub carries a substantial conformational change which can affect ubiquitination reaction
+cascade.216
+Despite the crucial roles played by PTMs, their structural and dynamical effects of protein functions remain
+poorly understood, mainly due to the labile transient nature of most of these modifications and the lack of
+adequate laboratory experimental techniques to detect and characterize them. The ML algorithms mentioned
+above are valid methods to overcome some of these experimental limitations and have been successfully applied in
+predicting putative PTM sites, but they seldom provide any valuable information concerning the dynamic effects
+introduced by PTMs from a mechanistic point of view. Molecular modeling of PTMs combined with MD simula-
+tions, and coarse‐grained network models, is an interesting idea for probing the allosteric regulation underlying
+PTMs. Together, by exploring different protein conformations in specific biological process, the PTMI‐DD targeting
+orthosteric or allosteric specific PTM‐isoforms would greatly enlarge the biological space and contribute to ob-
+taining modulators with more selectivity.
+2.4
+|
+Progress of PTM specific targeting in drug discovery
+In the history of pharmaceuticals associated with PTMs, especially the “biopharmaceutical,” which normally en-
+compasses recombinant therapeutic proteins (including antibodies), usually bear some forms of PTMs in their
+natural forms and possess specific advantages. The PTMs mostly commonly associated with currently approved
+biopharmaceuticals, include glycosylation, carboxylation, hydroxylation, amidation, sulfation, and disulfide bond
+formation. Constructing artificial PTMs on proteins or peptides can improve the stability and bioavailability, and
+optimize the physiochemical pharmacokinetics (PK) profiles.200,217–219 Among, glycosylation has represented by
+far the most widespread and the most complex PTM in biopharmaceuticals, and this PTM can have several
+potential roles and/or effects upon the modified proteins. The sugar side chains can potentially stabilize a gly-
+coprotein and contribute to the druggability in several ways including enhancing its solubility, shielding hydro-
+phobic patches on its surface, protecting from proteolysis, and directing participation in intrachain stabilizing
+interactions. Glycosylation can also affect local protein secondary structure, help direct folding of the polypeptide
+chains, and participate in the targeting/trafficking to the destination.220,221 Importantly, rational designed
+1712 |
+MENG ET AL.
+ 10981128, 2021, 3, Downloaded from https://onlinelibrary.wiley.com/doi/10.1002/med.21774 by Peking University Health, Wiley Online Library on [28/04/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+modifications such as removal of fucosylation are proved approaches in improving efficacy of an antibody through
+antibody‐mediated cellular cytotoxicity (ADCC).222 Another well‐known example is widely used diabetes treat-
+ment drug Semaglutide, an GLP‐1 agonist with a fatty acid modification at lysine 26 of the peptide to extend half‐
+life of the drug by binding to albumin.223 Additionally, immunotherapies targeting programmed cell death protein 1
+(PD‐1) and programmed cell death 1 ligand 1 (PD‐L1) immune checkpoints have revolutionized the cancer
+treatment. Although cancer patients showed remarkable response to immune checkpoint antibody inhibitors, many
+of them either not respond or become resistance to the treatment. PD1 and PD‐L1 are highly glycosylated proteins
+and such modifications are important for their biological functions. Antibodies targeting specific glycosylated sites
+of PD‐1 and PD‐L1 have shown improved antitumor immunity in mice tumor models, suggesting an interesting
+direction to develop more efficacious next‐generation immune checkpoint inhibitors.224,225
+In small molecule drug design, covalent inhibitors by mimicking the mode of targeting PTMs can result in the
+same therapeutic effects with posttranslational protein products. A well‐known feature of covalent inhibitor is the
+improved binding affinity and higher selectivity, which is often achieved by the bonding formation with non-
+conserved residues.226–228 Thus, unlike the conventional noncovalent competitive inhibitors, covalent modulators
+can bring in less off‐targets effects due to higher selectivity. Moreover, the covalent modifications on activate sites
+can capture the proteins in specific conformation, regulating the biological functions through this locked/stabilized
+conformation involved in specific signaling pathways. For example, the Bruton's tyrosine kinase inhibitor im-
+brutinib is reported to increase the selectivity and potency by targeting the cysteine of ATP‐binding sites of
+kinases.229 The covalent inhibitors have also displayed advantages over drugs of noncovalent competitive me-
+chanism for longer residence time (less dosing),230,231 reducing the risk of drug resistance,232–234 and achieving
+personalized therapy by only targeting the acquired mutations.229 Moreover, we can also design covalent drugs
+targeting solvent exposed or shallow pockets which is typically challenging for designing noncovalent drugs.235
+More guidelines and technics over covalent inhibitors can be found from those excellent reviews.228,232,236–238
+3
+|
+POTENTIAL DIRECTIONS OF TARGETING PTM ISOFORMS IN DRUG
+DISCOVERY
+Given the strong rationale of PTMs in drug design, we propose the following strategies as feasible approaches in
+extending both c
+\end{document}
