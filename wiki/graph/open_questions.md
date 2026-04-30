@@ -51,10 +51,6 @@ _Auto-generated open questions. Do not edit._
 - [paper/ubiquitin-ligases-oncogenic-transformation-cancer-therapy] What is the role of non-degradative ubiquitylation (K63, K11, mono-ubiquitylation) in cancer, and is it druggable in ways that K48/proteasome biology is not?
 - [paper/ubiquitin-ligases-oncogenic-transformation-cancer-therapy] For E3s with substrate sets spanning both tumour suppressors and oncoproteins (for example, FBXW7 targeting MYC, cyclin E, mTOR), can substrate-selective inhibitors be engineered to dial in only the desired axis?
 - [paper/ubiquitin-ligases-oncogenic-transformation-cancer-therapy] How does the unfolded protein response and ER-stress arm of ubiquitylation feed back into tumour metabolism and therapy resistance?
-- [paper/very-high-frequency-oscillations-main-peak] Are kHz QPOs in the main burst peak generic to magnetar giant flares, or peculiar to GRB 200415A?
-- [paper/very-high-frequency-oscillations-main-peak] Does the f1/f2 ratio reflect harmonics of a single magnetospheric mode, or distinct crustal overtones?
-- [paper/very-high-frequency-oscillations-main-peak] Can future instruments resolve the QPO in time-frequency space finely enough to distinguish reconnection vs. crustal-mode origin?
-- [paper/very-high-frequency-oscillations-main-peak] What is the connection between high-frequency main-peak QPOs and the lower-frequency (<150 Hz) tail QPOs seen in earlier galactic giant flares?
 - [concept/alphafold-db] Multimeric / complex predictions at proteome scale.
 - [concept/alphafold-db] Isoform-level structural coverage.
 - [concept/alphafold-db] Systematic small-molecule (ligand / cofactor) integration without breaking the modelCIF archive.
@@ -92,9 +88,6 @@ _Auto-generated open questions. Do not edit._
 - [concept/geometric-deep-learning] Routine integration of explainable-AI tooling into GDL pipelines for domain-expert audit.
 - [concept/invariant-point-attention] Generalising IPA to multi-chain / hetero-complex residue gases without losing the locality bias.
 - [concept/invariant-point-attention] Variants that fold in time or conformational ensembles instead of a single static structure.
-- [concept/magnetar-giant-flare] What triggers the main burst — crustquake, magnetospheric instability, or both?
-- [concept/magnetar-giant-flare] What sets the population statistics of giant flares relative to ordinary magnetar bursts?
-- [concept/magnetar-giant-flare] How generic are kHz quasi-periodic oscillations in the main burst peak?
 - [concept/pairformer-module] Can the triangle-attention quadratic-in-n cost be replaced by a linearised or sparse variant without losing accuracy on long complexes?
 - [concept/pairformer-module] Is the 4-block MSA module a generic-enough route for evolutionary information, or does it leave headroom for shallow-MSA improvements?
 - [concept/pairformer-module] Does the pairformer transfer to non-structure tasks (binding-affinity prediction, mutation-effect scoring) that consume pair representations?
@@ -117,8 +110,6 @@ _Auto-generated open questions. Do not edit._
 - [concept/protein-protein-interaction-interface] A continuous, probabilistic definition of "interface-ness" that integrates predicted-structure uncertainty.
 - [concept/protein-protein-interaction-interface] Handling ensembles: interfaces that exist only in a subset of conformations.
 - [concept/protein-protein-interaction-interface] Defining interfaces in highly disordered or fuzzy complexes.
-- [concept/quasi-periodic-oscillation] Whether kHz QPOs in magnetar giant flares originate from magnetospheric Alfvén-wave reconnection or from (magneto-)elastic crustal oscillations — both interpretations are viable for current data.
-- [concept/quasi-periodic-oscillation] How to combine QPO timing measurements across multiple detectors and energy bands to constrain neutron-star equation of state.
 - [concept/smiles-chemical-language-modelling] When is string-based generation preferable to graph-based generation, given the validity guarantees of SELFIES and the 3D awareness of equivariant GNNs?
 - [concept/smiles-chemical-language-modelling] Combining language-model pretraining with geometric / 3D priors at fine-tuning time.
 - [concept/smiles-chemical-language-modelling] Evaluating chemical language models on prospective rather than retrospective benchmarks.
@@ -132,7 +123,6 @@ _Auto-generated open questions. Do not edit._
 - [concept/ubiquitylation] Quantitative dissection of ubiquitin-pool sharing between proteasomal degradation, autophagy, and signalling.
 - [concept/yeast-two-hybrid-system] How to most efficiently combine Y2H, AP-MS, and proximity labeling to converge on a "ground-truth" human interactome?
 - [concept/yeast-two-hybrid-system] Can Y2H variants be engineered to recover transmembrane and lipid-bilayer-resident interactions at scale?
-- [claim/alfven-wave-magnetosphere-reconnection] Magnetar giant flares can produce kHz QPOs in the main burst peak via magnetospheric Alfven-wave reconnection (status: weakly_supported)
 - [claim/deep-learning-ensembles-outperform-classical-ml] Deep-learning ensembles with sequence-only input outperform feature-engineered classical ML for PTM site prediction across most PTM types (status: weakly_supported)
 - [claim/diffusion-based-generation-eliminates-need-equivariant] Diffusion-based atom-coordinate generation eliminates the need for equivariant frame-based structure modules (status: weakly_supported)
 - [claim/multi-omics-ml-network-pharmacology-enables] Integrating multi-omics data with machine learning and network-pharmacology models enables identification of multi-target therapeutic strategies that single-omics analysis cannot recover (status: weakly_supported)

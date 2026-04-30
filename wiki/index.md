@@ -56,11 +56,6 @@ papers:
     tags: [ubiquitin-ligase, e3-ligase, cancer, oncogenesis, tumour-suppressor, drug-target, review]
     importance: 4
     domain: Cancer biology / Molecular oncology
-  - slug: very-high-frequency-oscillations-main-peak
-    title: "Very-high-frequency oscillations in the main peak of a magnetar giant flare"
-    tags: [magnetar, giant-flare, QPO, neutron-star, gamma-ray, astrophysics]
-    importance: 4
-    domain: Astrophysics
 
 concepts:
   - slug: alphafold-db
@@ -111,10 +106,6 @@ concepts:
     title: "Invariant point attention (IPA)"
     tags: [attention, equivariance, se3, geometric-deep-learning, structure-module, alphafold]
     maturity: active
-  - slug: magnetar-giant-flare
-    title: "Magnetar giant flare"
-    tags: [magnetar, neutron-star, gamma-ray, astrophysics]
-    maturity: stable
   - slug: multi-omics-integration
     title: "Multi-omics integration"
     tags: [computational-biology, machine-learning, biomarker-discovery, network-pharmacology]
@@ -147,10 +138,6 @@ concepts:
     title: "Protein-protein interaction interface"
     tags: [protein-structure, protein-protein-interaction, structural-biology]
     maturity: stable
-  - slug: quasi-periodic-oscillation
-    title: "Quasi-periodic oscillation"
-    tags: [timing, neutron-star, accretion, magnetar, astrophysics]
-    maturity: stable
   - slug: smiles-chemical-language-modelling
     title: "SMILES chemical language modelling"
     tags: [smiles, chemical-language-model, generative-molecular-design, retrosynthesis, recurrent-neural-network, transformer]
@@ -177,9 +164,6 @@ people:
   - slug: arne-elofsson
     tags: [bioinformatics, structure-prediction, protein-complexes, alphafold2]
     affiliation: "Stockholm University; Science for Life Laboratory (SciLifeLab)"
-  - slug: castro-tirado
-    tags: [astrophysics, gamma-ray-bursts, magnetars]
-    affiliation: "Instituto de Astrofisica de Andalucia (IAA-CSIC), Granada; Universidad de Malaga"
   - slug: david-burke
     tags: [computational-biology, structural-bioinformatics, ppi]
     affiliation: "European Molecular Biology Laboratory, European Bioinformatics Institute (EMBL-EBI)"
@@ -231,12 +215,6 @@ ideas:
 experiments:
 
 claims:
-  - slug: alfven-wave-magnetosphere-reconnection
-    title: "Magnetar giant flares can produce kHz QPOs in the main burst peak via magnetospheric Alfven-wave reconnection"
-    tags: [magnetar, QPO, Alfven-waves, magnetic-reconnection, astrophysics]
-    status: weakly_supported
-    confidence: 0.55
-    domain: Astrophysics
   - slug: alphafold2-enables-large-scale-structural-modeling
     title: "AlphaFold2 enables large-scale structural modeling of human PPI network"
     tags: [alphafold2, protein-protein-interaction, interactome, structural-biology]
