@@ -41,7 +41,7 @@ AF3's diffusion module sits where AF2's structure module sat. It uses no equivar
 
 ## Linked ideas
 
-(none yet)
+- [[ptm-conditioned-ensemble-prediction]] — PTM-conditioned pair-rep scaling adapter on Boltz-2 will strengthen or contradict this claim depending on whether ensemble calibration succeeds without re-introducing equivariant machinery
 
 ## Open questions
 

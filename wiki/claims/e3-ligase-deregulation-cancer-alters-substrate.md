@@ -40,7 +40,7 @@ The claim applies most strongly to the well-studied E3s catalogued in the source
 
 ## Linked ideas
 
-(none yet — `/ideate` may add candidates such as substrate-selective cullin–RING inhibitors, PROTAC-recruiter discovery, or topology-specific Ub-chain therapeutics.)
+- [[ptm-aware-degrader-target-nomination]] — leverages context-dependent E3-substrate axis for PTM-isoform-selective degrader nomination
 
 ## Open questions
 

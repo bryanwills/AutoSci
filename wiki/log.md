@@ -16,3 +16,4 @@
 ## [2026-04-30] ingest | added papers/accurate-structure-prediction-biomolecular-interactions-alphafold | created: concepts/pairformer-module, concepts/diffusion-based-structure-prediction, concepts/biomolecular-complex-prediction-unified-deep-learning, claims/single-deep-learning-model-predict-diverse, claims/diffusion-based-generation-eliminates-need-equivariant, people/john-jumper, people/demis-hassabis, people/max-jaderberg, people/josh-abramson
 ## [2026-04-30] init | medpredict scaffold + 12 papers ingested in parallel; 12 worktrees fanned in; index/context-brief/open-questions rebuilt
 ## [2026-04-30] edit | removed off-topic magnetar paper s41586-021-04101 (5 wiki pages, 3 edges, raw + prepared sidecars)
+## [2026-04-30] ideate | direction: structure-aware PTM modelling for drug discovery | 3 ideas proposed (priorities 5/4/5), 2 ideas filtered out as failed (banlist) | maturity: warm

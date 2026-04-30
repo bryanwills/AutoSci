@@ -211,6 +211,36 @@ people:
     affiliation: "Sanford Burnham Prebys Medical Discovery Institute, La Jolla, California, USA; Technion Integrated Cancer Center, Technion – Israel Institute of Technology, Haifa, Israel"
 
 ideas:
+  - slug: chirality-aware-af3-diffusion
+    title: "Chirality-aware noise schedule for the AF3 diffusion module (eliminated)"
+    tags: [alphafold3, diffusion, chirality, equivariance, eliminated]
+    status: failed
+    domain: Computational Biology / ML for Science
+    priority: 1
+  - slug: ptm-aware-degrader-target-nomination
+    title: "PTM-aware degrader target nomination with ΔpTernary noise-floor calibration"
+    tags: [drug-design, ptm-isoforms, protac, ternary-complex, e3-ligase]
+    status: proposed
+    domain: Computational Biology / ML for Science
+    priority: 5
+  - slug: ptm-conditioned-ensemble-prediction
+    title: "PTM-conditioned pair-representation scaling for calibrated conformational ensembles"
+    tags: [alphafold, conformational-ensemble, ptm, structure-prediction, pair-representation]
+    status: proposed
+    domain: Computational Biology / ML for Science
+    priority: 4
+  - slug: ptm-resolved-structurally-modeled-interactome
+    title: "PTM-resolved structurally-modeled human interactome via ΔpDockQ-per-PTM"
+    tags: [alphafold-multimer, protein-protein-interaction, ptm, interactome, drug-target]
+    status: proposed
+    domain: Computational Biology / ML for Science
+    priority: 5
+  - slug: ptm-site-disorder-predictor
+    title: "AlphaFold-derived PTM-site disorder predictor (eliminated)"
+    tags: [ptm, alphafold, plddt, idr, eliminated]
+    status: failed
+    domain: Computational Biology / ML for Science
+    priority: 1
 
 experiments:
 

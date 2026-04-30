@@ -45,7 +45,7 @@ The 3,137 high-confidence models include 1,371 with no homology to any known str
 
 ## Linked ideas
 
-(none yet)
+- [[ptm-resolved-structurally-modeled-interactome]] — extends the AF2-Multimer interactome with PTM stratification (ΔpDockQ-per-PTM operator)
 
 ## Open questions
 

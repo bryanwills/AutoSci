@@ -39,7 +39,7 @@ For protein structure predictors that take a multiple sequence alignment (MSA) a
 
 ## Linked ideas
 
-Pending — `/ideate` may surface ideas for combining MSA conditioning with language-model-derived priors, or for synthetic-MSA augmentation under controlled covariation.
+- [[ptm-conditioned-ensemble-prediction]] — tests whether MSA-orthogonal pair-rep scaling can recover ensemble populations that MSA depth alone cannot, probing the boundary of this claim
 
 ## Open questions
 

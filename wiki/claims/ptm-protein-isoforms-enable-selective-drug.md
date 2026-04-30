@@ -47,7 +47,8 @@ Confidence is set at 0.6 (weakly_supported) because: the claim is supported by c
 
 ## Linked ideas
 
-Pending — to be populated by `/ideate` runs that propose PTM-aware structure-prediction or PTM-isoform target nomination ideas.
+- [[ptm-aware-degrader-target-nomination]] — proposes ΔpTernary noise-floor-calibrated PTM-isoform-selective degrader nomination
+- [[ptm-resolved-structurally-modeled-interactome]] — proposes ΔpDockQ-per-PTM operator across binary interactome to nominate druggable PTM-dependent PPI hotspots
 
 ## Open questions
 
