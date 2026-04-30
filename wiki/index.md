@@ -11,6 +11,12 @@ concepts:
   - slug: yeast-two-hybrid-system
   - slug: binary-protein-protein-interaction
   - slug: ccsb-hi1-human-interactome-v1
+  - slug: highly-accurate-protein-structure-prediction-alphafold
+
+concepts:
+  - slug: evoformer
+  - slug: invariant-point-attention
+  - slug: frame-aligned-point-error
 
 topics: []
 
@@ -28,3 +34,9 @@ claims:
 
 claims:
   - slug: high-throughput-y2h-recovers-novel-disease-associated-ppis
+  - slug: john-jumper
+  - slug: demis-hassabis
+
+claims:
+  - slug: deep-learning-predicts-protein-structure-atomic
+  - slug: msa-depth-bounds-structure-prediction-accuracy
