@@ -1,20 +1,21 @@
 ---
-description: Multi-phase research idea generation pipeline: landscape scan → dual-model brainstorm → first-pass filter → deep validation → write to wiki
-argument-hint: "[research-direction-or-topic] [--max-ideas N] [--skip-validation] [--auto]"
+description: Multi-phase research idea generation pipeline: landscape scan → dual-model brainstorm → filter & validation → pilot → write to wiki
+argument-hint: "[research-direction-or-topic] [--max-ideas N] [--skip-validation] [--skip-pilot] [--auto]"
 ---
 
 # /ideate
 
 > Generates high-quality research ideas through a 5-phase pipeline, grounded in the wiki knowledge base and external search.
 > Phase 1 scans the research landscape (wiki + WebSearch + S2), Phase 2 runs a dual-model brainstorm (Claude + Review LLM independently),
-> Phase 3 applies a first-pass filter (feasibility + quick novelty check), Phase 4 performs deep validation (calls /novelty + /review),
+> Phase 3 applies first-pass filter + deep validation (feasibility, novelty, review), Phase 4 runs pilot experiments on surviving ideas,
 > Phase 5 writes to the wiki (ideas/ + graph edges), including eliminated ideas (failure reasons recorded as anti-repetition memory).
 
 ## Inputs
 
 - `direction` (optional): research direction, keywords, or specific problem description. If omitted, automatically selects the most valuable direction from open_questions.md.
 - `--max-ideas N` (optional, default 3): maximum number of ideas to write to the wiki
-- `--skip-validation`: skip Phase 4 deep validation (fast mode: Phase 1–3 + Phase 5 only)
+- `--skip-validation`: skip Phase 3 Step 2 deep validation (skip /novelty and /review; fast mode: first-pass filter only)
+- `--skip-pilot`: skip Phase 4 pilot experiments (fast mode: Phase 1–3 + Phase 5 only)
 - `--auto`: fully automatic mode, no pause for user confirmation (used when called by /research)
 
 ## Outputs
@@ -117,23 +118,48 @@ Goal: generate ideas independently with Claude and Review LLM, exploiting the di
 
 1. **Claude generates 6–10 ideas**:
    - Input: landscape report + wiki gaps + active list + banlist
-   - Strategies:
-     - Cross-domain combination (method from Topic A + problem from Topic B)
+   - **Structured generation paths** — each idea must follow one of these four paths:
+
+     | Path | Name | Wiki input to read | Output form |
+     |------|------|--------------------|-------------|
+     | A | Incremental | `method.limitations` in `wiki/methods/*.md` | "Fix limitation L in method M" |
+     | B | Combination | `tradeoff_profile` of two methods under the same topic in `wiki/methods/*.md` | "Combine strengths of M1 + M2" |
+     | C | Innovation | Intersection of `assumptions` across N methods under the same topic in `wiki/methods/*.md` | "Break shared assumption P" |
+     | D | Cross-domain transfer | `mechanism` similarity of methods across different topics in `wiki/methods/*.md` | "Transfer mechanism M from domain X to Y" |
+
+     For each path, first extract the relevant wiki fields, then generate the idea. Every idea must declare which path (A/B/C/D) it comes from.
+
+   - Additional strategies (applied on top of paths A–D):
      - Fill gaps in the gap_map and topic/concept open-problem sections
-     - Refute or replace assumptions surfaced under `### Methodological gaps`
      - Known limitations of SOTA → improvement directions
-   - Each idea includes: title, hypothesis (1–2 sentences), approach sketch (3–5 sentences), `origin_gaps` (concept / topic slugs the idea targets), estimated feasibility (high/medium/low)
+   - Each idea includes: title, hypothesis (1–2 sentences), approach sketch (3–5 sentences), `origin_gaps` (concept / topic slugs the idea targets), estimated feasibility (high/medium/low), generation_path (A/B/C/D)
 
 2. **Review LLM independently generates 4–6 ideas** (run in parallel):
    ```
    mcp__llm-review__chat:
      system: "You are a creative ML researcher brainstorming research ideas.
               Generate novel, concrete, and feasible ideas based on the given context.
+              Each idea MUST follow one of the four structured generation paths below.
               For each idea, provide: title, hypothesis (1-2 sentences),
-              approach sketch (3-5 sentences), and feasibility assessment."
+              approach sketch (3-5 sentences), feasibility assessment,
+              and generation_path (A/B/C/D)."
      message: |
+       ## Structured Generation Paths
+
+       Each idea must follow exactly one of these paths:
+
+       | Path | Name | Wiki input | Output form |
+       |------|------|------------|-------------|
+       | A | Incremental | method.limitations | "Fix limitation L in method M" |
+       | B | Combination | tradeoff_profile of two methods under same topic | "Combine strengths of M1 + M2" |
+       | C | Innovation | Intersection of assumptions across N methods under same topic | "Break shared assumption P" |
+       | D | Cross-domain transfer | mechanism similarity across different topics | "Transfer mechanism M from domain X to Y" |
+
        ## Research Landscape
        {landscape report from Phase 1 — gaps, SOTA, trends}
+
+       ## Methods (for paths A–D)
+       {wiki/methods/*.md — limitations, tradeoff_profile, assumptions, mechanism fields}
 
        ## Knowledge Gaps
        {gap_map entries}
@@ -147,6 +173,7 @@ Goal: generate ideas independently with Claude and Review LLM, exploiting the di
        Generate 4-6 novel research ideas that address the gaps above.
        Focus on ideas that are: (1) genuinely novel, (2) feasible within 3-6 months,
        (3) directly address a knowledge gap.
+       Each idea MUST declare its generation_path (A/B/C/D).
    ```
 
 3. **Merge and deduplicate**:
@@ -156,11 +183,11 @@ Goal: generate ideas independently with Claude and Review LLM, exploiting the di
    - Remove ideas that heavily duplicate the active list
    - Output: 8–12 candidate ideas
 
-### Phase 3: First-Pass Filter
+### Phase 3: Filter & Validation
 
-Goal: quickly eliminate ideas that are clearly infeasible or insufficiently novel.
+Goal: eliminate infeasible or insufficiently novel ideas, then deeply validate survivors.
 
-Apply the following checks to each candidate idea:
+**Step 1 — First-pass filter** (apply to all 8–12 candidates):
 
 1. **Feasibility check**:
    - Are GPU/compute requirements within reasonable range? (reference experiment setups already in the wiki)
@@ -182,23 +209,21 @@ Apply the following checks to each candidate idea:
    - Eliminate if: feasibility=low AND quick novelty screening found similar published work
    - Eliminate if: highly correlated with a failure_reason in the banlist
    - Retain if: feasibility >= medium AND not eliminated
-   - Output: 4–6 surviving ideas (ranked)
+   - Output: 4–6 surviving ideas
 
-### Phase 4: Deep Validation
+**Step 2 — Deep validation** (apply to surviving ideas; skip if `--skip-validation` is set):
 
-(Skip if `--skip-validation` is set; proceed directly to Phase 5.)
-
-Apply deep validation to the top 3 ideas from Phase 3:
+(Skip if `--skip-validation`: proceed directly to Phase 4 with default priority = 3 for all survivors.)
 
 1. **Call /novelty `--write`** (one at a time):
    ```
-   For each top idea:
+   For each surviving idea:
    Skill: novelty
    Args: "<idea-slug>" --write
    ```
    The `--write` flag persists the resulting `novelty_score` (1–5) into the idea's frontmatter. Record the score for the IDEA_REPORT.
 
-2. **Call /review** (for top 2 ideas):
+2. **Call /review** (for top ideas):
    ```
    Skill: review
    Args: "<idea-full-description>" --difficulty hard --focus method
@@ -211,7 +236,40 @@ Apply deep validation to the top 3 ideas from Phase 3:
    - If novelty_score <= 2 → downgrade to "modify needed"
    - If review_score <= 4 → downgrade to "major issues"
 
-4. **If `--auto` is not set**: display ranked results in terminal, wait for user confirmation or adjustment
+4. **Post-validation filter**:
+   - Eliminate ideas with novelty_score <= 2 AND review_score <= 4
+   - Output: ranked survivors (passed both first-pass and deep validation)
+
+5. **If `--auto` is not set**: display ranked results in terminal, wait for user confirmation or adjustment
+
+### Phase 4: Pilot Experiments
+
+(Skip if `--skip-pilot` is set; proceed directly to Phase 5.)
+
+Goal: run lightweight pilot experiments on each surviving idea to detect obvious failures before committing to full experiments.
+
+**Per-idea pilot strategy** (based on `generation_path`):
+
+| Path | Pilot approach |
+|------|---------------|
+| A (Incremental) | Start from the original method's paper repo; apply the proposed fix and run a minimal evaluation. Compare against the original method to verify the limitation is addressed. |
+| B (Combination) | Implement the combined version of M1 + M2. Run on a small benchmark to check whether the performance/cost tradeoff reaches the expected balance (not dominated by either pure M1 or M2). |
+| C (Innovation) | Run existing methods under the new setting (where the shared assumption P is broken). Verify that they indeed fail or degrade, confirming the gap is real. |
+| D (Cross-domain transfer) | Implement the transferred mechanism in the target domain. Run a minimal evaluation to check whether the mechanism is compatible and produces non-degenerate output. |
+
+**Pilot requirements**:
+- **Reduced batch size**: use the smallest batch size that still produces meaningful gradients (typically 1/4 to 1/8 of the paper's reported batch size)
+- **Shortened training**: train to early-mid stage (10–30% of full training steps), not full convergence
+- **Goal**: detect obvious degradation or failure, NOT achieve SOTA. The window should be meaningful enough to compare proposed method vs. baseline, but short enough to save time.
+- **Comparison**: always include a baseline (the original method for path A, pure M1/M2 for path B, existing methods for path C, target-domain SOTA for path D)
+- **Output per pilot**: pass/fail verdict + brief metrics (e.g., "loss converged below threshold", "accuracy improved over baseline by X%", "method diverged after N steps")
+
+**Post-pilot decision**:
+- **Pass**: pilot shows positive signal — improvement over baseline, OR roughly on par with baseline. Since pilots are small-scale and short-term (not full convergence), matching baseline is already a good sign: it means the proposed method is not broken and the direction is worth a full experiment. Also passes if the gap is confirmed (path C: existing methods indeed fail under new setting).
+- **Fail**: pilot shows clear failure (divergence, significant degradation vs baseline, incompatibility) → idea eliminated with `failure_reason: "[pilot] <specific failure>"` (the `[pilot]` prefix distinguishes pilot failures from filter eliminations `[filter]` and post-experiment failures from /exp-eval)
+- **Inconclusive**: pilot is noisy or ambiguous → idea still proceeds to Phase 5 but flagged with `pilot_result: "inconclusive — needs full experiment"`
+
+**If `--auto` is not set**: display pilot results in terminal, wait for user confirmation on borderline cases
 
 ### Phase 5: Write to Wiki
 
@@ -243,11 +301,13 @@ Write the validated ideas to the wiki (including eliminated ideas, with their el
    ---
    ```
 
-   **Priority computation** (maps Phase 4 signals into the 1-5 scale):
-   - If `--skip-validation`: default `priority = 3`
+   **Priority computation** (maps Phase 3 validation signals into the 1-5 scale):
+   - If `--skip-validation`: default `priority = 3` (skip novelty/review scoring)
    - Otherwise start from `novelty_score` (1-5 from /novelty)
    - `+1` if `gap_alignment_bonus > 0` (directly targets a gap_map entry)
+   - `+1` if pilot passed (Phase 4 positive signal)
    - `-1` if `review_score <= 4` (major issues downgrade)
+   - `-1` if pilot result is inconclusive
    - Clamp to `[1, 5]`
 
    **Body sections** (exactly match `runtime/templates/ideas.md.tmpl` — do not rename):
@@ -282,7 +342,7 @@ Write the validated ideas to the wiki (including eliminated ideas, with their el
    - `status: failed`
    - `priority: 1` (eliminated ideas never block higher-priority work)
    - `date_resolved: YYYY-MM-DD` (today)
-   - `failure_reason: "[filter] <specific elimination reason>"` — the `[filter]` prefix distinguishes ideate-stage eliminations from post-experiment failures (which /exp-eval tags differently). Examples: `"[filter] highly similar published work exists: <paper-title>"`, `"[filter] insufficient feasibility: GPU requirements too high"`
+   - `failure_reason: "[filter] <specific elimination reason>"` or `"[pilot] <specific failure>"` — the prefix distinguishes ideate-stage eliminations: `[filter]` for Phase 3 filter eliminations, `[pilot]` for Phase 4 pilot failures. Post-experiment failures from /exp-eval use a different tag. Examples: `"[filter] highly similar published work exists: <paper-title>"`, `"[pilot] method diverged after 50 steps"`
    - Body `## Motivation` and `## Hypothesis` should still be filled (so future banlist matching has content); `## Approach sketch` may be brief; `## Expected outcome` and `## Risks` can note why the idea was eliminated
    - These failed ideas become the banlist for future ideate runs
 
@@ -319,22 +379,23 @@ Write the validated ideas to the wiki (including eliminated ideas, with their el
    - Direction: {direction}
    - Phase 1: Scanned {N} external papers, {M} wiki gaps identified
    - Phase 2: Generated {X} candidates (Claude: {a}, Review LLM: {b})
-   - Phase 3: {Y} survived initial filter (from {X})
-   - Phase 4: Deep validation on top {Z}
+   - Phase 3: {Y} survived filter & validation (from {X})
+   - Phase 4: {Z} passed pilot, {W} failed pilot
    - Phase 5: {K} ideas written to wiki
 
    ## Top Ideas (ranked)
 
-   | Rank | Idea | Novelty | Review | Gap Align | Status |
-   |------|------|---------|--------|-----------|--------|
-   | 1 | [[slug]] | 4/5 | 7/10 | +2 | proposed |
-   | 2 | [[slug]] | 3/5 | 6/10 | +0 | proposed |
+   | Rank | Idea | Novelty | Review | Gap Align | Pilot | Status |
+   |------|------|---------|--------|-----------|-------|--------|
+   | 1 | [[slug]] | 4/5 | 7/10 | +2 | pass | proposed |
+   | 2 | [[slug]] | 3/5 | 6/10 | +0 | pass | proposed |
 
    ## Filtered Out
    | Idea | Reason | Status |
    |------|--------|--------|
-   | [[slug]] | Similar published work exists | failed |
-   | [[slug]] | GPU requirements too high | failed |
+   | [[slug]] | Similar published work exists | failed [filter] |
+   | [[slug]] | Method diverged in pilot | failed [pilot] |
+   | [[slug]] | GPU requirements too high | failed [filter] |
 
    ## Suggested Next Steps
    - Run `/exp-design {top-idea-slug}` to design experiments
@@ -355,7 +416,7 @@ Write the validated ideas to the wiki (including eliminated ideas, with their el
 
 - **Auto-switch to cold-start mode when wiki is cold**: expand external search (WebSearch 8 queries, S2/DeepXiv limit 30), do not block execution
 - **Every idea must have wiki grounding**: each idea must reference at least 2 wiki pages (paper / concept / method / topic)
-- **Banlist must be loaded**: Phase 1 must read failed ideas' failure_reason; Phase 2/3 must check for overlap
+- **Banlist must be loaded**: Phase 1 must read failed ideas' failure_reason; Phase 2/3/4 must check for overlap
 - **Review LLM independence**: in Phase 2, Review LLM does not see Claude's idea list (cross-model-review.md)
 - **Eliminated ideas are also written to wiki**: status=failed + failure_reason, as anti-repetition memory
 - **No fabrication**: all ideas must be derived from existing wiki knowledge or external search results; do not invent non-existent papers or methods
@@ -369,8 +430,10 @@ Write the validated ideas to the wiki (including eliminated ideas, with their el
 - **Semantic Scholar API unavailable**: skip S2 search, rely on DeepXiv + WebSearch for compensation
 - **DeepXiv API unavailable**: skip DeepXiv search and trending, fall back to S2 + WebSearch (original behavior)
 - **Review LLM unavailable**: Phase 2 uses Claude only (no dual-model diversity, noted in report)
-- **/novelty fails**: if novelty fails for a single idea in Phase 4, mark "novelty unverified" and continue
-- **/review fails**: if review fails in Phase 4, mark "unreviewed" and continue; recommend user manually runs /review
+- **/novelty fails**: if novelty fails for a single idea in Phase 3, mark "novelty unverified" and continue
+- **/review fails**: if review fails in Phase 3, mark "unreviewed" and continue; recommend user manually runs /review
+- **Pilot fails for an idea**: mark as failed with `[pilot]` prefix in failure_reason; remaining ideas continue
+- **All pilots fail**: ideas still written to wiki (status: failed); report recommends user review pilot logs and adjust approach
 - **Slug conflict**: if the same slug already exists in wiki/ideas/, append a numeric suffix (e.g. `sparse-lora-v2`)
 - **All ideas eliminated**: still write to wiki (status: failed); report recommends user broaden the search direction or /ingest more papers
 
@@ -389,14 +452,14 @@ Write the validated ideas to the wiki (including eliminated ideas, with their el
 - `python3 tools/fetch_deepxiv.py trending --days 14` — trending paper trends
 
 ### Skills（via Skill tool）
-- `/novelty` — Phase 4 deep novelty validation
-- `/review` — Phase 4 cross-model review
+- `/novelty` — Phase 3 deep novelty validation
+- `/review` — Phase 3 cross-model review
 
 ### MCP Servers
 - `mcp__llm-review__chat` — Phase 2 Review LLM independent brainstorm
 
 ### Claude Code Native
-- `WebSearch` — Phase 1 external search, Phase 3 quick novelty screening
+- `WebSearch` — Phase 1 external search, Phase 3 quick novelty screening, Phase 4 pilot validation
 - `Agent` tool — Phase 1 parallel search, Phase 2 parallel brainstorm
 
 ### Shared References
