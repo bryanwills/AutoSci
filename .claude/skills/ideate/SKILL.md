@@ -291,7 +291,7 @@ Write the validated ideas to the wiki (including eliminated ideas, with their el
    origin_gaps: []           # [[concept-slug]] or [[topic-slug]] list — concepts/topics this idea targets
    tags: []                  # 2-5 topic tags (inherit from origin_gaps / direction)
    target_venue: ""          # NeurIPS / ICLR / ICML / ACL / COLM — leave empty if undecided
-   novelty_score: ""         # 1-5 — written by /novelty --write in Phase 4; leave empty otherwise
+   novelty_score: ""         # 1-5 — written by /novelty --write in Phase 3 Deep Validation; leave empty otherwise
    priority: 3               # 1-5 — see Priority computation below
    pilot_result: ""          # empty until /exp-eval fills it
    failure_reason: ""        # empty for proposed ideas

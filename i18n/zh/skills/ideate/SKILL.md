@@ -291,7 +291,7 @@ argument-hint: "[research-direction-or-topic] [--max-ideas N] [--skip-validation
    origin_gaps: []           # [[concept-slug]] 或 [[topic-slug]] 列表 — 该 idea 针对的 concept / topic
    tags: []                  # 2-5 个主题标签（从 origin_gaps / direction 继承）
    target_venue: ""          # NeurIPS / ICLR / ICML / ACL / COLM — 未定时留空
-   novelty_score: ""         # 1-5 — Phase 4 由 /novelty --write 写入；否则留空
+   novelty_score: ""         # 1-5 — Phase 3 中 深度验证 由 /novelty --write 写入；否则留空
    priority: 3               # 1-5 — 见下方 Priority 计算
    pilot_result: ""          # 留空，由 /exp-eval 填写
    failure_reason: ""        # proposed ideas 留空
