@@ -15,14 +15,11 @@ date_updated: 2026-04-30
 - Scientific applications of deep learning
 - Computational biology and AI-driven drug design
 
-## Key papers
+## Recent work
 
 - [[highly-accurate-protein-structure-prediction-alphafold]] — co-corresponding author on AlphaFold2
 - [[alphafold-protein-structure-database-2024-providing]] — corresponding author of the AlphaFold DB 2024 update
 - [[accurate-structure-prediction-biomolecular-interactions-alphafold]] — corresponding author, AlphaFold 3 (Nature, 2024)
-
-## Recent work
-
 - AlphaFold 3 (2024): joint senior author on the unified biomolecular complex predictor.
 - AlphaFold DB scaling and AlphaFold-family extensions (AlphaFold-Multimer, AlphaFold3) at Google DeepMind.
 - Isomorphic Labs: leadership of the AI-for-drug-design programme into which AF3 ships as a core capability.

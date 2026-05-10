@@ -14,12 +14,9 @@ date_updated: 2026-04-30
 - Network biology and disease-gene network analysis.
 - Topics: [[medpredict]]
 
-## Key papers
-
-- [[towards-proteome-scale-map-human-protein]] — senior / corresponding author; conceived the project and co-directed CCSB-HI1.
-
 ## Recent work
 
+- [[towards-proteome-scale-map-human-protein]] — senior / corresponding author; conceived the project and co-directed CCSB-HI1.
 - (pending — populated as further Vidal-lab papers are ingested into the wiki)
 
 ## Collaborators

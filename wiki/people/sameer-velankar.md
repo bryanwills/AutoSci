@@ -14,12 +14,9 @@ date_updated: 2026-04-30
 - PDBe (Protein Data Bank in Europe) integration
 - Structural bioinformatics services
 
-## Key papers
-
-- [[alphafold-protein-structure-database-2024-providing]] — corresponding author of the AlphaFold DB 2024 update
-
 ## Recent work
 
+- [[alphafold-protein-structure-database-2024-providing]] — corresponding author of the AlphaFold DB 2024 update
 EMBL-EBI side of the AlphaFold DB collaboration with Google DeepMind: data archiving, FTP / Google Cloud distribution, API development, BLAST integration, Foldseek-cluster integration.
 
 ## Collaborators

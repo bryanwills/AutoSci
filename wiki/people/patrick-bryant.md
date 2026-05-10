@@ -13,12 +13,9 @@ date_updated: 2026-04-30
 - FoldDock pipeline and downstream confidence calibration (pDockQ)
 - Sequential assembly of higher-order complexes from predicted dimers/trimers
 
-## Key papers
-
-- [[towards-structurally-resolved-human-protein-interaction]] (co-first author)
-
 ## Recent work
 
+- [[towards-structurally-resolved-human-protein-interaction]] (co-first author)
 - Lead developer of [[folddock-pipeline]] and the [[pdockq-score]] (Bryant, Pozzati, Elofsson, Nat. Commun. 2022).
 - Sequential-assembly methodology for predicting structures of large complexes from AF2 components (Bryant et al., Nat. Commun. 2022).
 

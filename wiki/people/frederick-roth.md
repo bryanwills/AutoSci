@@ -14,12 +14,9 @@ date_updated: 2026-04-30
 - Statistical evaluation and benchmarking of interactome maps.
 - Topics: [[medpredict]]
 
-## Key papers
-
-- [[towards-proteome-scale-map-human-protein]] — co-corresponding author; led computational analyses (network topology, biological-attribute enrichment, MCODE clustering) on CCSB-HI1.
-
 ## Recent work
 
+- [[towards-proteome-scale-map-human-protein]] — co-corresponding author; led computational analyses (network topology, biological-attribute enrichment, MCODE clustering) on CCSB-HI1.
 - (pending — populated as further Roth-lab papers are ingested into the wiki)
 
 ## Collaborators

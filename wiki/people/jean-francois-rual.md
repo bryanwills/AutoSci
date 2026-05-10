@@ -14,12 +14,9 @@ date_updated: 2026-04-30
 - Binary PPI map generation and disease-PPI candidate discovery.
 - Topics: [[medpredict]]
 
-## Key papers
-
-- [[towards-proteome-scale-map-human-protein]] — co-first author and pipeline architect; developed the high-throughput Y2H strategy used to build CCSB-HI1.
-
 ## Recent work
 
+- [[towards-proteome-scale-map-human-protein]] — co-first author and pipeline architect; developed the high-throughput Y2H strategy used to build CCSB-HI1.
 - (pending — populated as further Rual-authored papers are ingested into the wiki)
 
 ## Collaborators

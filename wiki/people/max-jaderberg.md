@@ -11,12 +11,9 @@ date_updated: 2026-04-30
 
 Deep learning for biomolecular modelling; AI-driven drug design; representation learning; previously deep reinforcement learning at Google DeepMind.
 
-## Key papers
-
-- [[accurate-structure-prediction-biomolecular-interactions-alphafold]] — corresponding author, AlphaFold 3 (Nature, 2024).
-
 ## Recent work
 
+- [[accurate-structure-prediction-biomolecular-interactions-alphafold]] — corresponding author, AlphaFold 3 (Nature, 2024).
 - AlphaFold 3 (2024): joint senior author and corresponding author from the Isomorphic Labs side; bridges the model and its therapeutic-design applications.
 
 ## Collaborators

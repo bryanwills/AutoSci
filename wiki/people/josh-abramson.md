@@ -11,12 +11,9 @@ date_updated: 2026-04-30
 
 Deep learning for biomolecular structure prediction; diffusion models for atomistic systems; AlphaFold 3 architecture and training.
 
-## Key papers
-
-- [[accurate-structure-prediction-biomolecular-interactions-alphafold]] — co-first author (equal contribution), AlphaFold 3 (Nature, 2024).
-
 ## Recent work
 
+- [[accurate-structure-prediction-biomolecular-interactions-alphafold]] — co-first author (equal contribution), AlphaFold 3 (Nature, 2024).
 - AlphaFold 3 (2024): co-first author on the architecture, training, and evaluation pipeline for the AF3 unified biomolecular complex predictor.
 
 ## Collaborators

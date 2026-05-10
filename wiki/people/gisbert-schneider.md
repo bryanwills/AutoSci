@@ -11,12 +11,9 @@ date_updated: 2026-04-30
 
 Computational drug discovery, deep learning for de novo molecular design, chemoinformatics, generative models for chemistry.
 
-## Key papers
-
-- [[geometric-deep-learning-molecular-representations]] (2021, Nature Machine Intelligence) — corresponding author of the canonical review of GDL on molecular representations.
-
 ## Recent work
 
+- [[geometric-deep-learning-molecular-representations]] (2021, Nature Machine Intelligence) — corresponding author of the canonical review of GDL on molecular representations.
 Pending.
 
 ## Collaborators

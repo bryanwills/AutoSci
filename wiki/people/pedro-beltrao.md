@@ -13,12 +13,9 @@ date_updated: 2026-04-30
 - Phosphorylation, post-translational modifications, and their regulatory function
 - Application of deep-learning structure prediction (AlphaFold2) to systems biology
 
-## Key papers
-
-- [[towards-structurally-resolved-human-protein-interaction]] (co-corresponding author)
-
 ## Recent work
 
+- [[towards-structurally-resolved-human-protein-interaction]] (co-corresponding author)
 - Co-led large-scale AlphaFold2-based modeling of the human protein interaction network (Burke, Bryant, Barrio-Hernandez, Memon, Pozzati et al., Nat. Struct. Mol. Biol. 2023).
 
 ## Collaborators

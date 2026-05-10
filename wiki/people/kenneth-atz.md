@@ -11,12 +11,9 @@ date_updated: 2026-04-30
 
 Geometric deep learning for molecular sciences, equivariant message-passing neural networks, drug discovery and quantum-chemistry applications of GNNs.
 
-## Key papers
-
-- [[geometric-deep-learning-molecular-representations]] (2021, Nature Machine Intelligence) — co-first author of the canonical review of GDL on molecular representations.
-
 ## Recent work
 
+- [[geometric-deep-learning-molecular-representations]] (2021, Nature Machine Intelligence) — co-first author of the canonical review of GDL on molecular representations.
 Pending.
 
 ## Collaborators

@@ -11,12 +11,9 @@ date_updated: 2026-04-30
 
 Ronai's group studies how ubiquitin ligases, the unfolded protein response, and stress-signalling networks contribute to cancer initiation, progression and therapy resistance, with a strong focus on melanoma. Long-standing themes include RING and HECT E3s in oncogenic transformation, post-translational regulation of MAPK and PI3K-AKT-mTOR signalling, and the use of E3-substrate biology to nominate cancer drug targets.
 
-## Key papers
-
-- [[ubiquitin-ligases-oncogenic-transformation-cancer-therapy]] — Senft, Qi & Ronai, Nature Reviews Cancer, 2018. Senior-authored review consolidating E3 deregulation in cancer.
-
 ## Recent work
 
+- [[ubiquitin-ligases-oncogenic-transformation-cancer-therapy]] — Senft, Qi & Ronai, Nature Reviews Cancer, 2018. Senior-authored review consolidating E3 deregulation in cancer.
 (Limited info from a single ingested review; will be expanded as further papers are ingested.)
 
 ## Collaborators

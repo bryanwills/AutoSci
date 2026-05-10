@@ -13,12 +13,9 @@ date_updated: 2026-04-30
 - Protein-protein interaction modeling
 - Disease-mutation impact on protein interfaces
 
-## Key papers
-
-- [[towards-structurally-resolved-human-protein-interaction]] (co-first author)
-
 ## Recent work
 
+- [[towards-structurally-resolved-human-protein-interaction]] (co-first author)
 - Co-led the structural-interactomics analysis in the Burke et al. 2023 human PPI paper, including disease-mutation interface mapping and the iterative dimer-to-assembly construction.
 
 ## Collaborators

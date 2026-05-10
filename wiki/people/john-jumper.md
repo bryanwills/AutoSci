@@ -14,14 +14,11 @@ date_updated: 2026-04-30
 - Geometric / invariance-aware neural architectures for molecular systems
 - Equivariant attention; diffusion-based denoising for structure
 
-## Key papers
+## Recent work
 
 - [[highly-accurate-protein-structure-prediction-alphafold]] — first author and co-corresponding author on AlphaFold2
 - [[alphafold-protein-structure-database-2024-providing]] — co-author of the AlphaFold DB 2024 update
 - [[accurate-structure-prediction-biomolecular-interactions-alphafold]] — corresponding author, AlphaFold 3 (Nature, 2024)
-
-## Recent work
-
 - AlphaFold programme at Google DeepMind: AlphaFold2, AlphaFold-Multimer, AlphaFold DB scaling.
 - AlphaFold 3 (2024): co-led the architecture redesign that replaced the AF2 evoformer with the pairformer and the AF2 structure module with a diffusion module, extending the system to nucleic acids, ligands, ions, and modified residues.
 

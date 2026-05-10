@@ -13,12 +13,9 @@ date_updated: 2026-04-30
 - Multiple sequence alignment construction and co-evolutionary signal
 - Computational pipelines for large-scale structural biology (FoldDock, sequential assembly)
 
-## Key papers
-
-- [[towards-structurally-resolved-human-protein-interaction]] (co-corresponding author)
-
 ## Recent work
 
+- [[towards-structurally-resolved-human-protein-interaction]] (co-corresponding author)
 - Co-led the FoldDock-based human-PPI structural-modeling effort (Burke et al., Nat. Struct. Mol. Biol. 2023).
 - Follow-up sequential-assembly work on building larger protein complexes from AF2 dimers/trimers (Bryant et al., Nat. Commun. 2022).
 

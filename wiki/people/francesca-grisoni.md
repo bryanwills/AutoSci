@@ -11,12 +11,9 @@ date_updated: 2026-04-30
 
 Chemical language models, geometric deep learning for drug discovery, generative molecular design, recurrent neural networks for SMILES.
 
-## Key papers
-
-- [[geometric-deep-learning-molecular-representations]] (2021, Nature Machine Intelligence) — co-first author and corresponding author of the canonical review of GDL on molecular representations.
-
 ## Recent work
 
+- [[geometric-deep-learning-molecular-representations]] (2021, Nature Machine Intelligence) — co-first author and corresponding author of the canonical review of GDL on molecular representations.
 Pending.
 
 ## Collaborators
