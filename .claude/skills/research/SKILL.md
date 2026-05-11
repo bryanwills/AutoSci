@@ -197,11 +197,11 @@ Call `/ideate`:
 
 ```
 Skill: ideate
-Args: "{direction}" --domain {domain}
+Args: "{direction}" --auto
 ```
 
 **After completion**:
-1. Read the generated ideas, sorted by priority
+1. Read the generated ideas and sort them according to the pilot experiment results and priority.
 2. Update pipeline-progress: Stage 1 → completed, record generated idea slugs
 3. Append log
 
@@ -212,7 +212,7 @@ Args: "{direction}" --domain {domain}
 - Output selection result to terminal without waiting for confirmation
 
 **If interactive mode**:
-- List all generated ideas (slug, title, priority, novelty score)
+- List all generated ideas (slug, title, priority, novelty score,pilot result)
 - Use AskUserQuestion to prompt user to select one idea (or enter "stop" to halt)
 - If user selects stop: save progress, terminate pipeline
 
@@ -226,11 +226,11 @@ Call `/exp-design`:
 
 ```
 Skill: exp-design
-Args: "{idea_slug}" --review
+Args: "{idea_slug}"
 ```
 
 **After completion**:
-1. Read generated experiment slugs (pages in wiki/experiments/ where linked_idea == idea_slug)
+1. Read generated experiment slugs (pages in wiki/experiments/ where linked_idea == idea_slug，and retrieve the detailed specs of the experiment block from wiki/experiments/designs/{slug}-master.md based on the exp-slug)
 2. Update pipeline-progress: Stage 2 → completed, record experiment_slugs
 
 ### Stage 3: Experiment Execution (non-blocking)

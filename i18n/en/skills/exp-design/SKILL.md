@@ -236,13 +236,13 @@ while iteration < 2:
 Order experiments by dependency and set decision gates:
 
 ```
-Stage 0: Sensitivity analysis (subset)
+Stage 0: Ablation (iteration 1)
+  └── Run ablation matrix
+  └── Classify factors → simplify if needed → re-run (iteration 2, up to max 2)
+  
+Stage 1: Sensitivity analysis (subset)
   └── Run on small subset to narrow hyperparameter ranges
   └── Gate: if no reasonable hparams found → stop, reconsider method
-
-Stage 1: Ablation (iteration 1)
-  └── Run ablation matrix with best hparams from Stage 0
-  └── Classify factors → simplify if needed → re-run (iteration 2, up to max 2)
 
 Stage 2: Main experiment
   └── Finalized method vs baselines, full benchmark, multi-seed
