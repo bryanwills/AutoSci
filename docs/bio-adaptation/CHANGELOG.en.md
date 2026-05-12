@@ -2175,3 +2175,43 @@ template update.
 
 Backlog A4 closed. All numbered backlog items in bio-adaptation Sections A + B + C are
 now merged (minimal or full).
+
+---
+
+## 2026-05-12 — D1 + D2 minimal pilot merge: Section D conventions resolved
+
+**Scope**: Section D's two convention conflicts. D1 — bio "Phase" vs skill "Stage"
+numbering collision; D2 — `concepts.maturity` CS feature-flag scale doesn't fit bio
+evidence-strength concepts.
+**Status**: **D1 + D2 minimal merged**. D1 ships as a disambiguation note (no rename —
+40+ Stage references across 10 wiki pages would be too much churn); D2 extends the
+enum with the bio 5-value scale. Full D1 (rename Stage → Block-X across all wiki
+content) + full D2 (lint detection of scale-mixing within a concept) deferred.
+
+### Files touched
+
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`:
+  Step 4 Build Run Order gains a "Vocabulary disambiguation" block — explicit statement
+  that the skill uses "Stage 0..4" for run-order and NEVER "Phase"; "Phase" is reserved
+  for the user's domain meaning (Phase 0 preclinical / Phase 1-3 clinical trials). When
+  parsing an idea page with "Phase-N", treat as domain vocabulary and do not silently
+  remap. Both terms can coexist: "Stage 2b runs the Phase-0 noise-floor calibration
+  sub-protocol".
+- `runtime/schema/entities.yaml`: `concepts.maturity` enum bumped from 4 to 9 values —
+  CS scale preserved (stable / active / emerging / deprecated) + bio scale added
+  (consensus / well-supported / contested / hypothesis / falsified). `datasets.maturity`
+  stays at the 4 CS values (datasets are operational tools — the bio evidence-strength
+  scale doesn't apply).
+- `docs/runtime-page-templates.{en,zh}.md`: concepts template maturity comment shows
+  both scales + note to pick one per concept, don't mix.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 |
+| `python tools/lint_bio.py` | 0 🔴 / 0 🟡 / 0 🔵 |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | identical |
+| Existing concept page maturity values | all CS scale; new enum backward-compatible |
+
+Section D backlog items (D1 + D2) minimal-merged.

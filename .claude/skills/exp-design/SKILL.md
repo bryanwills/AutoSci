@@ -144,6 +144,8 @@ Each experiment block carries:
 
 ### Step 4: Build Run Order
 
+**Vocabulary disambiguation** (bio-D1 minimal pilot merged 2026-05-12): this skill uses **Stage 0..4** for run-order positions. It does NOT use **"Phase"** for that purpose — "Phase" is reserved for the user's domain meaning. In drug discovery, "Phase 0" = preclinical pilot, "Phase 1–3" = clinical-trial stages; in some bio idea pages, "Phase-0 noise-floor calibration" or "Phase-1 dose escalation" carries that domain meaning, not a skill-workflow meaning. When emitting output, always say "Stage N" for the skill's run-order step. When parsing an idea page that uses "Phase-N" in its hypothesis or procedure, treat that as domain vocabulary and do NOT remap to Stage-N silently — surface the bio meaning in the experiment's `## Procedure` text instead. If a single page genuinely needs both ("Stage 2b runs the Phase-0 noise-floor calibration sub-protocol"), keep both — the reader's context disambiguates.
+
 Sort experiments by dependency and set decision gates:
 
 ```

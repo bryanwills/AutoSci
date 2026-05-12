@@ -144,6 +144,8 @@ argument-hint: <idea-slug-or-hypothesis> [--linked-idea <idea-slug>] [--review] 
 
 ### Step 4: 构建执行顺序（Build Run Order）
 
+**Vocabulary disambiguation**（bio-D1 minimal pilot 2026-05-12 合并）：本 skill 用 **Stage 0..4** 表示运行顺序位置。**不**用 "Phase" 表此意 —— "Phase" 留给用户领域的本义。药物发现里 "Phase 0" = 临床前 pilot,"Phase 1–3" = 临床试验阶段;部分 bio idea 页面的 "Phase-0 noise-floor calibration" 或 "Phase-1 dose escalation" 带的是领域含义而非 skill 工作流含义。输出时一律说 "Stage N" 指 skill 的运行顺序步。解析 idea 页面遇到 "Phase-N" 时视为领域词汇,**不**静默重映射为 Stage-N —— 把 bio 含义反映到实验的 `## Procedure` 文本即可。单页确需两者同存时（"Stage 2b 跑 Phase-0 noise-floor calibration 子协议"）,两者并存,读者上下文消歧。
+
 按依赖关系排序实验，设置决策门：
 
 ```

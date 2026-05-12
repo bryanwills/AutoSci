@@ -45,7 +45,15 @@ concepts:
     title:            { type: str, required: true }
     aliases:          { type: list_str, default: [] }
     tags:             { type: list_str, required: true, default: [] }
-    maturity:         { type: enum, values: [stable, active, emerging, deprecated],
+    # bio-D2 (pilot merged 2026-05-12): maturity gains a bio-side scale alongside the CS
+    # feature-flag scale. CS scale (stable / active / emerging / deprecated) fits ML methods,
+    # libraries, datasets-as-tools; bio scale (consensus / well-supported / contested /
+    # hypothesis / falsified) maps the evidence-strength spectrum bio concepts actually live
+    # on — a textbook fact is "consensus", a single-paper finding is "hypothesis", a
+    # mechanism still being argued in the literature is "contested". Per-concept choice;
+    # don't mix scales in the same wiki for a single concept.
+    maturity:         { type: enum, values: [stable, active, emerging, deprecated,
+                                              consensus, well-supported, contested, hypothesis, falsified],
                         required: true, default: active }
     definition:       { type: str }
     key_papers:       { type: list_link, to: papers, required: true, default: [] }

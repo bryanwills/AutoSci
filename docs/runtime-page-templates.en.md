@@ -41,7 +41,12 @@ Body sections: `## Problem` / `## Key idea` / `## Method` / `## Results` / `## L
 title: ""
 aliases: []
 tags: []
-maturity: active         # stable | active | emerging | deprecated
+# bio-D2 (pilot merged 2026-05-12): pick CS scale OR bio scale per concept; don't mix.
+# CS scale (default for ML methods / libraries / tools):
+#   stable | active | emerging | deprecated
+# Bio scale (default for bio concepts — evidence-strength spectrum):
+#   consensus | well-supported | contested | hypothesis | falsified
+maturity: active         # stable | active | emerging | deprecated | consensus | well-supported | contested | hypothesis | falsified
 key_papers: []
 first_introduced: ""
 date_updated: YYYY-MM-DD

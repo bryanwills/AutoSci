@@ -40,7 +40,12 @@ cited_by: []
 title: ""
 aliases: []
 tags: []
-maturity: active         # stable | active | emerging | deprecated
+# bio-D2（2026-05-12 pilot 合并）：每个 concept 选 CS 标度 OR bio 标度,不混用。
+# CS 标度（ML 方法 / 库 / 工具默认）:
+#   stable | active | emerging | deprecated
+# Bio 标度（bio 概念默认 —— 证据强度谱系）:
+#   consensus | well-supported | contested | hypothesis | falsified
+maturity: active         # stable | active | emerging | deprecated | consensus | well-supported | contested | hypothesis | falsified
 key_papers: []
 first_introduced: ""
 date_updated: YYYY-MM-DD
