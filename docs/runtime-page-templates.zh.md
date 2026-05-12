@@ -2,7 +2,8 @@
 
 > 仅按需读取的 wiki 页面模板。graph 派生文件以及 `index.md`、`log.md` 请看 `docs/runtime-support-files.zh.md`。
 
-## 9 类页面
+<!-- bio-A1（2026-05-11 pilot merge）：页面类型从 9 类扩为 10 类——datasets/ 成为一等实体。 -->
+## 10 类页面
 
 ### papers/{slug}.md
 
@@ -11,6 +12,11 @@
 title: ""
 slug: ""
 arxiv: ""
+# bio-A3（2026-05-11 minimal pilot merge）：生信原生标识符，全部可选。
+# 生信论文常有 DOI / PMID 但无 arXiv ID。完整 A3 方案还有 biorxiv、pdb_ids、uniprot_ids、
+# nct_ids、gene_symbols、species —— 这些字段延后到 /ingest（C1）的 bio NER 预扫能批量填充时。
+doi: ""                  # bio-A3：主生信标识符
+pmid: ""                 # bio-A3：PubMed ID
 venue: ""
 year:
 tags: []
@@ -39,6 +45,14 @@ key_papers: []
 first_introduced: ""
 date_updated: YYYY-MM-DD
 related_concepts: []
+# bio-A2（2026-05-11 light pilot merge）：可选的蛋白质锚点字段。仅当概念本身是具体基因产物
+# （p53、CRBN、VHL、MDM2、…）时填充。过程概念（ubiquitylation）、方法概念（alphafold-db）、
+# 类概念（ubiquitin-ligase-e3）请留空。蛋白概念累积到 ≥50 个时，提升为独立 `proteins/`
+# 实体类型（A2 heavy 选项，仍 drafted）。
+gene_symbol: ""          # bio-A2：HGNC 符号，例如 "TP53"
+uniprot_id: ""           # bio-A2：例如 "P04637"
+pdb_ids: []              # bio-A2：代表性结构
+species: []              # bio-A2：例如 ["human"]
 ---
 ```
 
@@ -125,6 +139,10 @@ failure_reason: ""
 linked_experiments: []
 date_proposed: YYYY-MM-DD
 date_resolved: ""
+# bio-A7（2026-05-11 pilot merge）：可选的 GRADE 风格整体证据等级。
+# 比 per-edge 分级（延后）粗，但对 /novelty 权重和 /paper-draft 置信度叙述立即有用。
+# 没有证据时留空即可。
+grade: ""                 # very-low | low | moderate | high（可选）
 ---
 ```
 
@@ -155,7 +173,17 @@ date_planned: YYYY-MM-DD
 date_completed: ""
 run_log: ""
 started: ""
-estimated_hours: 0
+estimated_hours: 0           # bio-A6：legacy 单数字预算，向后兼容保留
+# bio-A6（2026-05-11 pilot merge）：结构化成本块。子字段全部可选、加性。
+# 新实验在 GPU / MD / 湿实验 / FTE / 数据访问成本组成非平凡时应填充此块——
+# 单数字 estimated_hours 会把这些约束压扁成一个数。
+estimated_cost:
+  gpu_hours: 0
+  cpu_hours: 0
+  md_wallclock_hours: 0
+  wet_lab_usd: 0
+  fte_weeks: 0
+  dataset_access_lead_time_days: 0
 remote:
   server: ""
   gpu: ""
@@ -190,3 +218,30 @@ date_updated: YYYY-MM-DD
 ```
 
 正文：`## Statement` / `## Evidence summary` / `## Conditions and scope` / `## Counter-evidence` / `## Linked ideas` / `## Open questions`
+
+<!-- bio-A1（2026-05-11 pilot merge）：datasets/ 是第 10 种一等实体。锚定可复用的数据集引用
+     （TernaryDB、PROTAC-DB、AlphaFold-DB、dbPTM、PhosphoSitePlus、UniProt、PDB、…），
+     使 experiments[*].setup.dataset 和 papers/* 中的引用可以 wikilink 到带版本历史与
+     access tier 的规范页面。 -->
+### datasets/{slug}.md
+
+```yaml
+---
+title: ""
+slug: ""
+aliases: []
+tags: []
+maturity: stable             # stable | active | emerging | deprecated
+access: public               # public | registration | restricted | wet-lab-derived
+# versions 是 release 记录列表；下游 skill 会拿它与
+# experiments[*].reproducibility.dataset_versions[*].version 对比检测漂移。
+versions: []                 # 列表元素: {version, released, url, n_entries, notes}
+canonical_url: ""
+license: ""
+key_papers: []               # 反向链接 —— 由引用该数据集的 papers/ 写入
+key_concepts: []
+date_updated: YYYY-MM-DD
+---
+```
+
+正文：`## Overview` / `## Versions` / `## Access and licensing` / `## Schema and entries` / `## Known caveats` / `## Used by experiments` / `## Key papers`

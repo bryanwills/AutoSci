@@ -12,6 +12,12 @@ failure_reason: ""
 linked_experiments: [[deepternary-baseline-ternarydb-crbn-vhl-reproduction]], [[phase0-noise-floor-calibration-deepternary-ptm-perturbations]], [[calibrated-deltapternary-phospho-protac-ranking]], [[ablation-uncalibrated-vs-calibrated-deltapternary]], [[ablation-boltz2-ptm-vs-md-relaxed-route]], [[ablation-deepternary-vs-protac-stan-scorer]], [[robustness-cross-ptm-type-ubiq-methyl]], [[robustness-mutant-isoform-track-y220c-r175h]]
 date_proposed: 2026-04-30
 date_resolved: ""
+# bio-A7 (pilot 2026-05-11): GRADE = low — load-bearing premise (phospho-perturbation > noise floor)
+# is empirically unverified. Anchor claim ptm-protein-isoforms-enable-selective-drug confidence
+# is 0.6 (weakly_supported). Mechanistic basis exists (PTM-blind ternaries can't distinguish
+# isoforms structurally), but thin positive set (< 10 truly PTM-selective experimental degraders)
+# bounds the empirical evidence to "low" per GRADE conventions.
+grade: low
 ---
 
 ## Motivation

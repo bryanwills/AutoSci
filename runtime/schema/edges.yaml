@@ -169,6 +169,157 @@ inspired_by:
     evidence: { type: str }
 
 # -----------------------------------------------------------------------------
+# bio-B3 (pilot merged 2026-05-11): dataset-version provenance edge.
+# Pilot scope: confidence + evidence attributes only. Version info is encoded in the
+# evidence string (e.g. "version: v1; CRBN+VHL test split"). Full B3 — typed
+# metadata.version as a structured attribute — is deferred until add-edge CLI is extended
+# to accept --metadata or per-attribute flags (C3 lint depends on the structured form).
+# Until then, version drift detection has to grep evidence text.
+# -----------------------------------------------------------------------------
+
+dataset_version_used:
+  endpoints: { from: experiments, to: datasets }
+  direction: directed
+  workflow:  provenance
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+# -----------------------------------------------------------------------------
+# bio-B1 (minimal pilot merged 2026-05-11): bio relation edges.
+# Full B1 plan registers 10 verbs (targets_protein, binds, inhibits, activates, degrades,
+# phosphorylates, ubiquitinates, methylates, acetylates, is_substrate_of) connecting
+# paper / claim / concept → protein, or protein → protein. The minimal pilot registers
+# the two most-demoable verbs (targets_protein + ubiquitinates) with broad endpoints
+# (from: '*', to: concepts) — proteins-as-concepts per the A2 light option. The remaining
+# 8 verbs and tightened endpoints land in full B1.
+# -----------------------------------------------------------------------------
+
+targets_protein:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+ubiquitinates:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+# bio-B1 (full pilot merged 2026-05-11): remaining 8 verbs. Same endpoints + attributes
+# shape as targets_protein / ubiquitinates above. Live-edge population is sparse for now —
+# the wiki does not yet have kinase / phosphatase / acetyltransferase concepts to anchor
+# phosphorylates / acetylates / methylates against, and most drug-target / substrate-enzyme
+# pairs need bio NER (C1) for systematic extraction. Each verb is nonetheless registered
+# so the SPA / lint / research_wiki can validate them and downstream skills can emit them
+# once C1 lands.
+
+binds:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+inhibits:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+activates:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+degrades:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+phosphorylates:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+methylates:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+acetylates:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+is_substrate_of:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+# -----------------------------------------------------------------------------
+# bio-B2 (minimal pilot merged 2026-05-11): validation / translation edges.
+# Section B2 plan: claim / paper → indication / cohort with typed metadata
+# (clinical_trial_for {nct_id, phase}, fda_approved_for {indication, year},
+# validates_in_species {species}). The minimal pilot registers all 3 edge types with
+# confidence + evidence attributes only — typed metadata is encoded in the evidence
+# string for now, structured metadata.* keys deferred until add-edge CLI is extended
+# (same pattern as B3 minimal). No live edges yet: the wiki has no clinical-trial or
+# FDA-approval content to anchor against. Edges become populable as /ingest (C1) lands
+# bio NER for clinical-translation papers.
+# -----------------------------------------------------------------------------
+
+clinical_trial_for:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  evidence
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+fda_approved_for:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  evidence
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+validates_in_species:
+  endpoints: { from: '*', to: concepts }
+  direction: directed
+  workflow:  evidence
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+# -----------------------------------------------------------------------------
 # Bibliographic citation
 # -----------------------------------------------------------------------------
 

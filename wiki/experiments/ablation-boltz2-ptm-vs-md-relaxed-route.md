@@ -20,7 +20,14 @@ date_planned: 2026-05-02
 date_completed: ""
 run_log: ""
 started: ""
-estimated_hours: 12
+estimated_hours: 12   # legacy; superseded by estimated_cost below — MD wall-clock dominates
+estimated_cost:
+  gpu_hours: 4               # Boltz-2 inference + DeepTernary scoring
+  cpu_hours: 1
+  md_wallclock_hours: 8      # 50 ns explicit-solvent MD per tuple × ~25 tuples; dominant cost
+  wet_lab_usd: 0
+  fte_weeks: 0.5
+  dataset_access_lead_time_days: 0
 remote:
   server: ""
   gpu: ""

@@ -2,6 +2,8 @@
 title: "MusiteDeep: a deep-learning based webserver for protein post-translational modification site prediction and visualization"
 slug: "musitedeep-deep-learning-based-webserver-protein"
 arxiv: ""
+doi: "10.1093/nar/gkaa275"   # bio-A3: primary bio identifier (NAR 2020)
+pmid: "32324217"             # bio-A3: PubMed ID
 venue: "Nucleic Acids Research"
 year: 2020
 tags: [deep-learning, ptm, post-translational-modification, bioinformatics, webserver, protein-sequence, ensemble, attention, capsule-network]

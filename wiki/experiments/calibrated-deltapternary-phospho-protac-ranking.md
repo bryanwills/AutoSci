@@ -20,7 +20,14 @@ date_planned: 2026-05-02
 date_completed: ""
 run_log: ""
 started: ""
-estimated_hours: 16
+estimated_hours: 16   # legacy; superseded by estimated_cost.gpu_hours below
+estimated_cost:
+  gpu_hours: 16
+  cpu_hours: 2
+  md_wallclock_hours: 0
+  wet_lab_usd: 0
+  fte_weeks: 0.75
+  dataset_access_lead_time_days: 0
 remote:
   server: ""
   gpu: ""

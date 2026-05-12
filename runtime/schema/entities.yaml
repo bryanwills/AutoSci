@@ -20,6 +20,12 @@ papers:
     title:             { type: str, required: true }
     slug:              { type: str, required: true }
     arxiv:             { type: str }
+    # bio-A3 (minimal pilot merged 2026-05-11): bio-native identifiers. Optional, additive.
+    # Bio papers usually have DOI/PMID but no arXiv ID. Other A3 fields (biorxiv, pdb_ids,
+    # uniprot_ids, nct_ids, gene_symbols, species) deferred — they need /ingest C1 bio NER
+    # pre-pass to populate at scale; for the minimal pilot only doi+pmid are added.
+    doi:               { type: str }
+    pmid:              { type: str }
     venue:             { type: str }
     year:              { type: int }
     tags:              { type: list_str, required: true, default: [] }
@@ -47,6 +53,15 @@ concepts:
     date_updated:     { type: date }
     related_concepts: { type: list_link, to: concepts, default: [] }
     linked_ideas:     { type: list_link, to: ideas, default: [] }
+    # bio-A2 (light, pilot merged 2026-05-11): optional protein-anchor fields. Populate ONLY
+    # when the concept IS a specific gene product (p53, CRBN, VHL, MDM2, …) — leave empty for
+    # process concepts (ubiquitylation), method concepts (alphafold-db), or class concepts
+    # (ubiquitin-ligase-e3). When ≥50 such concepts accumulate or graph queries demand it,
+    # promote to a separate `proteins/` entity type (A2 heavy option, still drafted).
+    gene_symbol:      { type: str }                # HGNC symbol, e.g. "TP53"
+    uniprot_id:       { type: str }                # e.g. "P04637"
+    pdb_ids:          { type: list_str, default: [] }   # representative structures
+    species:          { type: list_str, default: [] }   # e.g. ["human"]
 
 topics:
   dir: wiki/topics/
@@ -92,6 +107,11 @@ ideas:
     linked_experiments: { type: list_link, to: experiments, default: [] }
     date_proposed:      { type: date }
     date_resolved:      { type: date }
+    # bio-A7 (pilot merged 2026-05-11): optional GRADE-style overall evidence grade for the idea.
+    # Coarser than per-edge grading (deferred) but immediately useful for /novelty weighting and
+    # /paper-draft confidence framing. Full A7 (per-evidence-edge grade attribute) waits on
+    # add-edge CLI extension.
+    grade:              { type: enum, values: [very-low, low, moderate, high] }
   lifecycle:
     transitions:
       proposed:    [in_progress]
@@ -141,7 +161,25 @@ experiments:
     date_completed:  { type: date }
     run_log:         { type: str }
     started:         { type: str }
+    # bio-A6 (pilot merged 2026-05-11): estimated_hours is legacy — kept for backward
+    # compatibility while live experiments migrate. New experiments should populate
+    # estimated_cost instead. C3 (bio-lint) will eventually warn when only
+    # estimated_hours is set on a bio-domain experiment.
     estimated_hours: { type: int }
+    # bio-A6 structured cost block. All sub-fields optional and additive — pages that
+    # carry only estimated_hours remain valid. md_wallclock_hours is for molecular-dynamics
+    # wall-clock (often dominates GPU time on PROTAC pipelines); wet_lab_usd captures
+    # wet-lab cost in USD; fte_weeks is researcher-time; dataset_access_lead_time_days
+    # surfaces lead time for restricted-access cohorts.
+    estimated_cost:
+      type: object
+      fields:
+        gpu_hours:                       { type: float }
+        cpu_hours:                       { type: float }
+        md_wallclock_hours:              { type: float }
+        wet_lab_usd:                     { type: float }
+        fte_weeks:                       { type: float }
+        dataset_access_lead_time_days:   { type: int }
     remote:
       type: object
       fields:
@@ -177,3 +215,27 @@ foundations:
     first_introduced: { type: str }
     date_updated:     { type: date }
     source_url:       { type: str }
+
+# bio-A1 (pilot merged 2026-05-11): datasets/ as 10th first-class entity. Anchors
+# reusable dataset references (TernaryDB, PROTAC-DB, AlphaFold-DB, …) so that
+# experiments[*].setup.dataset and papers/* mentions can wikilink to a canonical
+# page with version history and access tier.
+datasets:
+  dir: wiki/datasets/
+  fields:
+    title:         { type: str, required: true }
+    slug:          { type: str, required: true }
+    aliases:       { type: list_str, default: [] }
+    tags:          { type: list_str, required: true, default: [] }
+    maturity:      { type: enum, values: [stable, active, emerging, deprecated],
+                     required: true, default: stable }
+    access:        { type: enum, values: [public, registration, restricted, wet-lab-derived],
+                     required: true, default: public }
+    # versions[]: list of {version, released, url, n_entries, notes}. Future C8
+    # lint (bio) compares against experiments[*].reproducibility.dataset_versions[*].
+    versions:      { type: list_object, default: [] }
+    canonical_url: { type: str }
+    license:       { type: str }
+    key_papers:    { type: list_link, to: papers, default: [] }
+    key_concepts:  { type: list_link, to: concepts, default: [] }
+    date_updated:  { type: date }

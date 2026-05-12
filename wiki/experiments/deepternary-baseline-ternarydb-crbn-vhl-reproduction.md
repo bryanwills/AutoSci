@@ -8,7 +8,7 @@ tags: [baseline, deepternary, ternarydb, crbn, vhl, reproduction]
 domain: "Computational Drug Design / Chemical Biology"
 setup:
   model: "DeepTernary (released checkpoint, Nat. Commun. 2025)"
-  dataset: "TernaryDB CRBN+VHL test split (the same split used in the DeepTernary paper)"
+  dataset: "[[ternarydb]] CRBN+VHL test split (the same split used in the DeepTernary paper)"
   hardware: "1 × A100 80GB (or equivalent)"
   framework: "PyTorch + the public DeepTernary inference repo"
 metrics: ["pTernary mean absolute deviation vs paper", "per-tuple Pearson r", "wall-clock per tuple"]
@@ -20,7 +20,14 @@ date_planned: 2026-05-02
 date_completed: ""
 run_log: ""
 started: ""
-estimated_hours: 4
+estimated_hours: 4   # legacy; superseded by estimated_cost.gpu_hours below
+estimated_cost:
+  gpu_hours: 4
+  cpu_hours: 0
+  md_wallclock_hours: 0
+  wet_lab_usd: 0
+  fte_weeks: 0.25
+  dataset_access_lead_time_days: 0   # TernaryDB is public ([[ternarydb]] access: public)
 remote:
   server: ""
   gpu: ""

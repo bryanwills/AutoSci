@@ -64,6 +64,7 @@ _Auto-generated open questions. Do not edit._
 - [concept/ccsb-hi1-human-interactome-v1] Closing the coverage gap toward the full human interactome — addressed by HuRI and successors.
 - [concept/ccsb-hi1-human-interactome-v1] Mapping binary edges onto complex architecture and structural detail — partially addressed by structurally resolved PPI networks built on AlphaFold predictions.
 - [concept/ccsb-hi1-human-interactome-v1] Accounting for tissue- and condition-specific PPIs.
+- [concept/crbn] **PTM-isoform-selective CRBN-PROTAC ranking** — the load-bearing premise of [[ptm-aware-degrader-target-nomination]]. CRBN-trained ternary scorers do not see POI PTM state, so they cannot distinguish wild-type vs phospho-occupied substrate surfaces. Phase-0 noise-floor calibration ([[phase0-noise-floor-calibration-deepternary-ptm-perturbations]]) is the gating experiment.
 - [concept/diffusion-based-structure-prediction] Can MSA-resampling, latent-noise tempering, or guided diffusion be combined with this head to recover dynamical or multi-state behaviour rather than a single static structure?
 - [concept/diffusion-based-structure-prediction] How much of the lift over AF2 is the diffusion head versus the unified trunk versus the broader training data? Ablations isolating each are not reported.
 - [concept/diffusion-based-structure-prediction] Is there a way to add cheap symmetry priors (e.g. chirality-aware noise) without re-introducing the AF2 equivariant machinery?
@@ -123,9 +124,3 @@ _Auto-generated open questions. Do not edit._
 - [concept/ubiquitylation] Quantitative dissection of ubiquitin-pool sharing between proteasomal degradation, autophagy, and signalling.
 - [concept/yeast-two-hybrid-system] How to most efficiently combine Y2H, AP-MS, and proximity labeling to converge on a "ground-truth" human interactome?
 - [concept/yeast-two-hybrid-system] Can Y2H variants be engineered to recover transmembrane and lipid-bilayer-resident interactions at scale?
-- [claim/deep-learning-ensembles-outperform-classical-ml] Deep-learning ensembles with sequence-only input outperform feature-engineered classical ML for PTM site prediction across most PTM types (status: weakly_supported)
-- [claim/diffusion-based-generation-eliminates-need-equivariant] Diffusion-based atom-coordinate generation eliminates the need for equivariant frame-based structure modules (status: weakly_supported)
-- [claim/md-relaxed-phospho-route-comparable-to-native-ptm-tokens] MD-relaxed phospho-structure fallback yields ΔpTernary signal comparable to native CCD-PTM-token Boltz-2 prediction (status: proposed)
-- [claim/multi-omics-ml-network-pharmacology-enables] Integrating multi-omics data with machine learning and network-pharmacology models enables identification of multi-target therapeutic strategies that single-omics analysis cannot recover (status: weakly_supported)
-- [claim/noise-floor-calibrated-deltapternary-improves-ranking] Noise-floor-calibrated ΔpTernary improves PTM-isoform degrader ranking precision over uncalibrated raw ΔpTernary (status: proposed)
-- [claim/ptm-protein-isoforms-enable-selective-drug] PTM protein isoforms enable selective drug design beyond wild-type targets (status: weakly_supported)

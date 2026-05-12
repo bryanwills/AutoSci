@@ -58,6 +58,14 @@ papers:
     domain: Cancer biology / Molecular oncology
 
 concepts:
+  - slug: crbn
+    title: "CRBN (Cereblon)"
+    aliases: [Cereblon, CRL4-CRBN substrate receptor]
+    tags: [e3-ligase, protac, ubiquitin-ligase, drug-discovery]
+    maturity: active
+    gene_symbol: CRBN
+    uniprot_id: Q96SW2
+
   - slug: alphafold-db
     title: "AlphaFold Protein Structure Database (AlphaFold DB)"
     tags: [structural-biology, protein-structure-prediction, databases, bioinformatics]
@@ -297,5 +305,12 @@ experiments:
 Summary:
   - slug: medpredict
     title: "medpredict — ML for Biomedical Molecular Prediction"
+
+datasets:
+  - slug: ternarydb
+    title: "TernaryDB"
+    tags: [protac, ternary-complex, e3-ligase, crbn, vhl, drug-discovery]
+    maturity: active
+    access: public
 
 foundations:
