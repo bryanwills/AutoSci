@@ -1,0 +1,138 @@
+[
+  {
+    "title": "MP2D: Constrained Monte Carlo Tree-Guided Diffusion for Multi-Objective Protein Sequence Design",
+    "abstract": "Designing functional protein sequences that satisfy multiple desired properties is a core research focus of protein engineering. Prior methods struggle with inability or inefficiency when dealing with numerous, often conflicting, properties. We propose Multi-Property Protein Diffusion (MP2D), a unified framework for multi-objective protein sequence optimization that integrates conditional discrete diffusion with constrained MCTS and global iterative refinement. MP2D formulates diffusion denoising as a constrained sequential decision-making process and employs MCTS to explore diverse denoising trajectories guided by Pareto-based rewards. A global iterative refinement strategy further enables repeated remasking and re-optimization of candidate sequences, while a dynamic Pareto constraint prevents candidate bloat and maintains balanced trade-offs across objectives. We evaluate MP2D on two challenging multi-objective protein design tasks: antimicrobial peptide and protein binder optimization, involving four to five conflicting properties. Experimental results demonstrate that MP2D consistently outperforms existing multi-objective baselines, achieving robust and balanced improvements across all objectives without retraining generative models. These results highlight MP2D as a practical and scalable solution for multi-objective functional protein design.",
+    "authors": [
+      "Zitai Kong",
+      "Yifan Dong",
+      "Yixuan Wu",
+      "Zhaokang Liang",
+      "Jian Wu",
+      "Hongxia Xu"
+    ],
+    "arxiv_url": "https://arxiv.org/abs/2605.05829v1",
+    "arxiv_id": "2605.05829",
+    "category": "q-bio.BM",
+    "published": "2026-05-07T08:04:16Z"
+  },
+  {
+    "title": "Enhancing Cryo-EM Density Map Segmentation in Phenix for Improved Atomic Model Building",
+    "abstract": "We introduce PhenixCraft, a fully automated pipeline for building atomic models from cryo-EM density maps. By integrating AlphaFold predictions, we enhance the map-segmentation step in Phenix during model building, addressing challenges posed by noise and artifacts that traditionally hinder this step. Our results demonstrate PhenixCraft's superior performance in TM-scores and sequence accuracy, significantly improving upon the limitations and inefficiencies of traditional model building using Phenix.",
+    "authors": [
+      "Chenwei Zhang"
+    ],
+    "arxiv_url": "https://arxiv.org/abs/2605.05259v1",
+    "arxiv_id": "2605.05259",
+    "category": "q-bio.BM",
+    "published": "2026-05-06T04:51:25Z"
+  },
+  {
+    "title": "Loop Extrusion Reversal by Condensin Motor is Mediated by Catch Bonds",
+    "abstract": "Structural Maintenance Complexes (SMC) are energy consuming motors that are important in folding the genome by loop extrusion (LE) in all stages of the cell cycle. Single molecule magnetic tweezer pulling experiments have revealed that condensin, a member of the SMC family involved in mitosis, takes occasional backward steps, thus coughing up the gains in the length of the extruded loop. To reveal the mechanism of the forward and backward steps simultaneously, we developed a theory using the stochastic kinetic model and the scrunching mechanism for LE. The calculations quantitatively account for the measured force-dependent step size and dwell time distributions in both the directions. By postulating the existence of an intermediate state in the ATP-driven cycle that is poised to take a forward or a backward step, we predict that its lifetime increases as the external mechanical force increases till a critical value and subsequently decreases at higher forces. The surprising finding of lifetime increase in an active motor, at sub-piconewton forces, is the characteristic of catch bonds, known in force-induced rupture of several passive protein complexes. The identification of catch bond-like states in condensin not only expands our understanding of LE but also highlights the significance of mechanical forces in regulating genome organization.",
+    "authors": [
+      "Atreya Dey",
+      "Guang Shi",
+      "Ryota Takaki",
+      "D. Thirumalai"
+    ],
+    "arxiv_url": "https://arxiv.org/abs/2605.04482v1",
+    "arxiv_id": "2605.04482",
+    "category": "q-bio.BM",
+    "published": "2026-05-06T04:18:03Z"
+  },
+  {
+    "title": "Benchmarking open-source tools for in silico antiviral drug discovery",
+    "abstract": "Antivirals are uniquely positioned to be deployed quickly during a new outbreak, especially when repurposed from approved drugs. Yet there are no FDA-approved antivirals for the majority of viral families with pandemic potential. Here we lay out the case for investing in technologies and techniques for antiviral drug discovery and designing antiviral combinations. We present a survey of open source datasets and computational tools for in silico antiviral drug discovery, with a particular focus on the latest AI-based systems and docking tools. We then present our custom dataset of 43,005 viral protein-ligand binding measurements that we curated from BindingDB and other sources. Importantly, we found that 31% of viral protein binding data in BindingDB required polyprotein sequences to be carefully split before the data were suitable for training or testing ML models. Using our custom dataset we fine-tuned the DrugFormDTA binding affinity prediction model (Khokhlov et al. 2025). We then benchmarked 15 open-source binding affinity prediction tools on a custom test set of 853 antiviral compounds spread across 16 different protein targets from 10 virus species. Models tested include Boltz-2, GNINA, FlowDock, Interformer, AutoDock-GPU, and others. We found that Boltz-2 and DrugFormDTA ranked highest overall among ML-based approaches, and GNINA did best among docking approaches, with notable variance across specific viral proteins. Fine-tuning DrugFormDTA on our custom cleaned antiviral dataset boosted performance from $r=0.5$ to $r=0.7$. As part of this work we also compiled a library of approved drugs and a comprehensive list of investigational and approved antiviral drugs that can be viewed at https://antivirals-database.radvac.org. Together, this work provides a foundation for future work towards new tools and platforms for rapid drug repurposing and rapid design of antiviral combinations.",
+    "authors": [
+      "Daniel C. Elton",
+      "Preston W. Estep"
+    ],
+    "arxiv_url": "https://arxiv.org/abs/2605.04265v1",
+    "arxiv_id": "2605.04265",
+    "category": "q-bio.BM",
+    "published": "2026-05-05T19:59:39Z"
+  },
+  {
+    "title": "Mathematical Modeling of Early Embryonic Cell Cycles of Drosophila melanogaster",
+    "abstract": "In the early stages of development, Drosophila melanogaster embryos possess very fast and well-coordinated cell cycles. In the cell cycle, CDK activity is essentially regulated by binding CDK and CycB to form an active complex and by phosphorylating CDK via CDC25 and dephosphorylating it via Wee1. We develop a mathematical model for the embryonic cell cycle which is biochemically sound and which can be rigorously analysed after a model reduction. We show that there exists a region in the parameter space where the model describes oscillations. We then focus on the role of two parameters: the CycB synthesis and the activation coefficient of APC. Our main biological hypothesis is that the first one is responsible for the period lengthening over the first 14 cycles which can be experimentally observed and this hypothesis is supported by numerical simulations of our model: if the CycB synthesis is made time-dependent with a prescribed dynamics, then our simulations show qualitatively a very similar behavior to experimental data reported in the literature.",
+    "authors": [
+      "Meskerem Abebaw Mebratie",
+      "Benedikt Drebes",
+      "Katja Kapp",
+      "Arno Müller",
+      "Werner M. Seiler"
+    ],
+    "arxiv_url": "https://arxiv.org/abs/2605.06598v1",
+    "arxiv_id": "2605.06598",
+    "category": "q-bio.QM",
+    "published": "2026-05-07T17:22:18Z"
+  },
+  {
+    "title": "BioResearcher: Scenario-Guided Multi-Agent for Translational Medicine",
+    "abstract": "Translational medicine turns underspecified development goals into evidence synthesis that must combine literature, trials, patents, and quantitative multi-omics analysis while preserving identifiers, uncertainty, and retrievable provenance. General-purpose foundation models and off-the-shelf tool-augmented or multi-agent systems are not built for this: they tend to produce single-shot answers or run open-endedly, and fall short on the auditable, scenario-specific workflows that heterogeneous biomedical sources demand.  This paper introduces Ingenix BioResearcher, a scenario-guided multi-agent system that maps queries to versioned research playbooks, delegates to specialized subagents over 30+ tools and machine-learning endpoints, mixes structured database access with sandboxed code for genome-scale analyses, and applies claim-level multi-model reconciliation before editorial assembly.  We evaluate BioResearcher across unit-level capabilities, open-ended biomedical reasoning, and end-to-end clinical discovery. It leads evaluated baselines on 109 single-step tests (83.49% pass rate; 0.892 average score), achieves strong biomedical benchmark performance (89.33% on BixBench-Verified-50 and the top 0.758 mean score on BaisBench Scientific Discovery), and leads on a 30-query clinical end-to-end benchmark with the highest positive hit rate (74.7% $\\pm$ 3.3%) and negative clear rate (96.8% $\\pm$ 0.2%). These results show broad, competitive performance across unit-level, open-ended, and end-to-end clinical evaluations.",
+    "authors": [
+      "Remigiusz Kinas",
+      "Joanna Krawczyk",
+      "Rafał Powalski",
+      "Przemysław Pietrzak",
+      "Agnieszka Kowalewska",
+      "Krzysztof Kolmus",
+      "Maciej Sypetkowski",
+      "Łukasz Smoliński",
+      "Tomasz Jetka"
+    ],
+    "arxiv_url": "https://arxiv.org/abs/2605.05985v1",
+    "arxiv_id": "2605.05985",
+    "category": "q-bio.QM",
+    "published": "2026-05-07T10:33:43Z"
+  },
+  {
+    "title": "Planar morphometry via functional shape data analysis and quasi-conformal mappings",
+    "abstract": "The study of shapes is one of the most fundamental problems in life sciences. Although numerous methods have been developed for the morphometry of planar biological shapes over the past several decades, most of them focus solely on either the outer silhouettes or the interior features of the shapes without capturing the coupling between them. Moreover, many existing shape mapping techniques are limited to establishing correspondence between planar structures without further allowing for the quantitative analysis or modelling of shape changes. In this work, we introduce FDA-QC, a novel planar morphometry method that combines functional shape data analysis (FDA) techniques and quasi-conformal (QC) mappings, taking both the boundary and interior of the planar shapes into consideration. Specifically, closed planar curves are represented by their square-root velocity functions and registered by elastic matching in the function space. The induced boundary correspondence is then extended to the entire planar domains by a quasi-conformal map, optionally with landmark constraints. Moreover, the proposed FDA-QC method can naturally lead to a unified framework for shape morphing and shape variation quantification. We apply the FDA-QC method to various leaf and insect wing datasets, and the experimental results show that the proposed combined approach captures morphological variation more effectively than purely boundary-based or interior-based descriptions. Altogether, our work paves a new way for understanding the growth and form of planar biological shapes.",
+    "authors": [
+      "Hangyu Li",
+      "Gary P. T. Choi"
+    ],
+    "arxiv_url": "https://arxiv.org/abs/2605.05778v1",
+    "arxiv_id": "2605.05778",
+    "category": "q-bio.QM",
+    "published": "2026-05-07T07:15:52Z"
+  },
+  {
+    "title": "ActCam: Zero-Shot Joint Camera and 3D Motion Control for Video Generation",
+    "abstract": "For artistic applications, video generation requires fine-grained control over both performance and cinematography, i.e., the actor's motion and the camera trajectory. We present ActCam, a zero-shot method for video generation that jointly transfers character motion from a driving video into a new scene and enables per-frame control of intrinsic and extrinsic camera parameters. ActCam builds on any pretrained image-to-video diffusion model that accepts conditioning in terms of scene depth and character pose. Given a source video with a moving character and a target camera motion, ActCam generates pose and depth conditions that remain geometrically consistent across frames. We then run a single sampling process with a two-phase conditioning schedule: early denoising steps condition on both pose and sparse depth to enforce scene structure, after which depth is dropped and pose-only guidance refines high-frequency details without over-constraining the generation. We evaluate ActCam on multiple benchmarks spanning diverse character motions and challenging viewpoint changes. We find that, compared to pose-only control and other pose and camera methods, ActCam improves camera adherence and motion fidelity, and is preferred in human evaluations, especially under large viewpoint changes. Our results highlight that careful camera-consistent conditioning and staged guidance can enable strong joint camera and motion control without training. Project page: https://elkhomar.github.io/actcam/.",
+    "authors": [
+      "Omar El Khalifi",
+      "Thomas Rossi",
+      "Oscar Fossey",
+      "Thibault Fouque",
+      "Ulysse Mizrahi",
+      "Philip Torr",
+      "Ivan Laptev",
+      "Fabio Pizzati",
+      "Baptiste Bellot-Gurlet"
+    ],
+    "arxiv_url": "https://arxiv.org/abs/2605.06667v1",
+    "arxiv_id": "2605.06667",
+    "category": "cs.LG",
+    "published": "2026-05-07T17:59:58Z"
+  },
+  {
+    "title": "UniPool: A Globally Shared Expert Pool for Mixture-of-Experts",
+    "abstract": "Modern Mixture-of-Experts (MoE) architectures allocate expert capacity through a rigid per-layer rule: each transformer layer owns a separate expert set. This convention couples depth scaling with linear expert-parameter growth and assumes that every layer needs isolated expert capacity. However, recent analyses and our routing probe challenge this allocation rule: replacing a deeper layer's learned top-k router with uniform random routing drops downstream accuracy by only 1.0-1.6 points across multiple production MoE models. Motivated by this redundancy, we propose UniPool, an MoE architecture that treats expert capacity as a global architectural budget by replacing per-layer expert ownership with a single shared pool accessed by independent per-layer routers. To enable stable and balanced training under sharing, we introduce a pool-level auxiliary loss that balances expert utilization across the entire pool, and adopt NormRouter to provide sparse and scale-stable routing into the shared expert pool. Across five LLaMA-architecture model scales (182M, 469M, 650M, 830M, and 978M parameters) trained on 30B tokens from the Pile, UniPool consistently improves validation loss and perplexity over the matched vanilla MoE baselines. Across these scales, UniPool reduces validation loss by up to 0.0386 relative to vanilla MoE. Beyond raw loss improvement, our results identify pool size as an explicit depth-scaling hyperparameter: reduced-pool UniPool variants using only 41.6%-66.7% of the vanilla expert-parameter budget match or outperform layer-wise MoE at the tested scales. This shows that, under a shared-pool design, expert parameters need not grow linearly with depth; they can grow sublinearly while remaining more efficient and effective than vanilla MoE. Further analysis shows that UniPool's benefits compose with finer-grained expert decomposition.",
+    "authors": [
+      "Minbin Huang",
+      "Han Shi",
+      "Chuanyang Zheng",
+      "Yimeng Wu",
+      "Guoxuan Chen",
+      "Xintong Yu",
+      "Yichun Yin",
+      "Hong Cheng"
+    ],
+    "arxiv_url": "https://arxiv.org/abs/2605.06665v1",
+    "arxiv_id": "2605.06665",
+    "category": "cs.LG",
+    "published": "2026-05-07T17:59:44Z"
+  }
+]
