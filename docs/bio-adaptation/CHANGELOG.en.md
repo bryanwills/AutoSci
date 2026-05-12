@@ -1891,3 +1891,40 @@ the minimal pilot lets the agent call NCBI E-utilities URLs directly via WebFetc
 | Active SKILL.md line count | 253 (up from 217) |
 
 Section C status: 4/9 → 5/9.
+
+---
+
+## 2026-05-12 — C6 minimal pilot merge: `/exp-design` statistical defaults rebuilt around bio regimes
+
+**Scope**: `/exp-design` previously recommended ">= 3 seeds" blanket for validation / ablation.
+Bio test sets are routinely n_test < 50 with class imbalance; multi-seed alone does not produce
+reliable CIs — bootstrap CI + stratified k-fold is the standard. Wet-lab assays additionally need
+biological vs technical replicate separation. C6 minimal inserts a 4-regime table in Step 3.
+**Status**: **C6 minimal merged as pure-prompt change**. Full C6 (per-protocol Review LLM prompt
+variants, a `tools/research_wiki.py validate-setup` warning when chosen protocol contradicts
+n_test, `/exp-eval` routing to the protocol-specific p-value test) deferred.
+
+### Files touched
+
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`:
+  - Step 3 inserts a "Statistical defaults" 4-row table between Bio-specific block types and
+    "Each experiment block carries": ML-large (n_test >= 50 → >= 3 seeds) / Bio small-n
+    (n_test < 50 → bootstrap CI ≥ 1000 resamples + stratified k-fold k = min(5, n_positives))
+    / Bio very-small-n (n_test < 10 → leave-one-out CV + bootstrap CI on headline) /
+    Wet-lab assay (>= 3 biological × >= 3 technical replicates with explicit labelling).
+    Each row lists the value to record in `setup.random_seed_protocol` (A5 full field).
+  - Adds class-imbalance check: when `min(n_positives, n_negatives) < 20`, stratify k-fold
+    by class AND report per-class metrics, not just headline AUC.
+  - Step 3 B Validation, Step 3 `seeds` line, Step 5 Review LLM question 5, and Constraints
+    "At least 3 seeds" all updated to reference the table.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | identical |
+| `grep -c "bootstrap\|stratified-k-fold\|LOO-CV\|biological.*technical" .claude/skills/exp-design/SKILL.md` | ≥ 10 |
+| Active SKILL.md line count | 405 (up from 366) |
+
+Section C status: 5/9 → 6/9.

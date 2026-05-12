@@ -97,7 +97,7 @@ argument-hint: <idea-slug-or-hypothesis> [--linked-idea <idea-slug>] [--review] 
 **B. Validation 实验（验证 Target）**：
 - 目的：在基线之上验证 idea 的核心命题
 - 指标：比 baseline 有统计显著提升
-- 需要足够的 seed/run 数量确保可靠性（建议 >= 3 seeds）
+- 统计默认值：见下方 "Statistical defaults" 子节 —— `>= 3 seeds` 仅在 `n_test >= 50` 时足够;小样本 bio 集合需 bootstrap CI + stratified k-fold。
 - 计算量：中等
 
 **C. Ablation 实验（验证 Decomposition 因子）**：
@@ -119,6 +119,17 @@ argument-hint: <idea-slug-or-hypothesis> [--linked-idea <idea-slug>] [--review] 
 - **G. dose_response** —— 剂量梯度设计，自变量是有生物学意义的连续量（配体浓度、暴露时长、表达量）。与超参扫描区别：梯度是生物学的而非算法的，预期形状（sigmoidal IC50/EC50、激素效应、阈值）本身就含机制信息。
 - **H. cross_context** —— 跨物种 / 跨细胞系 / 跨组织的泛化。与 D 类 ML 跨数据集 robustness 区别：失败模式不同（PTM 底物 motif 的物种漂移、不同实验室的批次效应、细胞系特异的辅因子表达）。当声明指向人体临床转化时，至少需要一个针对目标临床物种 / 组织的 cross_context 块。
 
+**Statistical defaults**（bio-C6 minimal pilot 2026-05-12 合并）：按测试集大小与 assay 类型选复制策略，并把结果记入 `setup.random_seed_protocol`（A5 full 字段）。小样本 bio 集合仅靠多 seed 通常不够。
+
+| 形态 | 测试集大小 | 默认协议 | 记入 `random_seed_protocol` |
+|---|---|---|---|
+| ML 大样本 | `n_test >= 50` | `>= 3 random seeds` 足够 —— 报告跨 seed 的均值 ± 标准差 | `ranking-shuffle`（或 `multi-seed`） |
+| Bio 小样本 | `n_test < 50` | **bootstrap CI**（≥ 1000 次重抽）头条指标 + **stratified k-fold** `k = min(5, n_positives)` 避免类不平衡偏差。叠多 seed 可以,不可替代以上。 | `bootstrap`（bootstrap CI 主导时）或 `stratified-k-fold`（CV 主导时） |
+| Bio 极小样本 | `n_test < 10` | **leave-one-out CV** 替代 k-fold（k = n_test）;头条指标仍报 bootstrap CI | `LOO-CV` |
+| Wet-lab assay | 任意 | `>= 3 biological replicates × >= 3 technical replicates`。在 `## Procedure` 中显式标哪个是哪个;biological replicate 是独立样本,technical replicate 是同一样本重复读 —— 二者答不同问题。 | 在 `## Procedure` 文档 bio×tech 拆分;若与 in-silico 重抽混合再填 `random_seed_protocol` |
+
+类不平衡检查：二分类任务若 `min(n_positives, n_negatives) < 20`,k-fold 按类分层 AND 报告逐类指标,不仅是头条 AUC。在不平衡 bio 集上只报 AUC 经常掩盖少数类的大幅下降。
+
 每个实验块包含：
 - `title`：描述性标题
 - `linked_idea`：源 idea slug（必填；schema 要求字段，写入时校验）
@@ -129,7 +140,7 @@ argument-hint: <idea-slug-or-hypothesis> [--linked-idea <idea-slug>] [--review] 
 - `baseline`：对比基线
 - `success_criterion`：明确的成功/失败标准（写在实验页面的 `## Procedure` 节）
 - `estimated_gpu_hours`：预估计算时间
-- `seeds`：随机种子数量（建议 >= 3）
+- `seeds`：随机种子数量（`n_test >= 50` 时 >= 3;小样本 bio 集合按上方 Statistical defaults 表用 bootstrap / stratified-k-fold / LOO-CV —— 把选择记入 `setup.random_seed_protocol`）
 
 ### Step 4: 构建执行顺序（Build Run Order）
 
@@ -187,7 +198,7 @@ mcp__llm-review__chat:
     2. Are the baselines fair and comprehensive?
     3. Is the ablation design sufficient to isolate each contribution?
     4. Are the success criteria well-defined and reasonable?
-    5. Any statistical concerns (sample size, variance, seeds)?
+    5. Any statistical concerns (sample size, variance, seeds)? For small-n bio sets (n_test < 50), is the protocol bootstrap CI + stratified k-fold (or LOO-CV when n_test < 10), or does it still rely on multi-seed only? For wet-lab assays, are biological vs technical replicates explicitly labelled?
 ```
 
 根据 Review LLM 反馈调整实验计划（添加遗漏的实验、修正不合理的标准）。
@@ -348,7 +359,7 @@ mcp__llm-review__chat:
 - **实验不可重复**：创建前扫描 `wiki/experiments/*.md` 中是否已存在相同 `linked_idea` + `hypothesis` 的实验。
 - **scope sheet 不持久化**：Step 2 的维度表是规划产物，不写入 wiki。`/exp-design` 不得创建新的 concept/method/topic 页面。
 - **success criterion 必须量化**：每个实验块的成功标准必须包含具体数值（如 "> 2% accuracy improvement"），写在 `## Procedure` 正文章节。
-- **至少 3 个 seeds**：需要统计可靠性的实验（validation, ablation）必须指定 >= 3 个 random seeds。
+- **统计可靠性**：需要统计可靠性的实验（validation、ablation）必须按 Step 3 Statistical defaults 表指定协议。`n_test >= 50`：>= 3 random seeds。`n_test < 50`：bootstrap CI + stratified k-fold（`n_test < 10` 改 LOO-CV）。Wet-lab assay：>= 3 biological × >= 3 technical replicates 并显式标注。
 - **graph edges 使用 tools/research_wiki.py**：不手动编辑 `edges.jsonl`。
 - **idea status 只能前进**：`proposed → in_progress`，不可逆（受 `entities.yaml::ideas.lifecycle` 约束）。
 - **slug 唯一性**：创建前检查是否存在相同 slug。

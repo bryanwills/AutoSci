@@ -97,7 +97,7 @@ Design experiment blocks for each scope row. Four types:
 **B. Validation experiments (validate Target)**:
 - Purpose: validate the idea's central proposition on top of the baseline
 - Metrics: statistically significant improvement over baseline
-- Requires sufficient seed/run count for reliability (recommend >= 3 seeds)
+- Statistical defaults: see "Statistical defaults" sub-section below — `>= 3 seeds` only when `n_test >= 50`; small-n bio sets need bootstrap CI + stratified k-fold instead.
 - Compute: moderate
 
 **C. Ablation experiments (validate Decomposition factors)**:
@@ -119,6 +119,17 @@ Design experiment blocks for each scope row. Four types:
 - **G. dose_response** — dose-gradient design with a biologically meaningful continuous variable (ligand concentration, exposure duration, expression level). Distinct from hyperparameter sweeps: the gradient is biological, not algorithmic, and the expected shape (sigmoidal IC50/EC50, hormesis, threshold) is informative about mechanism.
 - **H. cross_context** — cross-organism / cross-cell-line / cross-tissue generalisation. Distinct from ML cross-dataset robustness (D): failure modes differ (species drift in PTM substrate motifs, batch effects from different labs, cell-line-specific cofactor expression). When a claim is human-clinical-translation-relevant, at minimum one cross_context block targeting the intended clinical species/tissue is recommended.
 
+**Statistical defaults** (bio-C6 minimal pilot merged 2026-05-12): choose the replication strategy by test-set size and assay type, then record the choice in `setup.random_seed_protocol` (A5 full field). Multi-seed alone is rarely enough for small-n bio sets.
+
+| Regime | Test-set size | Default protocol | Record in `random_seed_protocol` |
+|---|---|---|---|
+| ML-large | `n_test >= 50` | `>= 3 random seeds` is sufficient — report mean ± std across seeds | `ranking-shuffle` (or `multi-seed`) |
+| Bio small-n | `n_test < 50` | **bootstrap CI** (≥ 1000 resamples) for headline metric + **stratified k-fold** with `k = min(5, n_positives)` to avoid class-imbalance bias. Multi-seed on top is fine but does not replace these. | `bootstrap` (when bootstrap CI dominates) or `stratified-k-fold` (when CV dominates) |
+| Bio very-small-n | `n_test < 10` | **leave-one-out CV** instead of k-fold (k = n_test); still report bootstrap CI on headline metric | `LOO-CV` |
+| Wet-lab assay | any | `>= 3 biological replicates × >= 3 technical replicates`. Explicitly label which is which in `## Procedure`; biological replicates are independent samples, technical replicates are repeated reads of the same sample — they answer different questions. | document the bio×tech split in `## Procedure`; leave `random_seed_protocol` empty unless mixed with in-silico re-sampling |
+
+Class imbalance check: for binary tasks where `min(n_positives, n_negatives) < 20`, stratify k-fold by class AND report per-class metrics, not just headline AUC. Reporting only AUC on imbalanced bio sets routinely hides large drops on the minority class.
+
 Each experiment block carries:
 - `title`: descriptive title
 - `linked_idea`: the source idea slug (mandatory; required by the schema and validated at write time)
@@ -129,7 +140,7 @@ Each experiment block carries:
 - `baseline`: comparison baseline
 - `success_criterion`: explicit pass/fail criterion (will live in `## Procedure` of the experiment page)
 - `estimated_gpu_hours`: estimated compute time
-- `seeds`: number of random seeds (recommend >= 3)
+- `seeds`: number of random seeds (>= 3 for `n_test >= 50`; for smaller bio sets, use bootstrap / stratified-k-fold / LOO-CV per the Statistical defaults table — record the choice in `setup.random_seed_protocol`)
 
 ### Step 4: Build Run Order
 
@@ -187,7 +198,7 @@ mcp__llm-review__chat:
     2. Are the baselines fair and comprehensive?
     3. Is the ablation design sufficient to isolate each contribution?
     4. Are the success criteria well-defined and reasonable?
-    5. Any statistical concerns (sample size, variance, seeds)?
+    5. Any statistical concerns (sample size, variance, seeds)? For small-n bio sets (n_test < 50), is the protocol bootstrap CI + stratified k-fold (or LOO-CV when n_test < 10), or does it still rely on multi-seed only? For wet-lab assays, are biological vs technical replicates explicitly labelled?
 ```
 
 Revise the experiment plan based on Review LLM feedback (add missing experiments, correct unreasonable criteria).
@@ -352,7 +363,7 @@ Revise the experiment plan based on Review LLM feedback (add missing experiments
 - **No duplicate experiments**: before creating, scan `wiki/experiments/*.md` for existing experiments with the same `linked_idea` + `hypothesis`.
 - **Scoped propositions are not persisted**: the dimension table from Step 2 is a planning artifact, not a wiki write. Do not create new concept/method/topic pages from `/exp-design`.
 - **Success criteria must be quantified**: each experiment block's success criterion must include a specific number (e.g. "> 2% accuracy improvement"). Place it in the `## Procedure` body section.
-- **At least 3 seeds**: experiments requiring statistical reliability (validation, ablation) must specify >= 3 random seeds.
+- **Statistical reliability**: experiments requiring statistical reliability (validation, ablation) must specify a protocol from the Step 3 Statistical defaults table. For `n_test >= 50`: >= 3 random seeds. For `n_test < 50`: bootstrap CI + stratified k-fold (or LOO-CV when `n_test < 10`). For wet-lab assays: >= 3 biological × >= 3 technical replicates with explicit labelling.
 - **Graph edges via tools/research_wiki.py**: do not manually edit `edges.jsonl`.
 - **Idea status advances only forward**: `proposed → in_progress`, irreversible (governed by `entities.yaml::ideas.lifecycle`).
 - **Slug uniqueness**: check for existing slug before creating.

@@ -1801,3 +1801,38 @@ NCBI E-utilities URL。
 | 活动 SKILL.md 行数 | 253（升自 217） |
 
 Section C 状态：4/9 → 5/9。
+
+---
+
+## 2026-05-12 —— C6 minimal pilot merge：`/exp-design` 统计默认值改 bio 形态
+
+**范围**：`/exp-design` 此前对 validation / ablation 一律建议 ">= 3 seeds"。bio 测试集常 n_test < 50
+且类不平衡，仅多 seed 不能给出可靠 CI ——bootstrap CI + stratified k-fold 是标准做法。湿实验
+还需 biological vs technical replicates 区分。C6 minimal 在 Step 3 加 4 形态表。
+**状态**：**C6 minimal 以纯 prompt 形态合并**。完整 C6（每种协议的 Review LLM prompt 变体、
+`tools/research_wiki.py validate-setup` 当协议与 n_test 矛盾时 warn、`/exp-eval` 按协议接入
+对应 p-value 检验）延后。
+
+### 改动位置
+
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`：
+  - Step 3 在 Bio-specific block types 之后、"每个实验块包含" 之前插入 "Statistical defaults"
+    4 行表：ML-large（n_test >= 50 → >= 3 seeds）/ Bio small-n（n_test < 50 → bootstrap CI
+    ≥ 1000 resamples + stratified k-fold k = min(5, n_positives)）/ Bio very-small-n
+    （n_test < 10 → leave-one-out CV + bootstrap CI 头条）/ Wet-lab assay（>= 3 biological ×
+    >= 3 technical replicates 并显式标注）。每行末尾列出 `setup.random_seed_protocol`
+    （A5 full 字段）应记录的值。
+  - 加类不平衡检查：`min(n_positives, n_negatives) < 20` 时按类分层 k-fold AND 报告逐类指标。
+  - Step 3 B Validation、Step 3 `seeds` 行、Step 5 Review LLM 问题 5、Constraints
+    "At least 3 seeds" 全部更新为引用此表。
+
+### 验证
+
+| 检查 | 结果 |
+|---|---|
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | 一致 |
+| `grep -c "bootstrap\|stratified-k-fold\|LOO-CV\|biological.*technical" .claude/skills/exp-design/SKILL.md` | ≥ 10 |
+| 活动 SKILL.md 行数 | 405（升自 366） |
+
+Section C 状态：5/9 → 6/9。
