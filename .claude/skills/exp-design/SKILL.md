@@ -67,6 +67,12 @@ argument-hint: <idea-slug-or-hypothesis> [--linked-idea <idea-slug>] [--review] 
    - From the idea's `origin_gaps`, read each `wiki/concepts/{slug}.md` or `wiki/topics/{slug}.md`. From their `key_papers` (concepts) / `## Seminal works` + `## SOTA tracker` (topics), recover the relevant `wiki/papers/*.md` for baseline setups.
    - From `## Approach sketch` wikilinks, read the referenced `wiki/methods/{slug}.md` pages — these tell you which reusable techniques the idea inherits and shape the ablation factors.
    - Read existing `wiki/experiments/*.md` whose `linked_idea` matches this idea (avoid duplicating prior designs).
+3. **Detect wet-lab dependencies** (bio-C5 minimal pilot merged 2026-05-12):
+   - Scan the idea's `## Hypothesis`, `## Risks`, and `## Approach sketch` (plus any free-text input) for wet-lab indicator phrases: `in cell`, `cellular target engagement`, `in vivo`, `tumor regression`, `binding assay`, `ELISA`, `Western blot`, `co-IP`, `cryo-EM`, `point mutation`, `knockdown`, `knockout`, `IC50`, `Kd`.
+   - If any phrase matches: prompt the user once with the matched list and ask whether the project has wet-lab access. Record the answer as `wet_lab_planned: true | false`.
+     - `true` → in Step 3, plan one or more experiment blocks with `setup.in_silico_or_wet: wet_lab` (or `mixed` for hybrid in-silico-prediction + wet-lab-validation blocks). The wet-lab block uses `## Procedure` for the protocol and `setup.assay_type` / `setup.cell_line` / `setup.species` to anchor reproducibility.
+     - `false` → narrow scope to retrospective-only (all blocks `setup.in_silico_or_wet: in_silico`) and record the constraint in each experiment page's `## Procedure` section: "Retrospective-only — wet-lab follow-up out of scope for this run; deferred to a future cycle gated on wet-lab access."
+   - If no phrase matches: skip silently. Pure-ML / pure-in-silico designs do not need to ask.
 
 ### Step 2: Scope the Hypothesis
 
@@ -106,11 +112,18 @@ Design experiment blocks for each scope row. Four types:
 - Test at least 2 variation dimensions
 - Compute: depends on `--budget`
 
+**Bio-specific block types** (bio-C4 minimal pilot merged 2026-05-12): use these in addition to A–D when the idea has bio-domain shape. They are independent of A–D — a single experiment can carry both an A–D tag and a bio tag (e.g. `tags: [validation, mechanism]`). Block type is captured as a tag rather than a frontmatter enum.
+
+- **E. negative_control** — sham / scrambled / placebo controls. Distinct from baseline-reproduction (A): baseline reproduces a published method's reported numbers; negative_control rules out confounding signal that a non-functional comparator would also pick up (e.g. scrambled-sequence PROTAC, catalytically dead enzyme, vehicle-only treatment). Use when the central claim is at risk of being a non-specific effect.
+- **F. mechanism** — validates the predicted causal mechanism, not just the outcome. Typical shape: point-mutate the predicted active site / PTM site / binding residue and check the predicted effect disappears; or use a chemical probe that specifically blocks the proposed mechanism. Distinct from validation (B): validation tests "does the headline number improve"; mechanism tests "is the improvement actually caused by what we said it was."
+- **G. dose_response** — dose-gradient design with a biologically meaningful continuous variable (ligand concentration, exposure duration, expression level). Distinct from hyperparameter sweeps: the gradient is biological, not algorithmic, and the expected shape (sigmoidal IC50/EC50, hormesis, threshold) is informative about mechanism.
+- **H. cross_context** — cross-organism / cross-cell-line / cross-tissue generalisation. Distinct from ML cross-dataset robustness (D): failure modes differ (species drift in PTM substrate motifs, batch effects from different labs, cell-line-specific cofactor expression). When a claim is human-clinical-translation-relevant, at minimum one cross_context block targeting the intended clinical species/tissue is recommended.
+
 Each experiment block carries:
 - `title`: descriptive title
 - `linked_idea`: the source idea slug (mandatory; required by the schema and validated at write time)
 - `hypothesis`: specific hypothesis the experiment tests
-- `type`: baseline / validation / ablation / robustness — captured as a tag rather than a frontmatter enum (the schema has no `type` field on experiments)
+- `type`: baseline / validation / ablation / robustness — and optionally any of negative_control / mechanism / dose_response / cross_context for bio designs. Captured as a tag rather than a frontmatter enum (the schema has no `type` field on experiments).
 - `setup`: model, dataset, hardware, framework
 - `metrics`: list of evaluation metrics
 - `baseline`: comparison baseline
@@ -200,6 +213,21 @@ Revise the experiment plan based on Review LLM feedback (add missing experiments
      dataset: ""
      hardware: ""
      framework: ""
+     # bio-A5 full (pilot merged 2026-05-12): optional bio-shaped setup fields. Leave empty
+     # for pure-ML designs — they remain valid. in_silico_or_wet is driven by the Step 1
+     # wet-lab-dependency detection; force_field / solvent_model / simulation_length apply
+     # only to MD pipelines; species / cell_line / assay_type cover wet-lab + cross-context;
+     # weight_version captures multi-version ML models; random_seed_protocol records the
+     # actual replication strategy.
+     in_silico_or_wet: ""         # in_silico | wet_lab | mixed
+     species: []                  # ["human"] | ["mouse", "human"] | …
+     cell_line: ""                # prefer Cellosaurus ID (e.g. CVCL_0023 for HEK293T)
+     assay_type: ""               # MD | docking | scoring | Y2H | AP-MS | cryo-EM | NMR | binding_assay | …
+     force_field: ""              # MD only (e.g. "AMBER ff14SB + phosaa14SB")
+     solvent_model: ""            # MD only (explicit | implicit | vacuum)
+     simulation_length: ""        # MD only (e.g. "50 ns")
+     weight_version: ""           # multi-version ML models (e.g. "Boltz-2 Jan 2026 weights")
+     random_seed_protocol: ""     # ranking-shuffle | bootstrap | stratified-k-fold | LOO-CV
    metrics: []
    baseline: ""
    outcome: ""                  # empty until /exp-run Phase 4 — succeeded | failed | inconclusive

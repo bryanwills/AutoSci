@@ -11,6 +11,15 @@ setup:
   dataset: "≈25 matched phospho-PROTAC tuples from the held-out track in [[calibrated-deltapternary-phospho-protac-ranking]] where (a) the PTM site has a CCD-PTM token in Boltz-2 AND (b) the wild-type POI has a PDB or AlphaFold-DB v4 structure with pLDDT > 70 in the modification region (to seed MD)"
   hardware: "2 × A100 80GB (Boltz-2 inference) + 1 × A100 80GB MD node, MD wall-clock dominates"
   framework: "Boltz-2 + GROMACS or OpenMM for MD relaxation + DeepTernary + the same calibration table from Phase-0"
+  in_silico_or_wet: "in_silico"
+  species: ["human"]
+  cell_line: ""
+  assay_type: "MD + scoring"
+  force_field: "AMBER ff14SB + phosaa14SB"
+  solvent_model: "explicit"
+  simulation_length: "50 ns"
+  weight_version: "Boltz-2 (Jan 2026 weights, native CCD-PTM tokens) + DeepTernary (Nat Commun 2025 checkpoint)"
+  random_seed_protocol: "ranking-shuffle (5 MD seeds × ≈25 tuples)"
 metrics: ["per-tuple ΔpTernary Pearson r between routes", "mean absolute disagreement (normalised score units)", "per-tuple per-route confidence intervals", "MD wall-clock per tuple vs Boltz-2 wall-clock per tuple"]
 baseline: "Boltz-2 native CCD-PTM-token route (the headline route used in Stage 2b)"
 outcome: ""

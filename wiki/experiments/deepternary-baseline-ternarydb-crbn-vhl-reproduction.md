@@ -11,6 +11,15 @@ setup:
   dataset: "[[ternarydb]] CRBN+VHL test split (the same split used in the DeepTernary paper)"
   hardware: "1 × A100 80GB (or equivalent)"
   framework: "PyTorch + the public DeepTernary inference repo"
+  in_silico_or_wet: "in_silico"
+  species: ["human"]
+  cell_line: ""
+  assay_type: "scoring"
+  force_field: ""
+  solvent_model: ""
+  simulation_length: ""
+  weight_version: "DeepTernary (released checkpoint, Nat Commun 2025)"
+  random_seed_protocol: "ranking-shuffle (>= 3 seeds)"
 metrics: ["pTernary mean absolute deviation vs paper", "per-tuple Pearson r", "wall-clock per tuple"]
 baseline: "DeepTernary published values on the same split"
 outcome: ""

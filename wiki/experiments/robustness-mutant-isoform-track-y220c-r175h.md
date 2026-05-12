@@ -11,6 +11,15 @@ setup:
   dataset: "Held-out mutant-isoform PROTAC track: ≈6-10 entries covering p53-Y220C bifunctional recruiters and p53-R175H bifunctional recruiters (PROTAC-DB + literature curation); matched negatives from PROTAC-DB CRBN+VHL"
   hardware: "1 × A100 80GB"
   framework: "Same as Stage 2b; per-POI noise-floor table extended to cover mutant POI variants (random size-matched residue substitutions, not chemical modifications)"
+  in_silico_or_wet: "in_silico"
+  species: ["human"]
+  cell_line: ""
+  assay_type: "scoring (mutant POI sequence input, not chemical modification)"
+  force_field: ""
+  solvent_model: ""
+  simulation_length: ""
+  weight_version: "Boltz-2 (Jan 2026 weights, no CCD-PTM tokens — mutation handled by sequence input) + DeepTernary"
+  random_seed_protocol: "ranking-shuffle"
 metrics: ["top-K=20 AUC on mutant-isoform track", "AUC lift over PTM-blind baseline on mutant-isoform track", "absolute difference vs phospho-PROTAC AUC lift", "per-POI breakdown of the two tracks side by side"]
 baseline: "PTM-blind DeepTernary ranking (WT POI = wild-type p53 in this case) on the mutant-isoform held-out set"
 outcome: ""

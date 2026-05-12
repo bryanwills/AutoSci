@@ -11,6 +11,15 @@ setup:
   dataset: "Held-out phospho-PROTAC track: true experimental phospho-PROTACs (phospho-BCL-XL family, ≈8-10 entries) + synthetic positives from kinase-substrate phospho-degron pairs in DegronMD (≈30-50 entries); negatives from PTM-blind PROTAC-DB CRBN+VHL entries with no known PTM-isoform selectivity"
   hardware: "2 × A100 80GB (Boltz-2 inference dominates wall-clock)"
   framework: "Boltz-2 + DeepTernary + custom ranking pipeline that consumes the Phase-0 per-POI noise-floor calibration table"
+  in_silico_or_wet: "in_silico"
+  species: ["human"]
+  cell_line: ""
+  assay_type: "scoring"
+  force_field: ""
+  solvent_model: ""
+  simulation_length: ""
+  weight_version: "Boltz-2 (Jan 2026 weights, native CCD-PTM tokens) + DeepTernary (Nat Commun 2025 checkpoint)"
+  random_seed_protocol: "ranking-shuffle (>= 5 seeds)"
 metrics: ["top-K (K=20) ranking AUC", "AUC lift over PTM-blind baseline", "per-seed mean and std", "noise-floor-bounded confidence band on the AUC lift"]
 baseline: "DeepTernary on WT-only POI structure (PTM-blind ranking) on the same held-out set"
 outcome: ""

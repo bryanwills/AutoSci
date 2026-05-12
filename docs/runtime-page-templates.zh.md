@@ -164,6 +164,20 @@ setup:
   dataset: ""
   hardware: ""
   framework: ""
+  # bio-A5 full（2026-05-12 pilot merge）：可选的 bio 形态 setup 字段。纯 ML 设计留空仍合法。
+  # in_silico_or_wet 驱动 /exp-design 湿实验探测与 /exp-run 目录布局。force_field /
+  # solvent_model / simulation_length 仅 MD 流水线。species / cell_line / assay_type
+  # 覆盖湿实验与 cross_context。weight_version 捕获多版本 ML 模型。random_seed_protocol
+  # 记录实际复制策略（多 seed 对小样本 bio n 通常不够）。
+  in_silico_or_wet: ""         # in_silico | wet_lab | mixed
+  species: []                  # ["human"] | ["mouse", "human"] | …
+  cell_line: ""                # 优先 Cellosaurus ID（如 HEK293T 是 CVCL_0023）
+  assay_type: ""               # MD | docking | scoring | Y2H | AP-MS | cryo-EM | NMR | binding_assay | …
+  force_field: ""              # 仅 MD（如 "AMBER ff14SB + phosaa14SB"）
+  solvent_model: ""            # 仅 MD（explicit | implicit | vacuum）
+  simulation_length: ""        # 仅 MD（如 "50 ns"）
+  weight_version: ""           # 多版本 ML 模型（如 "Boltz-2 Jan 2026 weights"）
+  random_seed_protocol: ""     # ranking-shuffle | bootstrap | stratified-k-fold | LOO-CV
 metrics: []
 baseline: ""
 outcome: ""               # succeeded | failed | inconclusive

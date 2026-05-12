@@ -11,6 +11,15 @@ setup:
   dataset: "Held-out tracks: (a) mono-ubiquitylation-degron PROTACs (≈10-15 entries from PROTAC-DB + literature mining), (b) methylation-degron PROTACs (≈8-12 entries from histone methylation degraders + EZH2-substrate degraders); matched negatives from PROTAC-DB CRBN+VHL with no annotated PTM-isoform selectivity"
   hardware: "2 × A100 80GB"
   framework: "Same as Stage 2b; only the held-out track changes; per-POI noise-floor table extended to cover the new POIs"
+  in_silico_or_wet: "in_silico"
+  species: ["human"]
+  cell_line: ""
+  assay_type: "scoring"
+  force_field: ""
+  solvent_model: ""
+  simulation_length: ""
+  weight_version: "Boltz-2 (Jan 2026 weights, native CCD-PTM tokens for ubiquitin + methyl marks) + DeepTernary (Stage 2b config)"
+  random_seed_protocol: "ranking-shuffle (matched seed budget to phospho-PROTAC track)"
 metrics: ["top-K=20 AUC per track", "AUC lift over PTM-blind baseline per track", "cross-track per-POI noise-floor comparison (phospho vs ubiq vs methyl-perturbation magnitudes)"]
 baseline: "PTM-blind DeepTernary ranking (WT-only POI) on each respective track"
 outcome: ""

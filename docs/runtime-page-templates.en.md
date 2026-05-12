@@ -166,6 +166,21 @@ setup:
   dataset: ""
   hardware: ""
   framework: ""
+  # bio-A5 full (pilot merged 2026-05-12): optional bio-shaped setup fields. Leave empty
+  # for pure-ML designs — they remain valid. in_silico_or_wet drives /exp-design wet-lab
+  # detection and /exp-run directory layout. force_field / solvent_model / simulation_length
+  # are MD-specific. species / cell_line / assay_type cover wet-lab + cross-context.
+  # weight_version captures multi-version ML models. random_seed_protocol records the
+  # actual replication strategy (multi-seed alone often isn't enough for small bio n).
+  in_silico_or_wet: ""         # in_silico | wet_lab | mixed
+  species: []                  # ["human"] | ["mouse", "human"] | …
+  cell_line: ""                # prefer Cellosaurus ID (e.g. CVCL_0023 for HEK293T)
+  assay_type: ""               # MD | docking | scoring | Y2H | AP-MS | cryo-EM | NMR | binding_assay | …
+  force_field: ""              # MD only (e.g. "AMBER ff14SB + phosaa14SB")
+  solvent_model: ""            # MD only (explicit | implicit | vacuum)
+  simulation_length: ""        # MD only (e.g. "50 ns")
+  weight_version: ""           # multi-version ML models (e.g. "Boltz-2 Jan 2026 weights")
+  random_seed_protocol: ""     # ranking-shuffle | bootstrap | stratified-k-fold | LOO-CV
 metrics: []
 baseline: ""
 outcome: ""               # succeeded | failed | inconclusive

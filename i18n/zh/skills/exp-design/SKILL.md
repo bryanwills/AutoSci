@@ -67,6 +67,12 @@ argument-hint: <idea-slug-or-hypothesis> [--linked-idea <idea-slug>] [--review] 
    - 从 idea 的 `origin_gaps` 读取每个 `wiki/concepts/{slug}.md` 或 `wiki/topics/{slug}.md`。再从它们的 `key_papers`（concept）/ `## Seminal works` + `## SOTA tracker`（topic）回溯到相关的 `wiki/papers/*.md` 用于 baseline setup。
    - 从 `## Approach sketch` 中的 wikilink 读取被引用的 `wiki/methods/{slug}.md` 页面 —— 这些告诉你 idea 继承了哪些可复用技术，决定了 ablation 因子。
    - 读取已有 `wiki/experiments/*.md` 中 `linked_idea` 与本 idea 一致的实验（避免重复先前设计）。
+3. **探测湿实验依赖**（bio-C5 minimal pilot 2026-05-12 合并）：
+   - 扫描 idea 的 `## Hypothesis`、`## Risks`、`## Approach sketch`（以及任何自由文本输入），匹配湿实验信号词：`in cell`、`cellular target engagement`、`in vivo`、`tumor regression`、`binding assay`、`ELISA`、`Western blot`、`co-IP`、`cryo-EM`、`point mutation`、`knockdown`、`knockout`、`IC50`、`Kd`。
+   - 若命中任一词：向用户一次性展示命中清单，并询问项目是否具备湿实验访问条件。把回答记为 `wet_lab_planned: true | false`。
+     - `true` → Step 3 规划一个或多个 `setup.in_silico_or_wet: wet_lab`（或 `mixed` —— 适合 in-silico 预测 + 湿实验验证的混合块）的实验块。湿实验块在 `## Procedure` 中写协议，用 `setup.assay_type` / `setup.cell_line` / `setup.species` 锚定可复现性。
+     - `false` → 把范围收紧为 retrospective-only（全部块 `setup.in_silico_or_wet: in_silico`），并在每个实验页的 `## Procedure` 节记录约束："Retrospective-only —— 湿实验后续不在本轮范围内,留待具备湿实验访问的未来周期。"
+   - 若无命中：静默跳过。纯 ML / 纯 in-silico 设计不必询问。
 
 ### Step 2: 界定 Hypothesis（Scope the Hypothesis）
 
@@ -106,11 +112,18 @@ argument-hint: <idea-slug-or-hypothesis> [--linked-idea <idea-slug>] [--review] 
 - 至少测试 2 个变化维度
 - 计算量：取决于 --budget
 
+**Bio 专用块类型**（bio-C4 minimal pilot 2026-05-12 合并）：idea 具有 bio 形态时，在 A–D 之外加用这些。它们与 A–D 独立 —— 一个实验可同时携带 A–D 和 bio 两个 tag（例如 `tags: [validation, mechanism]`）。块类型作为 tag 记录而非 frontmatter 枚举。
+
+- **E. negative_control** —— 假对照 / 乱序对照 / 安慰剂。与 A 类基线复现不同：basline 复现已发表方法的报告数值；negative_control 排除"无功能对照也能产生的混淆信号"（如乱序 PROTAC、催化失活酶、仅载体处理）。当核心声明可能是非特异效应时使用。
+- **F. mechanism** —— 验证预测的因果机制而非仅看结果。典型形态：点突变预测的活性位点 / PTM 位点 / 结合残基，检查预测效应是否消失；或用化学探针特异性阻断所提出的机制。与 B 类 validation 区别：validation 测"头条数字是否提升"；mechanism 测"提升是否真的由我们说的原因引起"。
+- **G. dose_response** —— 剂量梯度设计，自变量是有生物学意义的连续量（配体浓度、暴露时长、表达量）。与超参扫描区别：梯度是生物学的而非算法的，预期形状（sigmoidal IC50/EC50、激素效应、阈值）本身就含机制信息。
+- **H. cross_context** —— 跨物种 / 跨细胞系 / 跨组织的泛化。与 D 类 ML 跨数据集 robustness 区别：失败模式不同（PTM 底物 motif 的物种漂移、不同实验室的批次效应、细胞系特异的辅因子表达）。当声明指向人体临床转化时，至少需要一个针对目标临床物种 / 组织的 cross_context 块。
+
 每个实验块包含：
 - `title`：描述性标题
 - `linked_idea`：源 idea slug（必填；schema 要求字段，写入时校验）
 - `hypothesis`：实验验证的具体假设
-- `type`：baseline / validation / ablation / robustness —— 作为 tag 记录而非 frontmatter 枚举（experiments schema 没有 `type` 字段）
+- `type`：baseline / validation / ablation / robustness —— 对 bio 设计可额外加 negative_control / mechanism / dose_response / cross_context 之一或多个。作为 tag 记录而非 frontmatter 枚举（experiments schema 没有 `type` 字段）。
 - `setup`：model、dataset、hardware、framework
 - `metrics`：评估指标列表
 - `baseline`：对比基线
@@ -194,12 +207,25 @@ mcp__llm-review__chat:
    status: planned
    linked_idea: "{idea-slug}"   # 必填（schema 要求）。通过 xref.yaml 反向链回 wiki/ideas/{idea-slug}.md::linked_experiments。
    hypothesis: ""
-   tags: []                     # 把类型 tag 放在这里：["baseline"]、["validation"]、["ablation"] 或 ["robustness"]
+   tags: []                     # 把类型 tag 放在这里：["baseline"]、["validation"]、["ablation"] 或 ["robustness"]；bio 设计可叠加 ["mechanism"]、["dose_response"]、["negative_control"]、["cross_context"]
    setup:
      model: ""
      dataset: ""
      hardware: ""
      framework: ""
+     # bio-A5 full（2026-05-12 pilot merge）：可选的 bio 形态 setup 字段。纯 ML 设计留空仍合法。
+     # in_silico_or_wet 由 Step 1 湿实验依赖探测驱动；force_field / solvent_model / simulation_length
+     # 仅 MD 流水线；species / cell_line / assay_type 覆盖湿实验与 cross_context；weight_version
+     # 捕获多版本 ML 模型；random_seed_protocol 记录实际复制策略。
+     in_silico_or_wet: ""         # in_silico | wet_lab | mixed
+     species: []                  # ["human"] | ["mouse", "human"] | …
+     cell_line: ""                # 优先 Cellosaurus ID（如 HEK293T 是 CVCL_0023）
+     assay_type: ""               # MD | docking | scoring | Y2H | AP-MS | cryo-EM | NMR | binding_assay | …
+     force_field: ""              # 仅 MD（如 "AMBER ff14SB + phosaa14SB"）
+     solvent_model: ""            # 仅 MD（explicit | implicit | vacuum）
+     simulation_length: ""        # 仅 MD（如 "50 ns"）
+     weight_version: ""           # 多版本 ML 模型（如 "Boltz-2 Jan 2026 weights"）
+     random_seed_protocol: ""     # ranking-shuffle | bootstrap | stratified-k-fold | LOO-CV
    metrics: []
    baseline: ""
    outcome: ""                  # 留空，由 /exp-run Phase 4 填写 — succeeded | failed | inconclusive

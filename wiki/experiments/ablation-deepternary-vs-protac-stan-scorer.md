@@ -11,6 +11,15 @@ setup:
   dataset: "Same held-out phospho-PROTAC track and negatives as [[calibrated-deltapternary-phospho-protac-ranking]]; per-POI noise-floor table re-computed on PROTAC-STAN (separate Phase-0 scope on the same training subset)"
   hardware: "1 × A100 80GB"
   framework: "PROTAC-STAN inference + reuse of Boltz-2 cached PTM-conditioned POI structures from Stage 2b"
+  in_silico_or_wet: "in_silico"
+  species: ["human"]
+  cell_line: ""
+  assay_type: "scoring"
+  force_field: ""
+  solvent_model: ""
+  simulation_length: ""
+  weight_version: "PROTAC-STAN (Adv. Sci. 2025 released checkpoint) + Boltz-2 (Jan 2026 weights, cached structures from Stage 2b)"
+  random_seed_protocol: "ranking-shuffle"
 metrics: ["top-K=20 AUC (PROTAC-STAN)", "AUC delta vs DeepTernary AUC", "AUC lift vs PROTAC-STAN PTM-blind baseline", "per-POI noise-floor stats for PROTAC-STAN"]
 baseline: "DeepTernary calibrated AUC from [[calibrated-deltapternary-phospho-protac-ranking]] AND PROTAC-STAN PTM-blind ranking (WT-only) on the same set"
 outcome: ""

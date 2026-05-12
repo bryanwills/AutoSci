@@ -11,6 +11,15 @@ setup:
   dataset: "Same held-out phospho-PROTAC track and the same negatives as [[calibrated-deltapternary-phospho-protac-ranking]]"
   hardware: "Re-uses the cached scores from Stage 2b; no new GPU inference, only re-ranking"
   framework: "Custom ranking pipeline with the calibration step toggled off"
+  in_silico_or_wet: "in_silico"
+  species: ["human"]
+  cell_line: ""
+  assay_type: "scoring (re-ranking only)"
+  force_field: ""
+  solvent_model: ""
+  simulation_length: ""
+  weight_version: "DeepTernary (cached Stage 2b scores) + Boltz-2 (cached structures)"
+  random_seed_protocol: "bootstrap (calibration step toggled on/off, >= 5 seeds)"
 metrics: ["top-K=20 AUC (uncalibrated)", "AUC delta vs calibrated", "per-seed mean and std"]
 baseline: "Calibrated ΔpTernary AUC from [[calibrated-deltapternary-phospho-protac-ranking]]"
 outcome: ""

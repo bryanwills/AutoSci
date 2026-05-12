@@ -1746,3 +1746,108 @@ until ≥50 protein concepts accumulate or graph queries demand it.
 ternarydb.md `[[crbn]]` upgrade, the index entry, the template additions, and the new
 B1 edge. The class-level `binds` edge to ubiquitin-ligase-e3 (from the earlier B1 full pilot)
 remains intact.
+
+---
+
+## 2026-05-12 — A5 full pilot merge: `experiments.setup` gains 9 bio-shaped optional fields
+
+**Scope**: The A5 slice (2026-05-11) only rewired `deepternary-baseline`'s `setup.dataset`
+into a wikilink. A5 full lands the 9 bio-shaped fields the backlog enumerated for
+`experiments.setup` (all optional + additive — pure-ML pages leaving them empty stay
+valid), and populates the applicable non-empty values across the 8 existing experiment pages.
+**Status**: **A5 full merged**. Downstream C7 (`/exp-run` setup-type routing) will key off
+`in_silico_or_wet`; C8 bio-lint plans to warn when `setup.assay_type=MD` lacks `force_field`
+(deferred).
+
+### Files touched
+
+- `runtime/schema/entities.yaml`: 9 fields added to `experiments.setup.fields` —
+  `in_silico_or_wet` (enum: in_silico|wet_lab|mixed), `species` (list_str), `cell_line`,
+  `assay_type`, `force_field`, `solvent_model`, `simulation_length`, `weight_version`,
+  `random_seed_protocol`.
+- `docs/runtime-page-templates.{en,zh}.md`: `experiments/{slug}.md` setup-block template
+  extended with the new fields plus inline guidance.
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`:
+  Step 6 frontmatter template extended in lockstep.
+- `wiki/experiments/*.md` (8 files): per-experiment bio fields filled. All 8 are
+  in_silico human; `ablation-boltz2-ptm-vs-md-relaxed-route` carries the MD trio
+  (force_field=AMBER ff14SB + phosaa14SB, solvent_model=explicit, simulation_length=50 ns);
+  the others carry weight_version (Boltz-2 Jan 2026 / DeepTernary Nat Commun 2025 /
+  PROTAC-STAN Adv Sci 2025) and random_seed_protocol (ranking-shuffle or bootstrap, split
+  by experiment role).
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 (informational set unchanged) |
+| `grep -c "in_silico_or_wet" wiki/experiments/*.md \| awk -F: '{s+=$2}END{print s}'` | 8 (all 8 experiments populated) |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | identical (synced) |
+
+Section A status: 6/8 → 7/8 (only A4 controlled vocabulary and A8 wet-lab reproducibility
+metadata remain).
+
+---
+
+## 2026-05-12 — C4 minimal pilot merge: `/exp-design` block taxonomy gains 4 bio block types
+
+**Scope**: `/exp-design`'s four block types (baseline / validation / ablation / robustness)
+are ML-pipeline-shaped; bio-natural block types (negative_control, mechanism, dose_response,
+cross_context) were absent. C4 minimal adds them to the SKILL prompt and articulates the
+boundary distinction vs A–D.
+**Status**: **C4 minimal merged as pure-prompt change**. Block type remains captured as a
+tag (no new frontmatter enum, consistent with backlog design). Full C4 (have the
+`/exp-design --review` Review LLM prompt explicitly check for "is a mechanism block missing"
+etc.) deferred.
+
+### Files touched
+
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`:
+  Step 3 inserts a "Bio-specific block types" section after A–D, listing E negative_control /
+  F mechanism / G dose_response / H cross_context with explicit boundary distinctions
+  vs the nearest A–D analogue (negative_control ≠ baseline, mechanism ≠ validation,
+  dose_response ≠ hyperparameter sweep, cross_context ≠ ML cross-dataset). The Step 3
+  "each block carries" `type` line now lists all 8 tags as composable.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `grep "negative_control\|mechanism\|dose_response\|cross_context" .claude/skills/exp-design/SKILL.md \| wc -l` | ≥ 4 (all 4 types present) |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | identical |
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 |
+
+Section C status: 2/9 → 3/9.
+
+---
+
+## 2026-05-12 — C5 minimal pilot merge: `/exp-design` Step 1 gains wet-lab dependency detection
+
+**Scope**: `/exp-design` Step 1 never asked "does this idea need new wet-lab data?". C5
+minimal inserts a sub-step in Step 1 that scans idea hypothesis / Risks / Approach sketch
+for 14 wet-lab indicator phrases; on match, prompts the user once for wet-lab access, and
+the answer drives Step 3 block planning. Pairs with A5 full's `setup.in_silico_or_wet`
+field.
+**Status**: **C5 minimal merged as pure-prompt change**. Full C5 (concrete wet-lab block
+templates, `protocol.md` sub-tree layout, wet-lab cost referencing) deferred to C7
+(`/exp-run` directory layout).
+
+### Files touched
+
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`:
+  Step 1 inserts sub-step 3 "Detect wet-lab dependencies" after "Load relevant wiki context".
+  14 trigger phrases: in cell / cellular target engagement / in vivo / tumor regression /
+  binding assay / ELISA / Western blot / co-IP / cryo-EM / point mutation / knockdown /
+  knockout / IC50 / Kd. Match → prompt user → record `wet_lab_planned: true|false` →
+  drives Step 3 block planning and `setup.in_silico_or_wet`; no match → silent skip.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `grep "wet_lab_planned\|Detect wet-lab" .claude/skills/exp-design/SKILL.md \| wc -l` | ≥ 1 |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | identical |
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 |
+
+Section C status: 3/9 → 4/9. P0 backlog closeout: 0 P0 items remain on this branch
+(A1/A3/A5/C1/C4/C5 all merged).

@@ -11,6 +11,15 @@ setup:
   dataset: "TernaryDB CRBN+VHL training subset (≈100 tuples) + a small probe set of 5-10 known phospho-PROTAC POI structures"
   hardware: "1 × A100 80GB"
   framework: "PyTorch + DeepTernary inference + a custom random-perturbation script (mass / radius constrained surface point picker)"
+  in_silico_or_wet: "in_silico"
+  species: ["human"]
+  cell_line: ""
+  assay_type: "scoring (noise-floor calibration via random size-matched POI surface perturbations)"
+  force_field: ""
+  solvent_model: ""
+  simulation_length: ""
+  weight_version: "DeepTernary (same checkpoint validated in [[deepternary-baseline-ternarydb-crbn-vhl-reproduction]])"
+  random_seed_protocol: "bootstrap (N=200 random perturbations per tuple, per-POI null distribution)"
 metrics: ["per-POI noise-floor mean and 95% interval", "fraction of true PTM-PROTAC positives clearing |ΔpTernary| > 1.5 × noise floor", "per-POI scorer-sensitivity slope (ΔpTernary vs perturbation distance from interface)"]
 baseline: "raw |ΔpTernary| with no calibration (from the same perturbations)"
 outcome: ""

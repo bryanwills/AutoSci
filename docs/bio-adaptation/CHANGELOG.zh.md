@@ -1669,3 +1669,97 @@ wiki 内容，与 prompt 分离）。
 `git revert <pilot-commit>` 移除 4 个新 concept 字段、crbn.md 页、ternarydb.md 的 `[[crbn]]`
 升级、index 条目、模板加项以及新 B1 边。早先 B1 完整 pilot 添加的类级 `binds` 边（指向
 ubiquitin-ligase-e3）保持完整。
+
+---
+
+## 2026-05-12 —— A5 full pilot merge：`experiments.setup` 加 9 个 bio 形态可选字段
+
+**范围**：A5 切片（2026-05-11）只把 `deepternary-baseline` 的 `setup.dataset` 升为 wikilink。
+A5 full 把 backlog 列出的 9 个 bio 形态字段全部加入 `experiments.setup`（仍可选 + 加性 ——
+纯 ML 页面留空仍合法），并在 8 个现有实验页填出适用的非空值。
+**状态**：**A5 full 合并**。下游 C7（`/exp-run` 按 setup type 路由）需要 `in_silico_or_wet`
+驱动；C8 bio-lint 计划针对 `setup.assay_type=MD` 时 `force_field` 缺失发 warning（延后）。
+
+### 改动位置
+
+- `runtime/schema/entities.yaml`：`experiments.setup.fields` 加 9 个字段 ——
+  `in_silico_or_wet`（enum: in_silico|wet_lab|mixed）、`species`（list_str）、`cell_line`、
+  `assay_type`、`force_field`、`solvent_model`、`simulation_length`、`weight_version`、
+  `random_seed_protocol`。
+- `docs/runtime-page-templates.{en,zh}.md`：`experiments/{slug}.md` setup 块模板扩展，含内联指引。
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`：
+  Step 6 frontmatter 模板同步扩展。
+- `wiki/experiments/*.md`（8 文件）：填入逐实验 bio 字段。全部 in_silico human；
+  `ablation-boltz2-ptm-vs-md-relaxed-route` 携带 MD 三连（force_field=AMBER ff14SB + phosaa14SB、
+  solvent_model=explicit、simulation_length=50 ns）；其他携带 weight_version（Boltz-2 Jan 2026 /
+  DeepTernary Nat Commun 2025 / PROTAC-STAN Adv Sci 2025）和 random_seed_protocol
+  （ranking-shuffle 或 bootstrap，按实验角色）。
+
+### 验证
+
+| 检查 | 结果 |
+|---|---|
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵（informational 集合不变） |
+| `grep -c "in_silico_or_wet" wiki/experiments/*.md \| awk -F: '{s+=$2}END{print s}'` | 8（8 个实验全部填写） |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | 一致（已同步） |
+
+Section A 状态：6/8 → 7/8（仅 A4 受控词表与 A8 wet-lab 可复现性元数据剩余）。
+
+---
+
+## 2026-05-12 —— C4 minimal pilot merge：`/exp-design` 块分类加 4 个 bio 块类型
+
+**范围**：`/exp-design` 原 4 类块（baseline / validation / ablation / robustness）形态是 ML
+流水线，bio 自然的块类型（negative_control、mechanism、dose_response、cross_context）缺席。
+C4 minimal 在 SKILL prompt 中加上这 4 类，并说明与 A–D 的边界区分。
+**状态**：**C4 minimal 以纯 prompt 形态合并**。块类型沿用 tags 记录（不引入新 frontmatter
+enum，与 backlog 设计一致）。完整 C4（在 `/exp-design --review` Review LLM 提问中显式问"是否
+缺 mechanism 块"等）延后。
+
+### 改动位置
+
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`：
+  Step 3 在 A–D 之后插入 "Bio-specific block types" 段，列出 E negative_control / F mechanism /
+  G dose_response / H cross_context 及与最近 A–D 类比的形态区分（negative_control ≠ baseline、
+  mechanism ≠ validation、dose_response ≠ 超参扫描、cross_context ≠ ML 跨数据集）。Step 3
+  "每个实验块包含" 列表中的 `type` 行更新为 8 类标签可叠加。
+
+### 验证
+
+| 检查 | 结果 |
+|---|---|
+| `grep "negative_control\|mechanism\|dose_response\|cross_context" .claude/skills/exp-design/SKILL.md \| wc -l` | ≥ 4（4 类均出现） |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | 一致 |
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 |
+
+Section C 状态：2/9 → 3/9。
+
+---
+
+## 2026-05-12 —— C5 minimal pilot merge：`/exp-design` Step 1 加湿实验依赖探测
+
+**范围**：`/exp-design` Step 1 此前未问"该 idea 是否需要湿实验数据"。C5 minimal 在 Step 1
+新增子步骤 3，扫描 idea hypothesis / Risks / Approach sketch 中的 14 个湿实验信号词；
+命中则提示用户一次询问湿实验访问条件，回答驱动 Step 3 的块规划。与 A5 full 的
+`setup.in_silico_or_wet` 字段配套。
+**状态**：**C5 minimal 以纯 prompt 形态合并**。完整 C5（具体湿实验块模板、protocol.md 子目录
+布局、湿实验 cost referencing）延后到 C7（`/exp-run` 目录布局）。
+
+### 改动位置
+
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`：
+  Step 1 在 "Load relevant wiki context" 之后插入子步骤 3 "Detect wet-lab dependencies"。
+  14 个触发词：in cell / cellular target engagement / in vivo / tumor regression / binding assay /
+  ELISA / Western blot / co-IP / cryo-EM / point mutation / knockdown / knockout / IC50 / Kd。
+  匹配 → 提示用户 → 记录 `wet_lab_planned: true|false` → 驱动 Step 3 块规划与
+  `setup.in_silico_or_wet` 字段；未匹配则静默跳过。
+
+### 验证
+
+| 检查 | 结果 |
+|---|---|
+| `grep "wet_lab_planned\|Detect wet-lab\|探测湿实验" .claude/skills/exp-design/SKILL.md \| wc -l` | ≥ 1 |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | 一致 |
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 |
+
+Section C 状态：3/9 → 4/9。P0 backlog 完结：当前分支 P0 余额 0（A1/A3/A5/C1/C4/C5 全部已 merge）。
