@@ -5,7 +5,7 @@ slug: "calibrated-deltapternary-phospho-protac-ranking"
 target_claim: "ptm-protein-isoforms-enable-selective-drug"
 hypothesis: "On a held-out phospho-PROTAC ranking task (true experimental phospho-PROTACs from the literature, augmented with synthetic positives from kinase-substrate phospho-degron pairs in DegronMD), feeding Boltz-2 PTM-conditioned POI structures into DeepTernary and computing the per-POI noise-floor-calibrated ΔpTernary lifts top-K (K=20) ranking AUC by >= 0.05 over the PTM-blind ranking baseline (DeepTernary on WT POI only), with >= 5 random seeds."
 tags: [validation, deepternary, boltz-2, phospho-protac, ranking, deltapternary, ptm-isoforms]
-domain: "Computational Drug Design / Chemical Biology"
+domain: "comp-drug-discovery"
 setup:
   model: "DeepTernary scorer + Boltz-2 (Jan 2026 weights) for PTM-conditioned POI structure prediction with native CCD-PTM tokens"
   dataset: "Held-out phospho-PROTAC track: true experimental phospho-PROTACs (phospho-BCL-XL family, ≈8-10 entries) + synthetic positives from kinase-substrate phospho-degron pairs in DegronMD (≈30-50 entries); negatives from PTM-blind PROTAC-DB CRBN+VHL entries with no known PTM-isoform selectivity"

@@ -5,7 +5,7 @@ status: planned
 target_claim: "md-relaxed-phospho-route-comparable-to-native-ptm-tokens"
 hypothesis: "On a matched subset of held-out phospho-PROTAC tuples (where both Boltz-2 native CCD-PTM tokens and MD-relaxed phospho-structures can be built), feeding the two POI variants into DeepTernary yields ΔpTernary scores whose Pearson correlation across the matched set is r >= 0.7 with mean absolute disagreement < 0.10 in normalised score units. If the two routes diverge (r < 0.5 or |disagreement| > 0.20), the headline ΔpTernary pipeline is gated on Boltz-2 PTM-token quality and partially re-couples to [[ptm-conditioned-ensemble-prediction]]."
 tags: [ablation, boltz-2, molecular-dynamics, ptm-conditioning, deepternary, route-comparison]
-domain: "Computational Drug Design / Chemical Biology"
+domain: "comp-drug-discovery"
 setup:
   model: "Boltz-2 (Jan 2026, native CCD-PTM tokens) vs MD-relaxed phospho-structure (AMBER ff14SB + phosaa14SB, 50 ns explicit-solvent) — both fed into the same DeepTernary scorer"
   dataset: "≈25 matched phospho-PROTAC tuples from the held-out track in [[calibrated-deltapternary-phospho-protac-ranking]] where (a) the PTM site has a CCD-PTM token in Boltz-2 AND (b) the wild-type POI has a PDB or AlphaFold-DB v4 structure with pLDDT > 70 in the modification region (to seed MD)"

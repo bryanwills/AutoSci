@@ -5,7 +5,7 @@ status: planned
 target_claim: "ptm-protein-isoforms-enable-selective-drug"
 hypothesis: "DeepTernary (Nat. Commun. 2025) reproduces its published per-tuple pTernary scores on the TernaryDB CRBN+VHL test split with mean absolute deviation < 5% from the values reported in the source manuscript and supplementary tables."
 tags: [baseline, deepternary, ternarydb, crbn, vhl, reproduction]
-domain: "Computational Drug Design / Chemical Biology"
+domain: "comp-drug-discovery"
 setup:
   model: "DeepTernary (released checkpoint, Nat. Commun. 2025)"
   dataset: "[[ternarydb]] CRBN+VHL test split (the same split used in the DeepTernary paper)"

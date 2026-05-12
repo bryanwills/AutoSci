@@ -10,7 +10,7 @@ date_added: 2026-04-30
 source_type: tex
 s2_id: ""
 keywords: [alphafold, protein-structure, database, plddt, predicted-aligned-error, foldseek, uniprot, structural-biology]
-domain: "Structural Bioinformatics"
+domain: "structural-bio"
 code_url: "https://alphafold.ebi.ac.uk"
 cited_by: []
 ---

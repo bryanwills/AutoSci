@@ -5,7 +5,7 @@ status: planned
 target_claim: "ptm-protein-isoforms-enable-selective-drug"
 hypothesis: "On a held-out mutant-isoform PROTAC track (p53-Y220C bifunctional recruiters, p53-R175H bifunctional recruiters, ≈6-10 entries), the calibrated ΔpTernary pipeline shows AUC lift over PTM-blind baseline whose magnitude is DIFFERENT from the phospho-PROTAC AUC lift in [[calibrated-deltapternary-phospho-protac-ranking]] by >= 0.05 in EITHER direction. The two tracks must NOT be conflated in the headline number for [[ptm-protein-isoforms-enable-selective-drug]]: PTM and mutation are mechanistically distinct (covalent chemistry vs sequence change) even though both produce 'isoform-selective' drugs."
 tags: [robustness, mutant-isoform, p53-y220c, p53-r175h, deltapternary, separation-of-tracks]
-domain: "Computational Drug Design / Chemical Biology"
+domain: "comp-drug-discovery"
 setup:
   model: "Same as Stage 2b — DeepTernary + Boltz-2 (no CCD-PTM tokens needed; the 'PTM' here is a residue substitution, handled natively by Boltz-2 from a mutant sequence)"
   dataset: "Held-out mutant-isoform PROTAC track: ≈6-10 entries covering p53-Y220C bifunctional recruiters and p53-R175H bifunctional recruiters (PROTAC-DB + literature curation); matched negatives from PROTAC-DB CRBN+VHL"

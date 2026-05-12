@@ -5,7 +5,7 @@ status: planned
 target_claim: "noise-floor-calibrated-deltapternary-improves-ranking"
 hypothesis: "Under N=200 random size-matched (≈80 Da, ≈3 Å radius) POI surface perturbations per tuple on the TernaryDB CRBN+VHL training subset, the resulting null distribution of ΔpTernary has a 95% interval narrow enough that real PTM-induced ΔpTernary values can clear the threshold |ΔpTernary| > 1.5 × noise-floor mean on at least 30% of true PTM-PROTAC positives. If the null distribution swallows the entire signal range, the load-bearing premise of [[ptm-aware-degrader-target-nomination]] fails fast."
 tags: [calibration, noise-floor, deepternary, ternarydb, ptm-perturbation, phase-0]
-domain: "Computational Drug Design / Chemical Biology"
+domain: "comp-drug-discovery"
 setup:
   model: "DeepTernary (the same checkpoint validated by [[deepternary-baseline-ternarydb-crbn-vhl-reproduction]])"
   dataset: "TernaryDB CRBN+VHL training subset (≈100 tuples) + a small probe set of 5-10 known phospho-PROTAC POI structures"

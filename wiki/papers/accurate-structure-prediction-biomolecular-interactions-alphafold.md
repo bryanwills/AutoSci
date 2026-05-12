@@ -10,7 +10,7 @@ date_added: 2026-04-30
 source_type: pdf
 s2_id: ""
 keywords: [AlphaFold 3, pairformer, diffusion module, protein-ligand docking, PoseBusters, protein-nucleic acid, antibody-antigen, biomolecular complex]
-domain: "Computational Biology / ML for Science"
+domain: "ml-for-science"
 code_url: ""
 cited_by: []
 ---

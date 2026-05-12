@@ -10,7 +10,7 @@ date_added: 2026-04-30
 source_type: tex
 s2_id: ""
 keywords: [PTMI-DD, allosteric inhibitor, covalent inhibitor, posttranslational modifications, precision medicine, PROTAC protein degradation, protein-protein interactions, PTM protein isoforms, rational drug design]
-domain: "Computational Drug Design / Chemical Biology"
+domain: "comp-drug-discovery"
 code_url: ""
 cited_by: []
 ---

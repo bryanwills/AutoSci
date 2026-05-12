@@ -10,7 +10,7 @@ date_added: 2026-04-30
 source_type: tex
 s2_id: ""
 keywords: [E3-substrate interaction, UbiBrowser, naive Bayesian classifier, likelihood ratio, ubiquitin ligase, E3 recognition motif, domain enrichment, GO term enrichment]
-domain: "computational biology"
+domain: "bioinformatics"
 code_url: "http://ubibrowser.ncpsb.org"
 cited_by: []
 ---

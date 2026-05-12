@@ -5,7 +5,7 @@ status: in_progress
 origin: "ideate: weakly_supported claim/ptm-protein-isoforms-enable-selective-drug + Phase-1 finding that all current PROTAC ternary predictors are PTM-blind on the POI side"
 origin_gaps: [[ptm-protein-isoforms-enable-selective-drug]], [[e3-ligase-deregulation-cancer-alters-substrate]]
 tags: [drug-design, ptm-isoforms, protac, ternary-complex, e3-ligase]
-domain: "Computational Biology / ML for Science"
+domain: "ml-for-science"
 priority: 5
 pilot_result: ""
 failure_reason: ""

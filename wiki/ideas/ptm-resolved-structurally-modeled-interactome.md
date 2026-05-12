@@ -5,7 +5,7 @@ status: proposed
 origin: "ideate: gap G5 (PTM-resolved structurally-modeled interactome) + weakly_supported claim/ptm-protein-isoforms-enable-selective-drug"
 origin_gaps: [[ptm-protein-isoforms-enable-selective-drug]], [[alphafold2-enables-large-scale-structural-modeling]]
 tags: [alphafold-multimer, protein-protein-interaction, ptm, interactome, drug-target]
-domain: "Computational Biology / ML for Science"
+domain: "ml-for-science"
 priority: 5
 pilot_result: ""
 failure_reason: ""

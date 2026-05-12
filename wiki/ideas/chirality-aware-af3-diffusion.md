@@ -5,7 +5,7 @@ status: failed
 origin: "ideate: gap 'Can the diffusion module's lack of equivariance be exploited (or replaced) to add cheap symmetry-aware prior, narrowing the chirality-violation gap?'"
 origin_gaps: []
 tags: [alphafold3, diffusion, chirality, equivariance, eliminated]
-domain: "Computational Biology / ML for Science"
+domain: "ml-for-science"
 priority: 1
 pilot_result: ""
 failure_reason: "[filter] AF3 weights are restricted to a non-commercial license; fine-tuning the AF3 diffusion module is not feasible for an external research group. Replicating the diffusion-head architecture from scratch on Boltz-2 is a different (and much larger) project than the original idea framing."

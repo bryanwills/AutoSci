@@ -2129,3 +2129,49 @@ lint_bio extension + live backfill all wired and end-to-end smoke-tested).
 **Section A status: 7/8 → 8/8 complete**. bio-adaptation Sections A + B + C are now
 **fully covered**: A 8/8, B 14/14 edge types, C 9/9 skills. Only deferred items remain
 (Section D conventions, Section H subdomain validation, full versions of various pilots).
+
+---
+
+## 2026-05-12 — A4 pilot merge: domain controlled vocabulary + full content migration
+
+**Scope**: `domain:` is a free-text field with no controlled vocabulary — drift is real
+(9 free-text variants across 24 pages). Backlog A4 asks for a canonical vocabulary,
+soft-lint warning, and convergence over time.
+**Status**: **A4 merged** (full). Lint check implementation + 24-page live migration +
+template update.
+
+### Files touched
+
+- `tools/lint_bio.py`:
+  - `RECOGNISED_DOMAINS` 15-entry canonical slug set (7 bio + 7 CS + other)
+  - `check_domains_recognised()` soft check scans all entity types' `domain:` field;
+    unrecognised values emit 🔵 informational with roll-up (multiple pages with the same
+    value collapse to one message)
+  - Wired into the main `lint()` entry point
+  - Module docstring + check list bumped to 6 items
+- `tools/lint_bio.py` line count: 348 → 401
+- `i18n/{en,zh}/skills/check/SKILL.md` + `.claude/skills/check/SKILL.md`:
+  bio-lint description bumped from "5 checks" to "6 checks", lists the 15 canonical slugs
+- `docs/runtime-page-templates.{en,zh}.md`: domain field comment replaced
+  `# NLP / CV / ML Systems / Robotics` with the full 15-slug canonical list +
+  soft-check note
+- **Live content migration** — Python script (longest-first mapping to avoid prefix
+  collisions) migrated all 24 pages:
+  - "Computational Drug Design / Chemical Biology" (9) → `comp-drug-discovery`
+  - "Computational Biology / ML for Science" (6) + "Structural Biology / ML for Science" (1) → `ml-for-science`
+  - "Computational Biology" (3) + "computational biology" (1) + "Bioinformatics" (1) → `bioinformatics`
+  - "Structural Bioinformatics" (1) → `structural-bio`
+  - "ML for Molecules" (1) → `chembio`
+  - "Cancer biology / Molecular oncology" (1) → `cancer-bio`
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 (unchanged) |
+| `python tools/lint_bio.py` (pre-migration) | 0 🔴 / 0 🟡 / 9 🔵 (one per free-text variant) |
+| `python tools/lint_bio.py` (post-migration) | 0 🔴 / 0 🟡 / 0 🔵 (fully clean) |
+| `diff -q i18n/en/skills/check/SKILL.md .claude/skills/check/SKILL.md` | identical |
+
+Backlog A4 closed. All numbered backlog items in bio-adaptation Sections A + B + C are
+now merged (minimal or full).

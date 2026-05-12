@@ -2015,3 +2015,43 @@ live backfill 全部 wired,且端到端 smoke-tested）。**Section A 完结：8
 **Section A 状态：7/8 → 8/8 完结**。bio-adaptation Section A + B + C **全覆盖**:A 8/8、
 B 14/14 edge types、C 9/9 skills。仅延后项剩余（D 约定、H 子领域验证、各 pilot full
 版本）。
+
+---
+
+## 2026-05-12 —— A4 pilot merge：domain 受控词表 + 全量内容迁移
+
+**范围**：`domain:` 字段是自由文本,无受控词表 —— 漂移已成事实(9 个 free-text 变体散落在 24
+页面)。backlog A4 要求定义规范化词表 + lint 软警告 + 鼓励收敛。
+**状态**：**A4 合并**(完整)。lint check 实现 + 24 页面 live 迁移 + 模板更新。
+
+### 改动位置
+
+- `tools/lint_bio.py`:
+  - `RECOGNISED_DOMAINS` 15 项规范化 slug 集(7 bio + 7 CS + other)
+  - `check_domains_recognised()` 软检查所有实体类型的 `domain:` 值;未识别值发 🔵 informational
+    带 roll-up(多页同值合并为一条消息)
+  - 在 `lint()` 主入口注册
+  - 模块 docstring + check 列表升至 6 项
+- `tools/lint_bio.py` 增长:348 → 401 行
+- `i18n/{en,zh}/skills/check/SKILL.md` + `.claude/skills/check/SKILL.md`:
+  bio-lint 描述从"5 项"升至"6 项",列出 15 个规范化 slug
+- `docs/runtime-page-templates.{en,zh}.md`: domain 字段注释从
+  `# NLP / CV / ML Systems / Robotics` 替换为完整的 15-slug 规范化列表 + 软检查说明
+- **Live 内容迁移** —— Python 脚本(longest-first 映射避免前缀冲突)迁移全部 24 页面:
+  - "Computational Drug Design / Chemical Biology"(9) → `comp-drug-discovery`
+  - "Computational Biology / ML for Science"(6) + "Structural Biology / ML for Science"(1) → `ml-for-science`
+  - "Computational Biology"(3) + "computational biology"(1) + "Bioinformatics"(1) → `bioinformatics`
+  - "Structural Bioinformatics"(1) → `structural-bio`
+  - "ML for Molecules"(1) → `chembio`
+  - "Cancer biology / Molecular oncology"(1) → `cancer-bio`
+
+### 验证
+
+| 检查 | 结果 |
+|---|---|
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵(不变) |
+| `python tools/lint_bio.py`(迁移前) | 0 🔴 / 0 🟡 / 9 🔵(每个 free-text 变体一条) |
+| `python tools/lint_bio.py`(迁移后) | 0 🔴 / 0 🟡 / 0 🔵(完全干净) |
+| `diff -q i18n/en/skills/check/SKILL.md .claude/skills/check/SKILL.md` | 一致 |
+
+backlog A4 项完结。bio-adaptation Sections A + B + C 全部 backlog 子项现在都已合并(minimal 或 full)。

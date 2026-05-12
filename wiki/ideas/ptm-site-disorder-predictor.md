@@ -5,7 +5,7 @@ status: failed
 origin: "ideate: gap pLDDT-as-IDR-predictor + PTM site prediction in IDRs"
 origin_gaps: []
 tags: [ptm, alphafold, plddt, idr, eliminated]
-domain: "Computational Biology / ML for Science"
+domain: "ml-for-science"
 priority: 1
 pilot_result: ""
 failure_reason: "[filter] saturated by SAPP (2025), PhosAF (2024), GraphPhos (2025), AstraPTM2 (2025), DeepPCT (2024), MTPrompt-PTM (2025) — 'AlphaFold structural features as input to PTM site predictor' is a published axis with at least five 2024-2025 entries. Adding pLDDT/IDR conditioning is incremental and unlikely to outperform any of these."

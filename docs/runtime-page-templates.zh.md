@@ -25,7 +25,7 @@ date_added: YYYY-MM-DD
 source_type: tex         # tex | pdf
 s2_id: ""
 keywords: []
-domain: ""
+domain: ""               # bio-A4 规范化 slug（2026-05-12 pilot 合并）：structural-bio | chembio | comp-drug-discovery | cancer-bio | systems-bio | bioinformatics | clinical-translation | nlp | cv | ml-systems | robotics | ml-for-science | rl | theory | other。允许自由文本但 lint_bio 对表外值发 🔵 informational。
 code_url: ""
 cited_by: []
 ---

@@ -10,7 +10,7 @@ date_added: 2026-04-30
 source_type: tex
 s2_id: ""
 keywords: [AlphaFold2, FoldDock, pDockQ, HuRI, hu.MAP, protein complex prediction, disease mutations, phosphorylation]
-domain: "Computational Biology"
+domain: "bioinformatics"
 code_url: ""
 cited_by: []
 ---

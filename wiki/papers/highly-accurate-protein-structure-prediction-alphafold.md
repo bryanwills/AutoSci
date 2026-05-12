@@ -10,7 +10,7 @@ date_added: 2026-04-30
 source_type: tex
 s2_id: ""
 keywords: [alphafold, evoformer, msa, invariant-point-attention, fape, casp14, protein-folding, pLDDT, triangle-attention, structure-module]
-domain: "Structural Biology / ML for Science"
+domain: "structural-bio"
 code_url: "https://github.com/deepmind/alphafold"
 cited_by: []
 ---

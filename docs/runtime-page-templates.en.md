@@ -26,7 +26,7 @@ date_added: YYYY-MM-DD
 source_type: tex         # tex | pdf
 s2_id: ""
 keywords: []
-domain: ""               # NLP / CV / ML Systems / Robotics
+domain: ""               # bio-A4 canonical slugs (pilot merged 2026-05-12): structural-bio | chembio | comp-drug-discovery | cancer-bio | systems-bio | bioinformatics | clinical-translation | nlp | cv | ml-systems | robotics | ml-for-science | rl | theory | other. Free-text accepted but lint_bio emits 🔵 informational on values outside this set.
 code_url: ""
 cited_by: []
 ---

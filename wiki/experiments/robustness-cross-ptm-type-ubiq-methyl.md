@@ -5,7 +5,7 @@ status: planned
 target_claim: "ptm-protein-isoforms-enable-selective-drug"
 hypothesis: "On held-out tracks of (a) mono-ubiquitylation-degron PROTACs and (b) methylation-degron PROTACs, the calibrated ΔpTernary pipeline (DeepTernary, Boltz-2 PTM tokens, per-POI noise-floor) maintains top-K ranking AUC lift >= 0.03 over the PTM-blind baseline. A drop below 0.03 indicates the AUC lift on phospho-PROTACs does not generalize across PTM types; a drop below zero (i.e., the pipeline ranks worse than baseline) indicates active harm and must be reported."
 tags: [robustness, generalization, ubiquitylation, methylation, deepternary, deltapternary, ptm-isoforms]
-domain: "Computational Drug Design / Chemical Biology"
+domain: "comp-drug-discovery"
 setup:
   model: "Same as [[calibrated-deltapternary-phospho-protac-ranking]] — DeepTernary + Boltz-2 PTM tokens"
   dataset: "Held-out tracks: (a) mono-ubiquitylation-degron PROTACs (≈10-15 entries from PROTAC-DB + literature mining), (b) methylation-degron PROTACs (≈8-12 entries from histone methylation degraders + EZH2-substrate degraders); matched negatives from PROTAC-DB CRBN+VHL with no annotated PTM-isoform selectivity"

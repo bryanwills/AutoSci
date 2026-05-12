@@ -72,7 +72,7 @@ python3 tools/lint.py --wiki-dir wiki/ --fix --dry-run --json
 python3 tools/lint_bio.py --wiki-dir wiki/ --json
 ```
 
-`lint_bio.py` 加 5 项基础 linter 无法表达的检查：`concepts.pdb_ids` 的 PDB ID 格式、`concepts.uniprot_id` 的 UniProt accession 格式、`dataset_version_used` 边 metadata.version 与目标 dataset `versions:` 表的对照（B3 + A1 交叉）、`experiments.setup.species` 的识别集检查、`experiments.setup.assay_type` 含 MD 时 `setup.force_field` 必填。把 JSON 输出合并到同一报告（同 🔴/🟡/🔵 严重度;`bio-*` category 前缀与基础 lint 区分）。wiki 全无 bio 字段时静默跳过 —— 非 bio wiki 零开销。
+`lint_bio.py` 加 6 项基础 linter 无法表达的检查：`concepts.pdb_ids` 的 PDB ID 格式、`concepts.uniprot_id` 的 UniProt accession 格式、dataset version 与 `datasets/{slug}.md::versions` 表的对照（BOTH 来源:`dataset_version_used` edge metadata.version (B3) AND `experiments.reproducibility.dataset_versions[*]` (A8)）、`experiments.setup.species` 的识别集检查、`experiments.setup.assay_type` 含 MD 时 `setup.force_field` 必填、`<entity>.domain` 的规范化 slug 软检查（A4 —— 鼓励收敛到 structural-bio / chembio / comp-drug-discovery / cancer-bio / systems-bio / bioinformatics / clinical-translation / nlp / cv / ml-systems / robotics / ml-for-science / rl / theory / other）。把 JSON 输出合并到同一报告（同 🔴/🟡/🔵 严重度;`bio-*` category 前缀与基础 lint 区分）。wiki 全无 bio 字段时静默跳过 —— 非 bio wiki 零开销。
 
 ### Step 2: 结构完整性（自动化覆盖）
 

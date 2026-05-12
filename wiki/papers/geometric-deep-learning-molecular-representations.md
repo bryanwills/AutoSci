@@ -10,7 +10,7 @@ date_added: 2026-04-30
 source_type: tex
 s2_id: ""
 keywords: [geometric deep learning, molecular graphs, equivariant neural networks, message passing, SMILES, 3D CNN, molecular surfaces, drug discovery, quantum chemistry, CASP]
-domain: "ML for Molecules"
+domain: "chembio"
 code_url: ""
 cited_by: []
 ---

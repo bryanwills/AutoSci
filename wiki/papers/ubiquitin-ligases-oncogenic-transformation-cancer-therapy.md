@@ -10,7 +10,7 @@ date_added: 2026-04-30
 source_type: pdf
 s2_id: ""
 keywords: [ubiquitin, E3 ligase, MDM2, BRCA1, FBXW7, SCF, APC/C, parkin, VHL, SPOP, PROTAC, p53, cell cycle, DNA damage repair, MAPK, PI3K-AKT-mTOR]
-domain: "Cancer biology / Molecular oncology"
+domain: "cancer-bio"
 code_url: ""
 cited_by: []
 ---

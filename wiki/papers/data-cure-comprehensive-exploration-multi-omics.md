@@ -10,7 +10,7 @@ date_added: 2026-04-30
 source_type: tex
 s2_id: ""
 keywords: [multi-omics, big-data, machine-learning, targeted-therapeutics, network-pharmacology, genomics, transcriptomics, proteomics, metabolomics, epigenomics]
-domain: "Computational Biology"
+domain: "bioinformatics"
 code_url: ""
 cited_by: []
 ---

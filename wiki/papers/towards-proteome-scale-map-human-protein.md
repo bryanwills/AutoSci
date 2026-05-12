@@ -10,7 +10,7 @@ date_added: 2026-04-30
 source_type: pdf
 s2_id: "fe32bfbfb24b967bb606aa9b00cf46f17a3936c6"
 keywords: [Y2H, CCSB-HI1, ORFeome, interactome map, binary PPI, co-affinity purification, OMIM disease genes]
-domain: "Computational Biology"
+domain: "bioinformatics"
 code_url: ""
 cited_by: []
 ---

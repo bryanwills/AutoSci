@@ -12,7 +12,7 @@ date_added: 2026-04-30
 source_type: tex
 s2_id: ""
 keywords: [PTM site prediction, MultiCNN, CapsNet, 2D attention, bootstrapping, transfer learning, weight averaging, FASTA, UniProtKB/Swiss-Prot, homology search, 3D structure visualization]
-domain: "Bioinformatics"
+domain: "bioinformatics"
 code_url: "https://github.com/duolinwang/MusiteDeep_web"
 cited_by: []
 ---

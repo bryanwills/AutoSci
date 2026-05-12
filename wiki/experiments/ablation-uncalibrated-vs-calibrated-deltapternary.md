@@ -5,7 +5,7 @@ status: planned
 target_claim: "noise-floor-calibrated-deltapternary-improves-ranking"
 hypothesis: "On the same held-out phospho-PROTAC ranking set used in [[calibrated-deltapternary-phospho-protac-ranking]], replacing the per-POI noise-floor calibration with raw |ΔpTernary| (no calibration) reduces top-K=20 ranking AUC by >= 0.03 with >= 5 seeds. If the AUC drop is < 0.01 the calibration step contributes nothing and should be dropped from the pipeline."
 tags: [ablation, calibration, deepternary, deltapternary, ptm-isoforms, phospho-protac]
-domain: "Computational Drug Design / Chemical Biology"
+domain: "comp-drug-discovery"
 setup:
   model: "Same as [[calibrated-deltapternary-phospho-protac-ranking]] — DeepTernary + Boltz-2 PTM-conditioned POI"
   dataset: "Same held-out phospho-PROTAC track and the same negatives as [[calibrated-deltapternary-phospho-protac-ranking]]"

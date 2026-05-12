@@ -5,7 +5,7 @@ status: planned
 target_claim: "ptm-protein-isoforms-enable-selective-drug"
 hypothesis: "Replacing DeepTernary with PROTAC-STAN (Adv. Sci. 2025) inside the calibrated ΔpTernary pipeline yields top-K=20 ranking AUC on the held-out phospho-PROTAC track that is within 0.05 of the DeepTernary AUC, with both still showing >= 0.05 lift over their respective PTM-blind baselines. If only one scorer carries the lift, the headline result is scorer-specific and not a property of the calibrated ΔpTernary axis."
 tags: [ablation, scorer-substitution, deepternary, protac-stan, deltapternary, ptm-isoforms, phospho-protac]
-domain: "Computational Drug Design / Chemical Biology"
+domain: "comp-drug-discovery"
 setup:
   model: "PROTAC-STAN (Adv. Sci. 2025 released checkpoint) substituted for DeepTernary in the Stage 2b pipeline; same Boltz-2 PTM-conditioned POI structures, same held-out track"
   dataset: "Same held-out phospho-PROTAC track and negatives as [[calibrated-deltapternary-phospho-protac-ranking]]; per-POI noise-floor table re-computed on PROTAC-STAN (separate Phase-0 scope on the same training subset)"

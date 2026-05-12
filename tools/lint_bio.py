@@ -14,6 +14,8 @@ This linter covers bio-shaped constraints that base lint cannot express:
   4. ``experiments.setup.species`` values are in a recognised set (A5-full)
   5. ``experiments.setup.assay_type`` containing MD/molecular dynamics
      requires ``setup.force_field`` to be populated (A5-full)
+  6. ``<entity>.domain`` values are in a recognised slug set (A4) — soft
+     warning (🔵) encouraging convergence on canonical bio + CS slugs.
 
 Severity convention matches ``tools/lint.py``: 🔴 hard error, 🟡 fix
 recommended, 🔵 informational.
@@ -60,6 +62,22 @@ RECOGNISED_SPECIES = {
     "c. elegans", "fruit fly", "fruitfly", "e. coli", "e-coli", "arabidopsis",
     "xenopus", "chicken", "pig", "dog", "rabbit", "macaque", "monkey",
     "hamster", "guinea pig", "sheep", "cow", "bovine",
+}
+
+# bio-A4 (pilot merged 2026-05-12): recommended canonical slug list for the
+# `domain:` field across all entity types. Soft check — unrecognised values
+# emit 🔵 informational to encourage convergence (current wiki has 9 distinct
+# free-text variants like "Computational Drug Design / Chemical Biology" that
+# drift over time). Same slug vocabulary referenced by /novelty Source E
+# (C9 bio-claim detection) so PubMed routing stays consistent.
+RECOGNISED_DOMAINS = {
+    # Bio canonical slugs (from backlog A4)
+    "structural-bio", "chembio", "comp-drug-discovery", "cancer-bio",
+    "systems-bio", "bioinformatics", "clinical-translation",
+    # CS canonical slugs (carried over from runtime-page-templates examples)
+    "nlp", "cv", "ml-systems", "robotics", "ml-for-science", "rl", "theory",
+    # Cross-cutting
+    "other",
 }
 
 # Patterns identifying an assay as MD (requires force_field).
@@ -280,6 +298,52 @@ def check_species_recognised(wiki_dir: Path) -> list[LintIssue]:
     return issues
 
 
+def check_domains_recognised(wiki_dir: Path) -> list[LintIssue]:
+    """bio-A4 (pilot merged 2026-05-12): nudge `domain:` values toward the
+    canonical slug set. Scans every wiki page across every entity directory.
+    Soft warning (🔵) — does NOT block legitimate free-text; just encourages
+    convergence to avoid the drift the backlog flagged (9 distinct variants
+    of "Computational Biology" / "Computational Drug Design / Chemical
+    Biology" / etc. in the same wiki).
+    """
+    issues: list[LintIssue] = []
+    # Track first occurrence of each unrecognised value so we don't spam.
+    # (Multiple pages with the same value get a single roll-up message.)
+    unrecognised: dict[str, list[str]] = {}
+    # Scan every .md file in wiki/, excluding wiki/graph/ (auto-generated).
+    for p in sorted(wiki_dir.rglob("*.md")):
+        try:
+            rel_parts = p.relative_to(wiki_dir).parts
+        except ValueError:
+            continue
+        if rel_parts and rel_parts[0] == "graph":
+            continue
+        fm = _parse_frontmatter(p)
+        if not fm:
+            continue
+        domain = fm.get("domain")
+        if not domain or not isinstance(domain, str):
+            continue
+        if domain.strip() in RECOGNISED_DOMAINS:
+            continue
+        unrecognised.setdefault(domain, []).append(str(p.relative_to(wiki_dir)))
+    for value, pages in unrecognised.items():
+        first = pages[0]
+        extra = f" (and {len(pages) - 1} other page{'s' if len(pages) > 2 else ''})" if len(pages) > 1 else ""
+        issues.append(LintIssue(
+            "🔵", "bio-domain-unrecognised", first,
+            f"domain={value!r} is not in the canonical slug set{extra}",
+            suggestion=(
+                "Consider migrating to a canonical slug: "
+                "structural-bio | chembio | comp-drug-discovery | cancer-bio | "
+                "systems-bio | bioinformatics | clinical-translation | "
+                "nlp | cv | ml-systems | robotics | ml-for-science | rl | theory | other. "
+                "Free-text is still accepted (this is a soft check) — extend "
+                "RECOGNISED_DOMAINS in tools/lint_bio.py if a new canonical slug is needed."
+            )))
+    return issues
+
+
 def check_md_force_field(wiki_dir: Path) -> list[LintIssue]:
     """experiments.setup.assay_type matching MD requires setup.force_field set."""
     issues: list[LintIssue] = []
@@ -315,6 +379,7 @@ def lint(wiki_dir: Path) -> list[LintIssue]:
     issues += check_dataset_versions(wiki_dir)
     issues += check_species_recognised(wiki_dir)
     issues += check_md_force_field(wiki_dir)
+    issues += check_domains_recognised(wiki_dir)
     return issues
 
 
