@@ -128,6 +128,36 @@ Raw persistence rule: never copy or duplicate a file already under `raw/discover
 
    `brief` seeds the Key-idea section AND the new `tldr` frontmatter field; `head` sanity-checks your tex parsing against the section structure; `social` is an auxiliary importance signal.
 
+<!-- bio-C1 (minimal pilot merged 2026-05-11): bio-aware identifier extraction. The full C1
+     design (PubMed/EuropePMC/CrossRef fetchers, `tools/extract_bio_ner.py`, JATS-XML pipeline)
+     is deferred — the planned Python tools are not yet implemented. This minimal slice asks
+     the LLM agent running /ingest to do lightweight in-prompt NER for bio identifiers that A3
+     minimal (doi + pmid on papers/) and A1 minimal (datasets/ entity) need to be useful. -->
+### Step 2.5: Bio identifier extraction (minimal C1)
+
+For bio-domain papers (those whose body, venue, or DOI prefix suggests biology / bioinformatics /
+chemistry / clinical research — see the bio-domain values in A8: `structural-bio`, `chembio`,
+`comp-drug-discovery`, `cancer-bio`, `systems-bio`, `bioinformatics`, `clinical-translation`):
+
+1. **Populate the A3 minimal frontmatter fields** when the values can be read from the body or
+   from already-fetched metadata sources:
+   - `doi` — primary bio identifier (CrossRef-shaped, `10.NNNN/...`). Often printed in the
+     paper header / first footnote.
+   - `pmid` — PubMed ID, when the paper has been indexed by PubMed. Bare numeric, ≥ 7 digits.
+
+   Leave both empty if not confidently extractable — do not fabricate. The remaining A3 fields
+   (`biorxiv`, `pdb_ids`, `uniprot_ids`, `nct_ids`, `gene_symbols`, `species`) are **deferred
+   to the full C1 merge** which adds the dedicated fetcher tools and a structured NER pre-pass.
+2. **Dataset wikilink upgrade.** Before writing `## Method`, `## Experiment & Results`, or any
+   other body section that mentions a dataset, check `wiki/datasets/` for an existing page whose
+   `title` or `aliases` matches the mention (case-insensitive). When a match exists, write the
+   wikilink form `[[{slug}]]` instead of plain text. Create no new `datasets/{slug}.md` page in
+   this minimal pilot — leave dataset-page authoring to `/edit` or to the full C1 merge.
+
+Bio papers without an arXiv ID will have an empty `arxiv:` field — this is expected after A3
+minimal (the `doi`/`pmid` fields are the canonical identifiers for those). The full C1 will add
+DOI / PMID / bioRxiv / PMC URLs as accepted `/ingest` source inputs.
+
 ### Step 3: Write the paper page
 
 Open `runtime/schema/entities.yaml` (papers section) for the field set and `runtime/templates/papers.md.tmpl` for body section order. Fill every required frontmatter field; leave `cited_by` empty for now (step 5 backfills it).

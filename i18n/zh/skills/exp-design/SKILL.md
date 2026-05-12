@@ -208,7 +208,20 @@ mcp__llm-review__chat:
    date_completed: ""           # 留空，由 /exp-run Phase 4 填写
    run_log: ""                  # 留空，由 /exp-run Phase 2 填写
    started: ""                  # 留空，由 /exp-run Phase 2 填写（ISO 时间戳，通过 set-meta）
-   estimated_hours: 0           # 0，由 /exp-run Phase 2 更新（通过 set-meta）
+   estimated_hours: 0           # bio-A6：legacy 单数字预算 —— 向后兼容保留
+   # bio-C2（2026-05-11 minimal pilot merge）：根据 Step 3 / Step 4 的预算拆分填充结构化
+   # estimated_cost 块。用真实的逐实验数字；子字段对该实验不适用时填 0（例如纯算力流水线
+   # wet_lab_usd: 0；公开数据集如 [[ternarydb]] 时 dataset_access_lead_time_days: 0）。保留
+   # estimated_hours 作为 GPU 时数的粗合计供 legacy 消费者使用；estimated_cost.gpu_hours
+   # 通常应等于 estimated_hours。完整 C2（自动检测湿实验 / MD 墙钟时）延后 —— 最小 pilot
+   # 阶段，从 setup.framework 和 setup.hardware 字段推断拆分。
+   estimated_cost:
+     gpu_hours: 0
+     cpu_hours: 0
+     md_wallclock_hours: 0      # > 0 仅适用于显式 MD 流水线（如 AMBER、GROMACS、OpenMM）
+     wet_lab_usd: 0             # > 0 仅当实验含湿实验交接
+     fte_weeks: 0               # 研究者时间估计（小/中/大粗粒度）
+     dataset_access_lead_time_days: 0   # > 0 当 setup.dataset 需要注册 / DUA 时
    remote:                      # 完整 block 必须存在，以便 /exp-run --env remote 通过 Edit 填充子字段
      server: ""
      gpu: ""

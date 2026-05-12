@@ -208,7 +208,22 @@ Revise the experiment plan based on Review LLM feedback (add missing experiments
    date_completed: ""           # empty until /exp-run Phase 4
    run_log: ""                  # empty until /exp-run Phase 2
    started: ""                  # empty until /exp-run Phase 2 (ISO timestamp, set via set-meta)
-   estimated_hours: 0           # 0 until /exp-run Phase 2 (set via set-meta)
+   estimated_hours: 0           # bio-A6: legacy single-number budget — kept for backward compat
+   # bio-C2 (minimal pilot merged 2026-05-11): populate the structured estimated_cost block
+   # from the budget breakdown you computed in Step 3 / Step 4. Use realistic per-experiment
+   # numbers; 0 is fine for sub-fields that genuinely don't apply (e.g. wet_lab_usd: 0 for a
+   # compute-only pipeline; dataset_access_lead_time_days: 0 for public datasets like
+   # [[ternarydb]]). Keep estimated_hours populated as the GPU-hours rough total for legacy
+   # consumers; estimated_cost.gpu_hours should typically equal estimated_hours. Full C2 (with
+   # automated wet-lab / MD wall-clock detection) is deferred — for the minimal pilot, infer
+   # the breakdown from the experiment's setup.framework and setup.hardware fields.
+   estimated_cost:
+     gpu_hours: 0
+     cpu_hours: 0
+     md_wallclock_hours: 0      # > 0 only for explicit MD pipelines (e.g. AMBER, GROMACS, OpenMM)
+     wet_lab_usd: 0             # > 0 only when the experiment includes a wet-lab handoff
+     fte_weeks: 0               # researcher-time estimate (small/medium/large rough scale)
+     dataset_access_lead_time_days: 0   # > 0 when setup.dataset requires registration / DUA
    remote:                      # full block must exist so /exp-run --env remote can populate sub-fields via Edit
      server: ""
      gpu: ""
