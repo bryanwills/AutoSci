@@ -1969,3 +1969,49 @@ wet-lab,docking}/` 具体模板文件）延后 —— minimal pilot 用文件清
 | 活动 SKILL.md 行数 | 436（升自 403） |
 
 **Section C 状态：8/9 → 9/9 完结**。bio-adaptation Section C 全部 9 项均已合并（最小或完整）。
+
+---
+
+## 2026-05-12 —— A8 pilot merge：experiments/ 加 reproducibility 块 + lint_bio cross-check 闭环
+
+**范围**：纯 in-silico 实验有 code commit + checkpoint hash 就够,但只要摄取了外部数据
+（湿实验数据、文献抗体、AlphaFold-DB v4、PROTAC-DB 等）,可复现性就需要 RRID / Cellosaurus
+/ Addgene / PDB 版本 / 数据集版本 + accessed_date。A8 加 `reproducibility` 块到 experiments/,
+并把 lint_bio.py 的 dataset_version check 扩展到覆盖此字段（与 B3 的 edge metadata.version
+共享同一 cross-check 通路）。
+**状态**：**A8 合并**（不是 minimal —— schema + 模板 + 两个 skill + lint_bio 扩展 +
+live backfill 全部 wired,且端到端 smoke-tested）。**Section A 完结：8/8**。
+
+### 改动位置
+
+- `runtime/schema/entities.yaml`: experiments/ 加 `reproducibility` 对象（5 子字段）。
+- `docs/runtime-page-templates.{en,zh}.md`: experiments 模板加 reproducibility 块。
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`:
+  Step 6 frontmatter 模板加 reproducibility 块 + 逐字段内联指引。
+- `i18n/{en,zh}/skills/exp-run/SKILL.md` + `.claude/skills/exp-run/SKILL.md`:
+  Phase 1 Step 1 读 reproducibility,Step 3 各布局把值固化到产物文件（wet-lab protocol.md
+  ## Reagents / MD mdrun.sh header pdb_versions / ML / docking config.yaml dataset_versions）。
+- `tools/lint_bio.py`: `_load_dataset_versions` 抽出复用;`check_dataset_versions` 现在
+  cross-check 两个数据源 ——（3a）`dataset_version_used` edge metadata.version (B3) +
+  （3b）`experiments.reproducibility.dataset_versions[*]` (A8)。新 issue category
+  `bio-repro-dataset-version`（🟡）覆盖 3 种 failure mode：版本未列、缺必填 key、entry 非 dict。
+- **Live backfill**：`wiki/experiments/deepternary-baseline-ternarydb-crbn-vhl-reproduction.md`
+  + `wiki/experiments/phase0-noise-floor-calibration-deepternary-ptm-perturbations.md` 加
+  `reproducibility.dataset_versions: [{dataset_slug: ternarydb, version: v1,
+  accessed_date: 2026-05-02}]` —— 与 ternarydb.md::versions=v1 闭合,lint cross-check 通过。
+  其他 6 个实验暂无外部数据 pin,块保持缺失（合法）。
+
+### 验证
+
+| 检查 | 结果 |
+|---|---|
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 |
+| `python tools/lint_bio.py` | 0 🔴 / 0 🟡 / 0 🔵 |
+| A8 lint smoke（4 种 bad case）| ternarydb@v999、不存在的 dataset、缺 version key、非 dict entry —— 全部正确 flagged |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | 一致 |
+| `diff -q i18n/en/skills/exp-run/SKILL.md .claude/skills/exp-run/SKILL.md` | 一致 |
+| lint_bio.py 行数 | 348（升自 298） |
+
+**Section A 状态：7/8 → 8/8 完结**。bio-adaptation Section A + B + C **全覆盖**:A 8/8、
+B 14/14 edge types、C 9/9 skills。仅延后项剩余（D 约定、H 子领域验证、各 pilot full
+版本）。

@@ -259,6 +259,17 @@ mcp__llm-review__chat:
      wet_lab_usd: 0             # > 0 仅当实验含湿实验交接
      fte_weeks: 0               # 研究者时间估计（小/中/大粗粒度）
      dataset_access_lead_time_days: 0   # > 0 当 setup.dataset 需要注册 / DUA 时
+   # bio-A8（2026-05-12 pilot merge）：reproducibility 块。实验摄取外部试剂 / 结构 / 数据集
+   # 版本时填充非空子字段。纯 in-silico 无外部数据时块可留空。lint_bio 会 cross-check
+   # dataset_versions[*] 与 datasets/{slug}.md::versions —— setup.dataset wikilink 到含版本
+   # 条目的外部 [[dataset]] 页时填此字段（如 dataset_versions: [{dataset_slug: ternarydb,
+   # version: v1, accessed_date: 2026-05-02}]）。
+   reproducibility:
+     rrid: []                   # 抗体 / 试剂 RRID（如 ["AB_12345"]）
+     cellosaurus: []            # 细胞系 Cellosaurus ID（如 ["CVCL_0023"]）
+     addgene: []                # Addgene 质粒 ID（如 ["#12345"]）
+     pdb_versions: []           # ["{PDB_ID}@{version-or-date}"]（如 ["6XYZ@2024-03-15"]）
+     dataset_versions: []       # {dataset_slug, version, accessed_date} 列表
    remote:                      # 完整 block 必须存在，以便 /exp-run --env remote 通过 Edit 填充子字段
      server: ""
      gpu: ""

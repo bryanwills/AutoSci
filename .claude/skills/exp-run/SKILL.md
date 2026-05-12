@@ -72,7 +72,7 @@ argument-hint: <experiment-slug> [--review] [--collect] [--full] [--env local|re
 **Phase 1: Prepare**
 
 1. **Read experiment page**:
-   - `wiki/experiments/{slug}.md`: extract setup (model, dataset, hardware, framework), metrics, baseline, hypothesis. Also read the A5-full bio fields when present: `setup.in_silico_or_wet`, `setup.assay_type`, `setup.force_field`, `setup.solvent_model`, `setup.simulation_length`, `setup.species`, `setup.cell_line`, `setup.weight_version`, `setup.random_seed_protocol` — these drive the Step 3 setup-type routing (bio-C7 minimal pilot).
+   - `wiki/experiments/{slug}.md`: extract setup (model, dataset, hardware, framework), metrics, baseline, hypothesis. Also read the A5-full bio fields when present: `setup.in_silico_or_wet`, `setup.assay_type`, `setup.force_field`, `setup.solvent_model`, `setup.simulation_length`, `setup.species`, `setup.cell_line`, `setup.weight_version`, `setup.random_seed_protocol` — these drive the Step 3 setup-type routing (bio-C7 minimal pilot). And the A8 `reproducibility` block when present (`rrid`, `cellosaurus`, `addgene`, `pdb_versions`, `dataset_versions`) — Step 3 layouts pin these into the scaffolded files: wet-lab `protocol.md` lists rrid + cellosaurus + addgene under "## Reagents"; MD `mdrun.sh` notes `pdb_versions` in a header comment so the snapshot is locked; ML / docking `config.yaml` records `dataset_versions` so analysis can re-derive the exact training split (bio-A8 pilot).
    - Verify status == `planned`
    - If status is `running`, prompt user to use `--collect` mode
    - If status is `completed`/`abandoned`, refuse to execute

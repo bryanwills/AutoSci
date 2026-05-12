@@ -37,6 +37,15 @@ estimated_cost:
   wet_lab_usd: 0
   fte_weeks: 0.25
   dataset_access_lead_time_days: 0   # TernaryDB is public ([[ternarydb]] access: public)
+reproducibility:
+  rrid: []
+  cellosaurus: []
+  addgene: []
+  pdb_versions: []
+  dataset_versions:
+    - dataset_slug: ternarydb
+      version: v1
+      accessed_date: 2026-05-02
 remote:
   server: ""
   gpu: ""

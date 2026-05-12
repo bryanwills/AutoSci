@@ -210,6 +210,17 @@ estimated_cost:
   wet_lab_usd: 0
   fte_weeks: 0
   dataset_access_lead_time_days: 0
+# bio-A8 (pilot merged 2026-05-12): reproducibility metadata for wet-lab inputs + external
+# data versions. All sub-fields optional; leave empty for purely-self-contained experiments.
+# Populate whenever the experiment ingests external reagents (antibody/cell-line/plasmid)
+# or specific external structure / dataset versions. lint_bio.py cross-checks
+# dataset_versions[*] against datasets/{slug}.md::versions.
+reproducibility:
+  rrid: []                  # antibody / reagent RRIDs (e.g. ["AB_12345"])
+  cellosaurus: []           # cell-line Cellosaurus IDs (e.g. ["CVCL_0023"])
+  addgene: []               # Addgene plasmid IDs (e.g. ["#12345"])
+  pdb_versions: []          # ["{PDB_ID}@{version-or-date}"] (e.g. ["6XYZ@2024-03-15"])
+  dataset_versions: []      # list of {dataset_slug, version, accessed_date}
 remote:
   server: ""
   gpu: ""

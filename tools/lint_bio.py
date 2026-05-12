@@ -7,8 +7,10 @@ This linter covers bio-shaped constraints that base lint cannot express:
 
   1. PDB ID format on ``concepts.pdb_ids`` (A2-light)
   2. UniProt accession format on ``concepts.uniprot_id`` (A2-light)
-  3. ``dataset_version_used`` edge metadata.version must hit the target
-     dataset's ``versions:`` list (B3 + A1 cross-check)
+  3. Dataset version cross-check against ``datasets/{slug}.md::versions`` (A1) —
+     applied to BOTH sources:
+       (3a) ``dataset_version_used`` edge metadata.version (B3)
+       (3b) ``experiments.reproducibility.dataset_versions[*]`` (A8)
   4. ``experiments.setup.species`` values are in a recognised set (A5-full)
   5. ``experiments.setup.assay_type`` containing MD/molecular dynamics
      requires ``setup.force_field`` to be populated (A5-full)
@@ -138,62 +140,116 @@ def check_uniprot_ids(wiki_dir: Path) -> list[LintIssue]:
     return issues
 
 
-def check_dataset_versions(wiki_dir: Path) -> list[LintIssue]:
-    """``dataset_version_used`` edges carrying metadata.version must reference a
-    version present in the target dataset's ``versions:`` list."""
-    issues: list[LintIssue] = []
-    edges_path = wiki_dir / "graph" / "edges.jsonl"
-    if not edges_path.exists():
-        return issues
-    # Build dataset_slug -> set(version strings).
-    dataset_versions: dict[str, set[str]] = {}
+def _load_dataset_versions(wiki_dir: Path) -> dict[str, set[str]]:
+    """Build dataset_slug -> set(version strings) from datasets/*.md::versions."""
+    out: dict[str, set[str]] = {}
     datasets_dir = wiki_dir / "datasets"
-    if datasets_dir.exists():
-        for p in datasets_dir.glob("*.md"):
+    if not datasets_dir.exists():
+        return out
+    for p in datasets_dir.glob("*.md"):
+        fm = _parse_frontmatter(p)
+        if not fm:
+            continue
+        versions = fm.get("versions") or []
+        if not isinstance(versions, list):
+            continue
+        out[p.stem] = {
+            str(v.get("version")) for v in versions
+            if isinstance(v, dict) and v.get("version") not in (None, "")
+        }
+    return out
+
+
+def check_dataset_versions(wiki_dir: Path) -> list[LintIssue]:
+    """Two cross-checks against ``datasets/{slug}.md::versions``:
+
+    1. ``dataset_version_used`` edges carrying ``metadata.version`` (B3 + A1)
+    2. ``experiments.reproducibility.dataset_versions[*]`` entries (A8 + A1)
+    """
+    issues: list[LintIssue] = []
+    dataset_versions = _load_dataset_versions(wiki_dir)
+
+    # Check 1: B3 edges
+    edges_path = wiki_dir / "graph" / "edges.jsonl"
+    if edges_path.exists():
+        try:
+            with edges_path.open(encoding="utf-8") as f:
+                for line_num, raw in enumerate(f, 1):
+                    raw = raw.strip()
+                    if not raw:
+                        continue
+                    try:
+                        edge = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    if edge.get("type") != "dataset_version_used":
+                        continue
+                    metadata = edge.get("metadata") or {}
+                    version = metadata.get("version")
+                    if not version:
+                        continue
+                    to = edge.get("to", "")
+                    if not to.startswith("datasets/"):
+                        continue
+                    dataset_slug = to.split("/", 1)[1]
+                    known = dataset_versions.get(dataset_slug, set())
+                    if str(version) not in known:
+                        known_str = sorted(known) if known else "empty"
+                        issues.append(LintIssue(
+                            "🟡", "bio-dataset-version",
+                            f"graph/edges.jsonl:{line_num}",
+                            f"Edge references dataset version {version!r} not listed in "
+                            f"datasets/{dataset_slug}.md::versions (known: {known_str})",
+                            suggestion=(
+                                f"Either add version {version!r} to "
+                                f"datasets/{dataset_slug}.md::versions or correct the edge metadata.version."
+                            )))
+        except OSError:
+            pass
+
+    # Check 2: A8 experiments.reproducibility.dataset_versions[*]
+    experiments_dir = wiki_dir / "experiments"
+    if experiments_dir.exists():
+        for p in sorted(experiments_dir.glob("*.md")):
             fm = _parse_frontmatter(p)
             if not fm:
                 continue
-            versions = fm.get("versions") or []
-            if not isinstance(versions, list):
+            repro = fm.get("reproducibility") or {}
+            if not isinstance(repro, dict):
                 continue
-            dataset_versions[p.stem] = {
-                str(v.get("version")) for v in versions
-                if isinstance(v, dict) and v.get("version") not in (None, "")
-            }
-    try:
-        with edges_path.open(encoding="utf-8") as f:
-            for line_num, raw in enumerate(f, 1):
-                raw = raw.strip()
-                if not raw:
+            entries = repro.get("dataset_versions") or []
+            if not isinstance(entries, list):
+                continue
+            rel = f"experiments/{p.name}"
+            for idx, entry in enumerate(entries):
+                if not isinstance(entry, dict):
+                    issues.append(LintIssue(
+                        "🟡", "bio-repro-dataset-version", rel,
+                        f"reproducibility.dataset_versions[{idx}] must be a mapping "
+                        "{dataset_slug, version, accessed_date}",
+                        suggestion="Use [{dataset_slug: ternarydb, version: v1, accessed_date: 2026-05-02}]"))
                     continue
-                try:
-                    edge = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue  # base lint already flags malformed edges
-                if edge.get("type") != "dataset_version_used":
+                slug = entry.get("dataset_slug")
+                ver = entry.get("version")
+                if not slug or not ver:
+                    issues.append(LintIssue(
+                        "🟡", "bio-repro-dataset-version", rel,
+                        f"reproducibility.dataset_versions[{idx}] missing required key "
+                        f"(have keys: {sorted(entry.keys())}); both dataset_slug and version required",
+                        suggestion="Populate both dataset_slug and version; accessed_date is optional but recommended."))
                     continue
-                metadata = edge.get("metadata") or {}
-                version = metadata.get("version")
-                if not version:
-                    continue  # version stored only in free-text evidence — not checkable
-                to = edge.get("to", "")
-                if not to.startswith("datasets/"):
-                    continue  # base lint catches misrouted endpoints
-                dataset_slug = to.split("/", 1)[1]
-                known = dataset_versions.get(dataset_slug, set())
-                if str(version) not in known:
+                known = dataset_versions.get(str(slug), set())
+                if str(ver) not in known:
                     known_str = sorted(known) if known else "empty"
                     issues.append(LintIssue(
-                        "🟡", "bio-dataset-version",
-                        f"graph/edges.jsonl:{line_num}",
-                        f"Edge references dataset version {version!r} not listed in "
-                        f"datasets/{dataset_slug}.md::versions (known: {known_str})",
+                        "🟡", "bio-repro-dataset-version", rel,
+                        f"reproducibility.dataset_versions[{idx}] references "
+                        f"{{dataset_slug: {slug!r}, version: {ver!r}}} which is not listed in "
+                        f"datasets/{slug}.md::versions (known: {known_str})",
                         suggestion=(
-                            f"Either add version {version!r} to "
-                            f"datasets/{dataset_slug}.md::versions or correct the edge metadata.version."
+                            f"Either add version {ver!r} to datasets/{slug}.md::versions or "
+                            f"correct the reproducibility.dataset_versions entry."
                         )))
-    except OSError:
-        return issues
     return issues
 
 

@@ -210,6 +210,21 @@ experiments:
         wet_lab_usd:                     { type: float }
         fte_weeks:                       { type: float }
         dataset_access_lead_time_days:   { type: int }
+    # bio-A8 (pilot merged 2026-05-12): wet-lab + external-data reproducibility metadata.
+    # All sub-fields optional and additive — pure-ML / pure-in-silico experiments that need
+    # no external reagents can leave them empty. The point: any experiment that ingests
+    # wet-lab signals (antibody, cell line, plasmid, literature-derived assay data) or
+    # specific external structure / dataset versions should pin them here so /paper-draft
+    # and /rebuttal can audit reproducibility from the page alone. lint_bio.py cross-checks
+    # reproducibility.dataset_versions[*] against datasets/{slug}.md::versions.
+    reproducibility:
+      type: object
+      fields:
+        rrid:             { type: list_str, default: [] }   # antibody / reagent RRIDs (e.g. AB_12345)
+        cellosaurus:      { type: list_str, default: [] }   # cell-line Cellosaurus IDs (CVCL_xxxx)
+        addgene:          { type: list_str, default: [] }   # Addgene plasmid IDs
+        pdb_versions:     { type: list_str, default: [] }   # "{PDB_ID}@{version-or-date}" strings (e.g. "6XYZ@2024-03-15")
+        dataset_versions: { type: list_object, default: [] }  # list of {dataset_slug, version, accessed_date}
     remote:
       type: object
       fields:

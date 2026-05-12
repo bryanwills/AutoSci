@@ -2075,3 +2075,57 @@ pilot uses file-list specs + agent scaffolding.
 
 **Section C status: 8/9 → 9/9 complete**. All 9 Section C items of bio-adaptation are now
 merged (minimal or full).
+
+---
+
+## 2026-05-12 — A8 pilot merge: experiments/ gains reproducibility block + lint_bio cross-check loop closed
+
+**Scope**: Pure in-silico experiments with code commit + checkpoint hash are
+self-contained, but any experiment ingesting external data (wet-lab signals,
+literature antibody / cell-line / plasmid IDs, AlphaFold-DB v4, PROTAC-DB, etc.)
+needs RRID / Cellosaurus / Addgene / PDB version / dataset version + accessed_date
+to be reproducible. A8 adds a `reproducibility` block to experiments/, and
+extends lint_bio.py's dataset_version check to cover this field too (sharing the
+same cross-check path as the B3 edge metadata.version).
+**Status**: **A8 merged** (not minimal — schema + templates + two skills +
+lint_bio extension + live backfill all wired and end-to-end smoke-tested).
+**Section A complete: 8/8**.
+
+### Files touched
+
+- `runtime/schema/entities.yaml`: experiments/ gains `reproducibility` object (5 sub-fields:
+  rrid, cellosaurus, addgene, pdb_versions, dataset_versions).
+- `docs/runtime-page-templates.{en,zh}.md`: experiments template extended with the block.
+- `i18n/{en,zh}/skills/exp-design/SKILL.md` + `.claude/skills/exp-design/SKILL.md`:
+  Step 6 frontmatter template gains the reproducibility block with per-sub-field inline
+  guidance.
+- `i18n/{en,zh}/skills/exp-run/SKILL.md` + `.claude/skills/exp-run/SKILL.md`:
+  Phase 1 Step 1 reads reproducibility alongside A5-full setup; Step 3 layouts pin values
+  into scaffolded files (wet-lab protocol.md ## Reagents / MD mdrun.sh header pdb_versions /
+  ML/docking config.yaml dataset_versions).
+- `tools/lint_bio.py`: factored out `_load_dataset_versions` helper; `check_dataset_versions`
+  now cross-checks BOTH sources — (3a) `dataset_version_used` edge metadata.version (B3) and
+  (3b) `experiments.reproducibility.dataset_versions[*]` (A8). New issue category
+  `bio-repro-dataset-version` (🟡) handles 3 failure modes: version not listed, missing
+  required key, non-dict entry.
+- **Live backfill**: `wiki/experiments/deepternary-baseline-ternarydb-crbn-vhl-reproduction.md`
+  + `wiki/experiments/phase0-noise-floor-calibration-deepternary-ptm-perturbations.md` gain
+  `reproducibility.dataset_versions: [{dataset_slug: ternarydb, version: v1,
+  accessed_date: 2026-05-02}]` — closes against ternarydb.md::versions=v1; lint cross-check
+  passes end-to-end. The other 6 experiments leave the block absent (no external data to
+  pin yet — valid).
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `python tools/lint.py` | 0 🔴 / 0 🟡 / 11 🔵 |
+| `python tools/lint_bio.py` | 0 🔴 / 0 🟡 / 0 🔵 |
+| A8 lint smoke (4 bad cases) | ternarydb@v999, nonexistent dataset, missing version key, non-dict entry — all flagged correctly |
+| `diff -q i18n/en/skills/exp-design/SKILL.md .claude/skills/exp-design/SKILL.md` | identical |
+| `diff -q i18n/en/skills/exp-run/SKILL.md .claude/skills/exp-run/SKILL.md` | identical |
+| lint_bio.py line count | 348 (up from 298) |
+
+**Section A status: 7/8 → 8/8 complete**. bio-adaptation Sections A + B + C are now
+**fully covered**: A 8/8, B 14/14 edge types, C 9/9 skills. Only deferred items remain
+(Section D conventions, Section H subdomain validation, full versions of various pilots).

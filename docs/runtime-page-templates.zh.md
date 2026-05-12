@@ -206,6 +206,15 @@ estimated_cost:
   wet_lab_usd: 0
   fte_weeks: 0
   dataset_access_lead_time_days: 0
+# bio-A8（2026-05-12 pilot merge）：湿实验 + 外部数据可复现性元数据。子字段全部可选;纯
+# 自包含实验留空。实验摄取外部试剂（抗体 / 细胞系 / 质粒）或特定外部结构 / 数据集版本时填充。
+# lint_bio.py 会 cross-check dataset_versions[*] 与 datasets/{slug}.md::versions。
+reproducibility:
+  rrid: []                  # 抗体 / 试剂 RRID（如 ["AB_12345"]）
+  cellosaurus: []           # 细胞系 Cellosaurus ID（如 ["CVCL_0023"]）
+  addgene: []               # Addgene 质粒 ID（如 ["#12345"]）
+  pdb_versions: []          # ["{PDB_ID}@{version-or-date}"]（如 ["6XYZ@2024-03-15"]）
+  dataset_versions: []      # {dataset_slug, version, accessed_date} 列表
 remote:
   server: ""
   gpu: ""

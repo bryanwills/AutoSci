@@ -72,7 +72,7 @@ argument-hint: <experiment-slug> [--review] [--collect] [--full] [--env local|re
 **Phase 1: 准备（Prepare）**
 
 1. **读取实验页面**：
-   - `wiki/experiments/{slug}.md`：提取 setup（model, dataset, hardware, framework）、metrics、baseline、hypothesis。存在时一并读取 A5-full bio 字段：`setup.in_silico_or_wet`、`setup.assay_type`、`setup.force_field`、`setup.solvent_model`、`setup.simulation_length`、`setup.species`、`setup.cell_line`、`setup.weight_version`、`setup.random_seed_protocol` —— 这些驱动 Step 3 的 setup-type 路由（bio-C7 minimal pilot）。
+   - `wiki/experiments/{slug}.md`：提取 setup（model, dataset, hardware, framework）、metrics、baseline、hypothesis。存在时一并读取 A5-full bio 字段：`setup.in_silico_or_wet`、`setup.assay_type`、`setup.force_field`、`setup.solvent_model`、`setup.simulation_length`、`setup.species`、`setup.cell_line`、`setup.weight_version`、`setup.random_seed_protocol` —— 这些驱动 Step 3 的 setup-type 路由（bio-C7 minimal pilot）。存在时一并读取 A8 `reproducibility` 块（`rrid`、`cellosaurus`、`addgene`、`pdb_versions`、`dataset_versions`）—— Step 3 各布局把这些固化到产物文件:wet-lab 的 `protocol.md` 在 "## Reagents" 列 rrid + cellosaurus + addgene;MD 的 `mdrun.sh` 在头部注释中标 `pdb_versions` 锁定快照;ML / docking 的 `config.yaml` 记录 `dataset_versions` 以便分析重建训练划分（bio-A8 pilot）。
    - 验证 status == `planned`
    - 若 status 为 `running`，提示用户使用 `--collect` 模式
    - 若 status 为 `completed`/`abandoned`，拒绝执行

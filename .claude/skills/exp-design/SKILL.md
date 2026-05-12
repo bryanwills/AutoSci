@@ -263,6 +263,18 @@ Revise the experiment plan based on Review LLM feedback (add missing experiments
      wet_lab_usd: 0             # > 0 only when the experiment includes a wet-lab handoff
      fte_weeks: 0               # researcher-time estimate (small/medium/large rough scale)
      dataset_access_lead_time_days: 0   # > 0 when setup.dataset requires registration / DUA
+   # bio-A8 (pilot merged 2026-05-12): reproducibility block. Populate non-empty sub-fields
+   # whenever the experiment ingests external reagents / structures / dataset versions. Pure
+   # in-silico designs with no external data can leave the block present-but-empty (lint_bio
+   # cross-checks dataset_versions[*] against datasets/{slug}.md::versions, so populate that
+   # sub-field when setup.dataset wikilinks an external [[dataset]] page with versioned
+   # entries — e.g. dataset_versions: [{dataset_slug: ternarydb, version: v1, accessed_date: 2026-05-02}]).
+   reproducibility:
+     rrid: []                   # antibody / reagent RRIDs (e.g. ["AB_12345"])
+     cellosaurus: []            # cell-line Cellosaurus IDs (e.g. ["CVCL_0023"])
+     addgene: []                # Addgene plasmid IDs (e.g. ["#12345"])
+     pdb_versions: []           # ["{PDB_ID}@{version-or-date}"] (e.g. ["6XYZ@2024-03-15"])
+     dataset_versions: []       # list of {dataset_slug, version, accessed_date}
    remote:                      # full block must exist so /exp-run --env remote can populate sub-fields via Edit
      server: ""
      gpu: ""
