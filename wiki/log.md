@@ -4,3 +4,4 @@
 ## [2026-05-05] init | wiki initialized
 ## [2026-05-14] init | wiki initialized
 ## [2026-05-14] init: scaffold pages created for GPU kernel optimization topic
+## [2026-05-14] ingest: StitchCUDA — multi-agent end-to-end GPU programming framework with rubric-based agentic RL (ICML 2026)

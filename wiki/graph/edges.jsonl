@@ -1,0 +1,5 @@
+{"from": "papers/stitchcuda", "to": "concepts/kernel-benchmark", "type": "uses_concept", "evidence": "Evaluates on KernelBench Level 1/2/3 benchmarks", "date": "2026-05-14", "confidence": "high"}
+{"from": "papers/stitchcuda", "to": "concepts/gpu-kernel", "type": "uses_concept", "evidence": "Generates end-to-end GPU programs with custom CUDA kernels", "date": "2026-05-14", "confidence": "high"}
+{"from": "papers/stitchcuda", "to": "concepts/multi-agent-gpu-programming", "type": "introduces_concept", "evidence": "Proposes Planner-Coder-Verifier multi-agent framework for end-to-end GPU programming", "date": "2026-05-14", "confidence": "high"}
+{"from": "papers/stitchcuda", "to": "concepts/rubric-based-reinforcement-learning", "type": "introduces_concept", "evidence": "Introduces rubric-based agentic RL with four-dimension rubric reward for Coder training", "date": "2026-05-14", "confidence": "high"}
+{"from": "papers/stitchcuda", "to": "concepts/reward-hacking-prevention", "type": "introduces_concept", "evidence": "Introduces rubric reward with anti-hacking dimension to prevent reward hacking in RL training", "date": "2026-05-14", "confidence": "high"}
