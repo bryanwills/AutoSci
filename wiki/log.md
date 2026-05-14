@@ -14,3 +14,4 @@
 ## [2026-05-14] ## [2026-05-14] ingest | Ingested paper: KernelBenchX: A Comprehensive Benchmark for Evaluating LLM-Generated GPU Kernels
 ## [2026-05-14] ingest: Towards Cold-Start Drafting and Continual Refining (EvoKernel) - value-driven memory for NPU kernel synthesis, ICLR 2026
 ## [2026-05-14] init: fan-in complete, 9 papers merged
+## [2026-05-14] ideate | 4 ideas proposed, 4 ideas filtered out | direction: LLM for GPU kernel optimization on TritonBench

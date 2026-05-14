@@ -146,12 +146,52 @@ topics:
 people:
 
 ideas:
+  - slug: adaptive-iteration-depth-learned-stopping
+    title: "Adaptive Iteration Depth via Learned Stopping"
+    tags: [iterative-refinement, stopping-policy, tritonbench, llm, optimization-depth]
+    status: proposed
+    priority: 3
+  - slug: cross-backend-kernel-translation-cuda-triton
+    title: "Cross-Backend Kernel Translation: CUDA to Triton Optimization Transfer"
+    tags: [cross-backend, translation, cuda, triton, optimization-transfer, tritonbench]
+    status: proposed
+    priority: 3
   - slug: llm-agent-gpu-kernel-optimization
     title: "LLM/Agent-based GPU Kernel Optimization"
     tags: [llm, agents, gpu, kernel-optimization, code-generation]
     status: proposed
     novelty_score: 3
     priority: 3
+  - slug: multi-pass-kernel-optimization
+    title: "Multi-Pass Optimization: Breaking the Single-Pass Assumption"
+    tags: [multi-pass, optimization, memory, compute, parallelization]
+    status: failed
+    priority: 1
+  - slug: operator-complexity-dependent-strategy-routing
+    title: "Operator Complexity-Dependent Strategy Routing"
+    tags: [operator-routing, complexity-aware, tritonbench, strategy-selection, llm]
+    status: proposed
+    priority: 3
+  - slug: profiling-guided-iterative-refinement-triton-speed
+    title: "Profiling-Guided Iterative Refinement for Triton Speed"
+    tags: [iterative-refinement, profiling, triton, tritonbench, llm, feedback-loop]
+    status: proposed
+    priority: 3
+  - slug: q-value-retrieval-kernel-optimization
+    title: "Experience-Guided Optimization via Q-Value Retrieval"
+    tags: [q-value, retrieval, experience, rl, kernel-optimization]
+    status: failed
+    priority: 1
+  - slug: quality-diversity-multi-agent-triton
+    title: "Quality-Diversity Search with Multi-Agent Verification for Triton Kernels"
+    tags: [quality-diversity, multi-agent, map-elites, triton]
+    status: failed
+    priority: 1
+  - slug: rl-pretraining-test-time-refinement
+    title: "RL Pre-training + Test-Time Iterative Refinement"
+    tags: [rl, pretraining, iterative-refinement, test-time, llm]
+    status: failed
+    priority: 1
 
 methods:
   - slug: ascendoptimizer-method
