@@ -8,3 +8,4 @@
 ## [2026-05-14] ingest: Towards Automated Kernel Generation in the Era of LLMs (IJCAI 2026 survey) — paper + 3 new concepts (kernel-generation-sft, kernel-generation-rl, llm-agent-kernel-generation)
 ## [2026-05-14] ingest | ingested paper: KernelBench: Can LLMs Write Efficient GPU Kernels?
 ## [2026-05-14] ingest: AscendOptimizer paper (ascendoptimizer) ingested with 3 new concepts (ascend-npu, optimization-rewind, evolutionary-guided-program-search) and 1 new method (ascendoptimizer-method)
+## [2026-05-14] ingest: StitchCUDA — multi-agent end-to-end GPU programming framework with rubric-based agentic RL (ICML 2026)
