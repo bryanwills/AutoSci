@@ -1,0 +1,29 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Authors:       Nina Wiedemann, Benjamin Ummenhofer, Diana Wofk, 
+%                Quentin Leboutet, and Michael Paulitsch
+%
+% Description:   The SYCL of Life: Evolutionary Kernel Optimization 
+%                with Large Language Models
+%
+% Section:       Introduction
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Introduction}
+Writing high-performance GPU kernels requires deep expertise in hardware architectures, memory hierarchies, and parallel programming paradigms: knowledge that remains scarce even among experienced engineers~\citep{li2025cuda}. Yet efficient GPU implementations are often decisive for a method's success and adoption, as illustrated by FlashAttention~\citep{dao2022flashattention}, which was instrumental to the practical scalability of Transformers. 
+Following the release of KernelBench~\citep{ouyang2025kernelbench}, a growing body of work has explored the automation of GPU kernel development using LLMs. With few exceptions based on model fine-tuning~\citep{li2025cuda, baronio2025kevin}, most approaches rely on an iterative generate$\to$verify$\to$measure loop: kernels proposed by an LLM are compiled, validated, benchmarked, and the resulting feedback is used to steer subsequent generations. Variants of this paradigm have been demonstrated across CUDA~\citep{chen2025cuda, zhang2025cudaforge, lange2025towards}, Triton~\citep{wang2025geak, li2025tritonforge}, and Metal~\citep{gimlet}, often augmented with profiling tools~\citep{zhang2025cudaforge, chen2025cuda, lange2025towards, gimlet}, multi-agent architectures~\citep{wei2025astra, zhang2025cudaforge, lei2025pragma}, or evolutionary search techniques~\citep{liao2025kernelevolve, lange2025ai, yan2026pacevolve}.
+Despite known shortcomings in KernelBench that require careful interpretation of reported speedups~\cite{lange2025towards}, these studies collectively demonstrate that LLMs can produce correct and performant kernels when guided by execution feedback. 
+
+However, existing approaches rely on general code-generation strategies that do not address the unique challenges of kernel optimization. Unlike standard programming tasks, kernel generation demands (1) knowledge of memory access patterns and an understanding of how parallelism maps to specific architectures and (2) a systematic exploration of optimization strategies. Furthermore, iterative prompting and kernel validation loops suffer from \textit{mode collapse}, in which iterative searches prematurely converge because LLMs repeatedly propose variants close to recent successes, and \textit{context degradation}, in which failed attempts dominate the prompt context as optimization histories grow.
+
+To overcome these limitations, we propose \textit{KernelFoundry}, an evolutionary framework that maintains a diverse archive of kernel implementations and systematically explores optimization techniques. 
+To counteract mode collapse, KernelFoundry adapts a MAP-Elites evolutionary strategy~\citep{mouret2015illuminating}. Rather than defining generic behavioral descriptors such as code length~\citep{lehman2023evolution}, kernel implementations are indexed along well‑defined, \textit{domain‑specific dimensions addressing hardware system architecture} such as memory access patterns or parallelism strategies. 
+To mitigate context degradation, we leverage \textit{meta‑prompt evolution}, allowing prompts to co-evolve with kernels and uncover task-specific optimization strategies. 
+Finally, we propose to repurpose\textit{ templated kernels} to allow the LLM to tune hardware-dependent values like tile and block sizes.
+
+
+We evaluate KernelFoundry on KernelBench, robust-kbench and custom benchmark suites spanning single-kernel operators, fusion patterns, and full model architectures. 
+Unlike prior work that targets NVIDIA's proprietary ecosystem almost exclusively, we additionally use SYCL, an open-standard C++ abstraction that is vendor-agnostic and more expressive than other cross-platform GPU programming frameworks such as Triton. 
+Furthermore, our framework is not limited to standardized tasks or benchmarks. We introduce a custom input format that allows users to optimize kernels based on arbitrary instructions (not restricted to PyTorch code) and to employ complex test frameworks, provided they are compatible with pytest. As a case study, we showcase the optimization of a specific operation within a LLama3 model, illustrating the practical utility of our pipeline for real-world, model-level tasks.
+

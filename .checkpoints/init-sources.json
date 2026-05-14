@@ -1,0 +1,95 @@
+{
+  "status": "ok",
+  "sources": [
+    {
+      "candidate_id": "arxiv:2603.12440",
+      "origin": "introduced",
+      "canonical_ingest_path": "raw\\discovered\\kernelfoundry-hardware-aware-evolutionary-gpu-kernel",
+      "prepared_path": null,
+      "discovered_path": "raw\\discovered\\kernelfoundry-hardware-aware-evolutionary-gpu-kernel",
+      "source_path": null,
+      "ingest_format": "directory",
+      "shortlist_rank": 1
+    },
+    {
+      "candidate_id": "arxiv:2601.15727",
+      "origin": "introduced",
+      "canonical_ingest_path": "raw\\discovered\\towards-automated-kernel-generation-era-llms",
+      "prepared_path": null,
+      "discovered_path": "raw\\discovered\\towards-automated-kernel-generation-era-llms",
+      "source_path": null,
+      "ingest_format": "directory",
+      "shortlist_rank": 3
+    },
+    {
+      "candidate_id": "arxiv:2502.10517",
+      "origin": "introduced",
+      "canonical_ingest_path": "raw\\discovered\\kernelbench-llms-write-efficient-gpu-kernels",
+      "prepared_path": null,
+      "discovered_path": "raw\\discovered\\kernelbench-llms-write-efficient-gpu-kernels",
+      "source_path": null,
+      "ingest_format": "directory",
+      "shortlist_rank": 4
+    },
+    {
+      "candidate_id": "arxiv:2603.23566",
+      "origin": "introduced",
+      "canonical_ingest_path": "raw\\discovered\\ascendoptimizer-episodic-agent-ascend-npu-operator",
+      "prepared_path": null,
+      "discovered_path": "raw\\discovered\\ascendoptimizer-episodic-agent-ascend-npu-operator",
+      "source_path": null,
+      "ingest_format": "directory",
+      "shortlist_rank": 5
+    },
+    {
+      "candidate_id": "arxiv:2603.02637",
+      "origin": "introduced",
+      "canonical_ingest_path": "raw\\discovered\\stitchcuda-automated-multi-agents-end-end",
+      "prepared_path": null,
+      "discovered_path": "raw\\discovered\\stitchcuda-automated-multi-agents-end-end",
+      "source_path": null,
+      "ingest_format": "directory",
+      "shortlist_rank": 6
+    },
+    {
+      "candidate_id": "arxiv:2502.14752",
+      "origin": "introduced",
+      "canonical_ingest_path": "raw\\discovered\\tritonbench-benchmarking-large-language-model-capabilities",
+      "prepared_path": null,
+      "discovered_path": "raw\\discovered\\tritonbench-benchmarking-large-language-model-capabilities",
+      "source_path": null,
+      "ingest_format": "directory",
+      "shortlist_rank": 7
+    },
+    {
+      "candidate_id": "arxiv:2601.02045",
+      "origin": "introduced",
+      "canonical_ingest_path": "raw\\discovered\\new-compiler-stack-survey-synergy-llms",
+      "prepared_path": null,
+      "discovered_path": "raw\\discovered\\new-compiler-stack-survey-synergy-llms",
+      "source_path": null,
+      "ingest_format": "directory",
+      "shortlist_rank": 9
+    },
+    {
+      "candidate_id": "arxiv:2605.04956",
+      "origin": "introduced",
+      "canonical_ingest_path": "raw\\discovered\\kernelbench-comprehensive-benchmark-evaluating-llm-generated",
+      "prepared_path": null,
+      "discovered_path": "raw\\discovered\\kernelbench-comprehensive-benchmark-evaluating-llm-generated",
+      "source_path": null,
+      "ingest_format": "directory",
+      "shortlist_rank": 10
+    },
+    {
+      "candidate_id": "arxiv:2603.10846",
+      "origin": "introduced",
+      "canonical_ingest_path": "raw\\discovered\\towards-cold-start-drafting-continual-refining",
+      "prepared_path": null,
+      "discovered_path": "raw\\discovered\\towards-cold-start-drafting-continual-refining",
+      "source_path": null,
+      "ingest_format": "directory",
+      "shortlist_rank": 11
+    }
+  ]
+}

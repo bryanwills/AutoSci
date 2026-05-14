@@ -1,0 +1,33 @@
+\section{Preliminary}  
+\label{Sec:Preliminary}
+
+\subsection{Hardware Efficiency Metrics}
+
+Hardware efficiency describes how effectively a kernel uses the available hardware resources. Beyond runtime, it provides a more direct view of whether performance is close to the hardware limit.
+For a kernel $k$, let $T(k)$ denote the measured runtime, $B(k)$ the total bytes moved, and $F(k)$ the total floating-point operations. We define the achieved bandwidth and achieved throughput as
+\begin{equation}
+\mathrm{BW}(k)=\frac{B(k)}{T(k)}, \qquad
+\mathrm{TP}(k)=\frac{F(k)}{T(k)},
+\end{equation}
+reported in GB/s and TFLOPS respectively.
+To enable comparison across hardware, we normalize these quantities by their corresponding peak values:
+\begin{equation}
+\mathrm{IOU}(k)=\frac{\mathrm{BW}(k)}{\mathrm{BW}_{\max}}, \qquad
+\mathrm{MFU}(k)=\frac{\mathrm{TP}(k)}{\mathrm{TP}_{\max}}.
+\end{equation}
+IOU measures memory bandwidth utilization, while MFU measures compute utilization. They are complementary, as some kernels are memory-bound while others are compute-bound.
+
+
+\subsection{Compared Methods}
+
+We compare five methods spanning key design axes: general-purpose versus specialized models, iterative refinement and domain-specific training.
+
+\textbf{AutoTriton}~\cite{li2025autotriton} is trained for Triton programming through supervised fine-tuning and reinforcement learning. We evaluate it in single-pass generation with its native prompting.
+
+\textbf{GEAK}~\cite{wang2025geak} is an agentic framework with generator, evaluator, reflector, and optimizer modules. We use DeepSeek-V3.2-Chat as the base model, run three iterations at temperature 1.0, generate four candidates per round, and retain five best implementations as context in each round.
+
+\textbf{KernelAgent}~\cite{kernelagent2025} is a multi-agent system based on a generate–verify–refine workflow, also using DeepSeek-V3.2-Chat. We bypass its Fuser pipeline (not applicable to single-operator tasks) and use its core generation API with 3 parallel workers, up to 5 refinement rounds each, at temperature 0.4.
+
+\textbf{Claude} is a strong general-purpose model evaluated in single-pass generation mode.
+
+\textbf{DeepSeek-Coder}~\cite{liu2024deepseek} is a general-purpose code model serving as a zero-specialization baseline. It is evaluated in single-pass generation mode.

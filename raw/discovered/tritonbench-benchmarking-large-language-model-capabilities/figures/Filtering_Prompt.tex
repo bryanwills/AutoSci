@@ -1,0 +1,24 @@
+
+\begin{tcolorbox}[colframe=gray!80!black, colback=gray!10!white, title=Filtering Prompt]
+\small
+{\{code\}}\\
+\justifying
+Please help me select \textbf{all} triton kernel functions decorated with \texttt{@triton.jit} and all code that calls these kernels, while only keeping the necessary imports (e.g., triton, torch) and the calling functions. \\
+\hdashrule[0.5ex]{15cm}{0.1pt}{1mm}
+\justifying \\
+Note 1: Retain necessary comments related to the Triton code. Code can be optimized, but do not remove all kernel code and its corresponding calls just for brevity. \\
+\hdashrule[0.5ex]{15cm}{0.1pt}{1mm}
+\justifying \\
+Note 2: If the triton kernel is decorated with a custom or third-party decorator other than triton, discard that kernel. \\
+\hdashrule[0.5ex]{15cm}{0.1pt}{1mm}
+\justifying \\
+Note 3: If \texttt{@triton.jit} appears as a \textbf{string} in the code or is nested within a function body, then discard it. \\
+\hdashrule[0.5ex]{15cm}{0.1pt}{1mm}
+\justifying \\
+Note 4: If there are multiple triton kernel functions decorated with \texttt{@triton.jit} and their calling wrapper functions, retain all of them, not just a subset.
+
+1) Extract all triton operators (kernel functions decorated with \texttt{@triton.jit} and their calling functions) and output them in python code format. If no triton kernel function is found, discard it.
+
+2) Provide a concise English description of each extracted operator (including both kernel and calling code) in the form of a python dictionary: \texttt{"description": "Use triton language to..."}
+\label{prompt_filter}
+\end{tcolorbox}

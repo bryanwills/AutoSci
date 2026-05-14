@@ -1,0 +1,29 @@
+\renewcommand{\theadfont}{\normalfont\bfseries}
+\begin{tabular}{lllrrrrr}
+\toprule
+\thead[l]{Task set\\{}\normalfont$n=\text{count}$} & \textbf{Method} & \thead{LLMs} & \thead[c]{Correct\\ rate} & \textbf{fast}$_1$ & \textbf{fast}$_2$ & \thead[c]{Avg.\\ speedup} & \thead[c]{Geom.\\ speedup} \\
+\midrule
+% \multicolumn{8}{l}{\textit{Baseline comparison on CUDA (controlled hardware and LLMs)}} \\
+% \midrule
+\multirow{5}{*}{\rotatebox{0}{\parbox{18mm}{\raggedright KernelBench\\repr.\ set L1 $n=20$}}} 
+ & Kernelsseum* &  GPT-\{o1,4o\}, DeepSeek-Coder, Sonnet-3.5, LLama-3.1-405B
+ & 0.65 & 15 \% & 0 \% & 0.765 & 0.600 \\
+ & AI CUDA Engineer original\textsuperscript{\textdagger} &  DeepSeek-\{v3,R1\}, GPT-\{o1-preview,o1-high,o3-mini\}, Sonnet-3.5 & 1.0 & 70 \% & 20 \% & 1.422 & 1.222 \\
+ & AI CUDA Engineer re-eval &  DeepSeek-\{v3,R1\}, GPT-\{o1-preview,o1-high,o3-mini\}, Sonnet-3.5 & 1.0 & 40 \% & 50 \% & 1.005 & 0.909 \\
+ & Ours &  o3-mini & 1.0 & \textbf{55 \%} & 10 \% & 1.204 & 1.092 \\
+ & Ours + parameter optim. &  o3-mini & 1.0 & \textbf{55 \%} & \textbf{15 \%} & \textbf{1.241} & \textbf{1.124} \\
+\midrule
+\multirow{5}{*}{\rotatebox{0}{\parbox{18mm}{\raggedright KernelBench\\repr.\ set L2 $n=20$}}}  
+ & Kernelsseum* &  GPT-\{o1,4o\}, DeepSeek-Coder, Sonnet-3.5 & 0.65 & 10 \% & 0 \% & 0.874 & 0.854 \\
+ & AI CUDA Engineer original\textsuperscript{\textdagger} &  DeepSeek-\{v3,R1\}, GPT-\{o1-preview,o1-high,o3-mini\}, Sonnet-3.5 & 1.0 & 100\% & 10 \% & 1.589 & 1.524 \\
+ & AI CUDA Engineer re-eval &  DeepSeek-\{v3,R1\}, GPT-\{o1-preview,o1-high,o3-mini\}, Sonnet-3.5 & 1.0 & 85 \% & 25 \% & 1.606 & 1.515 \\
+ & Ours &  o3-mini & 1.0 & \textbf{90 \%} & 40 \% & 2.051 & 1.680 \\
+ & Ours + parameter optim. &  o3-mini & 1.0 & \textbf{90 \%} & \textbf{45 \%} & \textbf{2.104} & \textbf{1.730} \\
+\midrule
+\multirow{4}{*}{\rotatebox{0}{\parbox{17mm}{\raggedright Robust-kbench\\{} $n=12$}}} &
+Robust-kbench original\textsuperscript{\textdagger} &  GPT-\{o3,o4-mini,4.1\}, Sonnet-3.7 & 1.0 & 92 \% & 50 \% & 15.622 & 2.591 \\
+ & Robust-kbench re-eval &  GPT-\{o3,o4-mini,4.1\}, Sonnet-3.7  & 1.0 & 92 \% & 58 \% & 8.865 & 3.499 \\
+ & Ours &  GPT-\{o3,o4-mini,4.1\} & 1.0 & \textbf{100 \%} & \textbf{67 \%} & \textbf{12.107} & \textbf{5.295} \\
+ & Ours + parameter optim. &  GPT-\{o3,o4-mini,4.1\} & 1.0 & \textbf{100 \%}  & \textbf{67 \%} & 12.081 & 5.225 \\
+\bottomrule
+\end{tabular}

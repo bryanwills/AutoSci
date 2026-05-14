@@ -1,0 +1,28 @@
+\section{Related Work}
+
+\subsection{Triton Development}
+Triton~\cite{triton-2021-translation} is an open-source, Python-like language and a compiler designed to simplify GPU programming in AI and HPC. 
+It abstracts the complexities of CUDA by introducing a block-based programming model, automating low-level optimizations such as memory coalescing and tensor core utilization, and making it more accessible to researchers without HPC background. 
+Nonetheless, Triton provides explicit control over memory access patterns and parallelism. 
+This balance of productivity and flexibility makes it prevalently adopted in both academia and industry~\cite{vllm, lightllm, liger, unsloth}. 
+However, Triton developers must still laboriously tune critical parameters to exploit hardware capabilities. 
+LLM code generation poses prospects for automating Triton development, which calls for a systematic evaluation of generated operators. 
+
+
+\subsection{Code Benchmarks}
+The demand for proper measurement of coding capability arises as the program synthesis research advances. 
+The primary practice of coding benchmarks is functional correctness testing, usually realized by test case construction and sandbox execution. 
+For example, \textsc{HumanEval}~\cite{humeval-2021-human} curate hand-written programs and test cases, and MBPP~\cite{mbpp2021} create programming problems by crowd-sourcing. 
+The functionality test has recently extended to automated test generation for better coverage~\cite{evalplus} and broader applications, including software engineering~\cite{jimenez2024swebench}.
+Another vital aspect of coding benchmarking is performance profiling~\cite{shypulalearning,evalplus,huang2024effibench,qiu2024efficient}.
+However, most existing frameworks focus on competition-style, single-process execution. 
+While there are some frameworks for evaluating parallel programming on CPUs~\cite{nichols2024can,chaturvedi2024hpc}, benchmarks targeting GPU code remain scarce. 
+As the deployment of deep learning models scales up, a comprehensive evaluation framework that considers both correctness and performance on GPU code becomes increasingly necessary. 
+
+
+\subsection{LLMs for Code Generation}
+LLMs have recently demonstrated impressive capabilities in generating code from natural language instructions, as evidenced by models such as DeepSeek-Coder~\cite{guo2024deepseek,zhu2024deepseek} and Qwen-Coder~\cite{hui2024qwen2}, which have achieved strong performance on broad coding benchmarks. 
+Despite their versatility, they often struggle with Domain-Specific Languages~(DSLs) designed for higher levels of abstraction and improved efficiency in targeted contexts~\cite{wkasowski2023domain}. 
+The main reason for this status is the limited availability of DSL datasets and benchmarks~\cite{cassano2024knowledge, pujar2023automated}, coupled with their unique syntax and semantics~\cite{pujar2023automated}, posing significant challenges for LLMs~\cite{buscemi2023comparative}.
+In this work, we focus on DSLs within the high-performance computing domain where the challenges we mentioned are more pronounced for involving the parallel programming model. 
+We introduce the first comprehensive benchmark for Triton generation, providing a systematic evaluation framework that aims to guide future improvements in DSL-centric LLM code generation.

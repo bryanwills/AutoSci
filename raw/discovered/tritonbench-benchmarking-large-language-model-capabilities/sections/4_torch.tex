@@ -1,0 +1,47 @@
+\section{\benchtwo}
+The real-world Triton operators introduced in \S~\ref{sec:git} primarily focus on highly frequent operations. 
+As a complement, we propose \benchtwo, which aligns the Triton wrapper with interfaces of the PyTorch library \cite{paszke2019pytorch}. 
+Together, \benchone and \benchtwo form a complementary evaluation framework.
+The following sections elaborate on the data construction (\S~\ref{sec:benchtwo-construction}), data statistics (\S~\ref{sec:benchtwo-datastatistic}), test code and metrics (\S~\ref{sec:benchtwo-testandmetric}), and  benchmark comparisons (\S~\ref{sec:benchtwo-comparison}). 
+
+
+\subsection{Data Construction}
+\label{sec:benchtwo-construction}
+We construct \benchtwo by selecting PyTorch operators based on their usage frequency in real-world coding and then fusing them ( hereafter referred to simply as ``operators'' ). 
+First, we select operators that require GPU interactions, ensuring alignment with Triton's scope.
+Next, we sample $40$ high-frequency operators and $40$ low-frequency operators from the remaining pool. 
+The frequency of each operator is determined by its usage probability in PyTorch-related code from The Stack V2~\cite{lozhkov2024starcoder} with those exceeding a predefined threshold $45$\% as common operators. 
+
+Subsequently, we fuse these operators in various configurations: combinations of common operators, combinations of common and uncommon operators, and combinations of uncommon operators. 
+All combinations are valid, as the outputs of preceding operators serve as appropriate inputs for subsequent ones. 
+The final set includes $166$ operators, based on the latest (v2.6.0) version of the PyTorch library. 
+Each operator is paired with its corresponding standard PyTorch call and document, while fused operators combine descriptions from all involved operators. 
+
+\subsection{Data Statistic}
+\label{sec:benchtwo-datastatistic}
+The statistics of \benchtwo are presented in Table~\ref{tab:statis_torch}. 
+Similar to \benchone, the operators are categorized into five difficulty levels ($\bf d1$ to $\bf d5$) using an LLM guided by prompt~\ref{prompt_diff}. 
+These initial categorizations are then validated through manual review by two domain experts. 
+
+We report the following statistics: (1)\textbf{torch-op\#} the average number of PyTorch operators, (2)\textbf{params\#} the average number of parameters, (3)\textbf{math\#}, the average token number of mathematical expressions, and (4)\textbf{description\#}, the average token count of the descriptions. 
+These statistics generally increase with the operator difficulty, similar trend that aligns with the observations in \benchone. 
+
+
+\input{tables/statis_torch}
+
+\subsection{Test Code and Metrics}
+\label{sec:benchtwo-testandmetric}
+The design of the test code in \benchtwo adheres to those of \benchone, employing randomly generated tensors for operator evaluation.
+For correctness and performance assessment, we utilize \textbf{\texttt{Call Accuracy}}, \textbf{\texttt{Execution Accuracy}}, and \textbf{\texttt{Speed Up}}, whose computation methods are consistent with those used in \benchone. 
+
+
+\input{tables/main_resG}
+
+\subsection{Benchmark Comparison} 
+\label{sec:benchtwo-comparison}
+This section provides comparisons between \benchone and \benchtwo, which differ in key aspects and together provide a well-rounded evaluation. 
+\paragraph{Source \& Distribution:} \benchone is collected from \textbf{GitHub} and reflects real-world programming demands with a concentration of frequently used operators, e.g., \texttt{Attention} at $20.0\%$, \texttt{MatMul} at $10.9\%$, \texttt{LayerNorm} at $6.5\%$, \texttt{SoftMax} at $3.8\%$. In contrast, \benchtwo, sourced from \textbf{PyTorch}, presents a more diverse operator set including both common and uncommon operators.
+% 
+\paragraph{Instruction Generation:} \benchone combines \textbf{LLM generation} with \textbf{expert verification} while \benchtwo directly extracts instructions from \textbf{PyTorch documentation}. This difference underlines their complementary roles in probing different facets of the Triton generation. 
+\paragraph{Evaluation Metrics:} Both benchmark channels assess \textbf{correctness} and \textbf{performance}. Additionally, \benchone incorporates a similarity-based assessment that offers direct comparisons with established implementations. 
+In summary, the different designs of \benchone and \benchtwo enable a comprehensive and nuanced evaluation of Triton operator generation. 

@@ -1,0 +1,43 @@
+\section{Analysis}
+
+In this section, we examine the distribution of correct and incorrect operators across difficulty levels ($\mathbf{d1}$–$\mathbf{d5}$) for the top-performing models, DeepSeek-R1 and GPT-o1, as shown in Figure~\ref{fig:barG} and Figure~\ref{fig:barT}. Additionally, we analyze the error patterns of incorrect operators and summarize the main challenges for each benchmark as detailed in Table~\ref{tab:git_res} and Table~\ref{tab:torch_res}.
+The zero-shot and one-shot settings are annotated as $^0$ and $^1$ respectively.
+
+
+\subsection{Challenges for \benchone}
+
+Figure~\ref{fig:barG} clearly shows that most operators are generated incorrectly. 
+Both DeepSeek-R1 and GPT-o1 exhibit similar trends, with DeepSeek-R1 outperforming GPT-o1.
+Notably, when moving from the zero-shot to the one-shot setting, both models achieve significant improvements on $\mathbf{d4}$.
+These improvements may stem from the prevalence of \texttt{Attention} and \texttt{Softmax} operators in $\mathbf{d4}$, enabling models to leverage similar examples. 
+In contrast, the simpler operators in $\mathbf{d2}$ and $\mathbf{d3}$ show only limited gains in the one-shot setting, likely due to the smaller, more idiosyncratic nature of these datasets that leads to lower retrieval similarity. 
+
+
+For the incorrectly written operators, we classify the $16$ error types into $4$ major categories, detailed in Appendix~\ref{app:error_catgrz}
+which is presented in Table~\ref{tab:err_G}.
+Note that only compiler-reported errors were considered.
+The results show that, compared to the zero-shot setting, both DeepSeek-R1 and GPT-o1 in the one-shot setting demonstrate a significant increase in \texttt{Syntax} and \texttt{Name\&Ref} errors but a reduction in \texttt{Attr\&Type} and \texttt{Run\&Logc} errors. 
+This trend suggests that the training corpus may provide helpful guidance on logical structure and Triton specifications, thus enhancing overall accuracy.
+Furthermore, error sensitivity differs between models: DeepSeek-R1 is less susceptible to syntax errors, whereas GPT-o1 handles logical errors better.
+
+
+
+\subsection{Challenges for \benchtwo}
+The execution results of \benchtwo (Figure~\ref{fig:barT}) show the percentages of correctly generated operators.
+we can observe that DeepSeek-R1 generated more correct than incorrect operators, which proves the point that the difficulty distributions in \benchtwo are smoother than \benchone. 
+
+However, while DeepSeek-R1's performance declines for difficulty $\mathbf{d2}$-$\mathbf{d4}$ in the one-shot setting, GPT-o1 shows improved accuracy on these subsets. 
+This finding indicates that GPT-o1 might be more adept at logical reasoning for Triton generation tasks, allowing it to efficiently use the provided sample. The differing trends also imply that sample operators affect models in diverse ways.
+
+
+\input{figures/analysis_diffG}
+\input{tables/err_G}
+
+For execution error statistics in \benchtwo (Table~\ref{tab:err_T}), DeepSeek-R1 notably avoids \texttt{Syntax} errors entirely, while GPT-o1 maintains a high rate of such errors. 
+Under the one-shot setting, DeepSeek-R1 shows a rise in \texttt{Attr\&Type} and \texttt{Name\&Ref} errors alongside a decline in \texttt{Run\&Logc} Errors. 
+Conversely, GPT-o1 experiences a significant increase in \texttt{Name\&Ref} errors with a notable drop in \texttt{Run\&Logc} errors. 
+Comparing \benchone and \benchtwo, the one-shot setting consistently reduces \texttt{Run\&Logc} errors. 
+These variations in error patterns likely stem from the mixed influence of useful and irrelevant information in the provided samples.
+
+\input{figures/analysis_diffT}
+\input{tables/err_T}

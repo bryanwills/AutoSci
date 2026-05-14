@@ -1,0 +1,50 @@
+\section{Experiments}
+We conduct an extensive set of experiments on \benchall to rigorously evaluate the performance and capabilities of current LLMs.
+\input{tables/main_resT}
+
+\subsection{Baselines and Setup}
+\label{sec:baselines}
+\benchall generally requires strong capabilities in code generation. Therefore, we select state-of-the-art LLMs that excel in programming tasks as baselines, including both specialized open-source models and general-purpose models.
+For specialized open-source models, we choose \texttt{Qwen2.5-Coder-7B-Instruct} \cite{hui2024qwen2} and \texttt{deepseek-coder-6.7b-instruct} \cite{guo2024deepseek}.
+For general-purpose models, we include \texttt{Claude-3.5-Sonnet-0620}\footnote{\href{https://www.anthropic.com/news/claude-3-5-sonnet}{https://www.anthropic.com/news/claude-3-5-sonnet}}, \texttt{GPT-4o-0806} \footnote{\href{https://openai.com/index/hello-gpt-4o}{https://openai.com/index/hello-gpt-4o}}, \texttt{qwen2.5-72B-Instruct} \cite{yang2024qwen2}, as well as the thought-driven models DeepSeek-R1 \cite{guo2025deepseek} and \texttt{GPT-o1-2024-12-17} \footnote{\href{https://openai.com/o1/}{https://openai.com/o1/}}.
+
+
+In our experiments, all general-purpose models are deployed for direct inference. 
+In contrast, domain-specific models undergo an additional supervised fine-tuning phase. 
+Details of the training corpus can be found in \S~\ref{sec:appendix-trainingcorpus}.
+For evaluation, we consider both zero-shot and one-shot scenarios. 
+In the one-shot setting, a BM25-based retrieval method~\cite{bm25robertson2009} is utilized to select the most relevant prompt from the training corpus. 
+
+
+\subsection{Main results of \benchone}
+\label{sec:main_res}
+Table~\ref{tab:git_res} illustrates the performances of baselines on \benchone. 
+It is evident that domain-specific models generally underperform compared to general-purpose models. 
+However, fine-tuning $7$B domain-specific models with domain data significantly boosts accuracy. 
+Qwen's accuracy rises from $0$ to $4.89$\%, and DeepSeek's from $0$ to $9.78$\% in zero-shot settings, with even more pronounced enhancements in one-shot settings due to the retrieval data from the same source as \benchone. 
+The observed increase in \texttt{Speed Up} can be attributed to the relative simplicity of the correctly generated operators, which makes it easier for LLMs to produce efficient code.
+The high \texttt{GPU efficiency} shares the similar reasons. 
+
+General-purpose models, particularly DeepSeek-R1 and GPT-o1, excel across all metrics. 
+Under one-shot conditions, DeepSeek-R1 achieves $22.83$\% in \texttt{Call and Execution Accuracy}, while GPT-o1 reaches $23.91$\%. 
+The roughly $10$\% improvement from zero-shot to one-shot highlights the critical role of high-quality examples for Triton generation. 
+Furthermore, the close alignment between \texttt{Call Accuracy} and \texttt{Execution Accuracy} indicates that only a few operators fail to produce correct results despite successfully invoked. 
+
+DeepSeek-R1 also leads in GPU execution times, with an improvement of $1.11\times$ in zero-shot and $1.22\times$ in one-shot settings. 
+While GPU efficiency is strong across most models, Qwen2.5-72B exhibits lower efficiency in zero-shot settings, likely due to a higher proportion of less efficient operators. 
+Finally, \texttt{Similarity} provides corroborative insights, as its variations mirror trends observed in other metrics.
+
+
+\subsection{Main Results of \benchtwo}
+From Table~\ref{tab:torch_res}, we can observe that domain-specific models generally underperform general-purpose models. 
+Nonetheless, fine-tuning with an $8k$ corpus considerably improves their performance. 
+For instance, Qwen’s zero-shot \texttt{Execution Accuracy} rises from $0$ to $17.47$\%.
+In contrast, its one-shot improvement ($15.67$\%) is slightly lower, likely due to the fact that the retrieved prompts and \benchtwo operators come from different sources (Github vs. Pytorch). 
+
+
+Among general-purpose models, DeepSeek-R1 demonstrates the strongest overall performance, achieving $53.01$\% \texttt{Call and Execution Accuracy} in the zero-shot setting. 
+Although its accuracy drops by $7.23$\% in the one-shot setting, it still slightly surpasses GPT-o1. 
+As for \texttt{Speed Up}, DeepSeek-R1 achieves the best performance of $1.91\times$ improvements.
+Most performance improvements in successfully executed operators stem from operator fusion. Triton’s fused operators reduce redundant memory reads and writes compared to PyTorch, enhancing memory bandwidth utilization and boosting performance.
+
+Overall, most models achieve better performance on \benchtwo than to \benchone, likely because \benchtwo features a more balanced distribution of operator difficulty, whereas \benchone is predominantly composed of higher-difficulty operators, namely, $\mathbf{d3}$ and $\mathbf{d4}$.

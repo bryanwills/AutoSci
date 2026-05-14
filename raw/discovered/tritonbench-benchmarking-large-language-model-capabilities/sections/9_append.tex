@@ -1,0 +1,57 @@
+\appendix
+\label{sec:appendix}
+
+\section{Training Corpus}
+\label{sec:appendix-trainingcorpus}
+The training corpus for supervised fine-tuning comprises two distinct components: real-world data sourced from GitHub and synthetically generated data produced through compiler operations.
+
+The real-world data component incorporates Triton code extracted from GitHub repositories, which undergoes basic cleaning procedures as outlined in prompt~\ref{prompt_filter}, undergoes a debugging process that is less rigorous than the methodology applied to \benchone.
+To prevent potential data leakage and ensure benchmark integrity, we systematically eliminate samples exhibiting high similarity to \benchone entries using the \textsc{CodeBertScore} similarity metric~\citep{codebertscore2023}.
+
+The synthetic data component is generated using Ninetoothed\footnote{\href{https://github.com/InfiniTensor/ninetoothed}{https://github.com/InfiniTensor/ninetoothed}}, a domain-specific language built upon Triton that offers enhanced abstraction capabilities. This framework facilitates the automated synthesis of valid Triton code through the processing of well-formed expressions.
+Each part of data containing $4K$ samples. This combined corpus serves as the foundational training dataset for experimental models in one-shot learning settings. For all experiments, the fine-tuning process is carried out over $3$ epochs with a learning rate of $5e-5$. 
+
+\section{Operator Performance Evaluation}
+\label{sec:appendix-performance_eval}
+\begin{figure}
+    \centering
+    \includegraphics[width=7.5cm]{figures/performance_evaluation_process.pdf}
+    \caption{The workflow of operator performance evaluation}
+    \label{fig:performance_evaluation_metrics}
+\end{figure}
+
+For operator performance evaluation, we refer primarily to the official examples provided by Triton\footnote{\href{https://triton-lang.org/main/getting-started/tutorials/}{https://triton-lang.org/main/getting-started/tutorials/}}. 
+We provide evaluation scripts for each operator in \benchone.
+Figure~\ref{fig:performance_evaluation_metrics} illustrates the workflow of our operator performance evaluation.
+
+First, we define a set of tensors with increasing dimensions based on the characteristics of the operator. 
+Next, each tensor is sequentially fed into the operator for execution. 
+During each execution, we use the expert annotations for each operator to determine the total memory bandwidth (Bytes) and the total number of floating-point operations (Flops) based on the input tensors.
+More importantly, we use the \texttt{triton.testing.do\_bench} method from the official Triton library\footnote{\href{https://triton-lang.org/main/python-api/generated/triton.testing.do_bench.html}{https://triton-lang.org/main/pythonapi/generated/triton.testing.do\_bench.html}} to measure the operator’s execution time on the GPU. 
+Specifically, we gradually increase the warm-up time and repetition time until the measured execution time stabilized, which means that most operators are run hundreds of thousands of times to ensure that the running time is measured accurately.
+After obtaining the execution time, we calculate the operator’s performance metrics by dividing the total memory bandwidth and the total floating-point operations by the execution time to obtain throughput in GB/s and Tflops, respectively. 
+We then calculate the GPU efficiency by calculating the ratio of the measured performance metrics (GB/s and Tflops) to the theoretical maximum performance of the NVIDIA A100 Tensor Core GPU.
+Repetition of the above process for tensors of increasing sizes obtains the performance metrics for each execution, which collectively form the operator performance report.
+We adopt the peak GPU efficiency from the performance report as the final measure of the operator's quality.
+
+By following the evaluation workflow described above, we generate a detailed performance report for each operator in \benchone. Figure~\ref{fig:common_operators_curves} illustrates the performance curves of several common operators. As the input dimensions increase, as can be seen from the figure, the GB/s or Tflops of the operators show an upward trend, eventually stabilizing. 
+This suggests that the performance of the operator reaches a bottleneck beyond a certain scale, and further increases in input size result in diminishing returns in performance, aligning with the expected trend of operator performance.
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=16cm]{figures/common_operators_curves.pdf}
+    \caption{Performance Curves of Common Operators}
+    \label{fig:common_operators_curves}
+\end{figure*}
+
+\section{Error Categories}
+\label{app:error_catgrz}
+We provide the error type statistics of failure operators in \benchall. A total of 16 error types are identified in the integrated Call and Execution error results. For convenience in presentation, we categorize them into four main groups: Syntax Errors: including SyntaxError and IndentationError; Attrb\&Type Errors: including AttributeError, TypeError, and NotImplementedError; Name\&Ref Errors: including NameError, KeyError, IndexError, ModuleNotFoundError, and ImportError; Run\&Logc Errors: including ValueError, ZeroDivisionError, RuntimeError, RecursionError, AssertionError, CompilationError, and ResultsError. ResultsError refers to the inconsistency between the execution results of the reference operator and the generated operator.
+
+\section{Prompts}
+Here are the four prompts we use in our work: Filtering Prompt, Instruction Prompt, Difficulty Prompt, and Test Code Prompt. Specifically, the first is used to extract Triton-related code from crawled code files; the second instructs the large model to generate corresponding instructions based on Triton code; the third prompts the large model to score the difficulty of Triton operators according to the standards we proposed; and the last asks the large model to generate test code.
+\onecolumn
+\input{figures/Filtering_Prompt}
+\input{figures/Instruction_Prompt}
+\input{figures/Test_Code_Prompt}
+\input{figures/Difficulty_Prompt}
