@@ -45,6 +45,9 @@ EvoKernel formulates kernel synthesis as a Memory-based Markov Decision Process 
 
 ## Related
 
+- [[value-driven-retrieval]]
+- [[memory-based-mdp]]
+- [[cold-start-kernel-synthesis]]
 - [[kernel-benchmark]]
 - [[gpu-kernel]]
 

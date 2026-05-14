@@ -1,0 +1,574 @@
+{
+  "nodes": [
+    {
+      "id": "concepts/cold-start-kernel-synthesis",
+      "type": "file",
+      "file": "concepts/cold-start-kernel-synthesis.md",
+      "x": 2950,
+      "y": 50,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/gpu-kernel",
+      "type": "file",
+      "file": "concepts/gpu-kernel.md",
+      "x": 2104,
+      "y": 1058,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/kernel-benchmark",
+      "type": "file",
+      "file": "concepts/kernel-benchmark.md",
+      "x": 2060,
+      "y": 938,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/kernel-generation-rl",
+      "type": "file",
+      "file": "concepts/kernel-generation-rl.md",
+      "x": 1620,
+      "y": 50,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/kernel-generation-sft",
+      "type": "file",
+      "file": "concepts/kernel-generation-sft.md",
+      "x": 1223,
+      "y": 50,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/llm-agent-kernel-generation",
+      "type": "file",
+      "file": "concepts/llm-agent-kernel-generation.md",
+      "x": 956,
+      "y": 50,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/llm-as-generator",
+      "type": "file",
+      "file": "concepts/llm-as-generator.md",
+      "x": 50,
+      "y": 290,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/llm-as-selector",
+      "type": "file",
+      "file": "concepts/llm-as-selector.md",
+      "x": 161,
+      "y": 50,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/llm-as-translator",
+      "type": "file",
+      "file": "concepts/llm-as-translator.md",
+      "x": 50,
+      "y": 1034,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/llm-enabled-compilation",
+      "type": "file",
+      "file": "concepts/llm-enabled-compilation.md",
+      "x": 50,
+      "y": 50,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/map-elites",
+      "type": "file",
+      "file": "concepts/map-elites.md",
+      "x": 2950,
+      "y": 1950,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/memory-based-mdp",
+      "type": "file",
+      "file": "concepts/memory-based-mdp.md",
+      "x": 2773,
+      "y": 50,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/meta-prompt-evolution",
+      "type": "file",
+      "file": "concepts/meta-prompt-evolution.md",
+      "x": 2950,
+      "y": 1392,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/multi-agent-gpu-programming",
+      "type": "file",
+      "file": "concepts/multi-agent-gpu-programming.md",
+      "x": 1220,
+      "y": 1950,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/quality-diversity-search",
+      "type": "file",
+      "file": "concepts/quality-diversity-search.md",
+      "x": 2950,
+      "y": 1774,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/reward-hacking-prevention",
+      "type": "file",
+      "file": "concepts/reward-hacking-prevention.md",
+      "x": 2510,
+      "y": 1950,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/rubric-based-reinforcement-learning",
+      "type": "file",
+      "file": "concepts/rubric-based-reinforcement-learning.md",
+      "x": 2251,
+      "y": 1950,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/sycl",
+      "type": "file",
+      "file": "concepts/sycl.md",
+      "x": 2037,
+      "y": 1950,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/triton-language",
+      "type": "file",
+      "file": "concepts/triton-language.md",
+      "x": 1850,
+      "y": 958,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "concepts/value-driven-retrieval",
+      "type": "file",
+      "file": "concepts/value-driven-retrieval.md",
+      "x": 2950,
+      "y": 282,
+      "width": 350,
+      "height": 250,
+      "color": "6"
+    },
+    {
+      "id": "papers/kernelbench-comprehensive-benchmark-evaluating-llm-generated",
+      "type": "file",
+      "file": "papers/kernelbench-comprehensive-benchmark-evaluating-llm-generated.md",
+      "x": 2173,
+      "y": 602,
+      "width": 400,
+      "height": 300,
+      "color": "4"
+    },
+    {
+      "id": "papers/kernelbench-llms-write-efficient-gpu-kernels",
+      "type": "file",
+      "file": "papers/kernelbench-llms-write-efficient-gpu-kernels.md",
+      "x": 1555,
+      "y": 1001,
+      "width": 400,
+      "height": 300,
+      "color": "4"
+    },
+    {
+      "id": "papers/kernelfoundry-hardware-aware-evolutionary-gpu-kernel",
+      "type": "file",
+      "file": "papers/kernelfoundry-hardware-aware-evolutionary-gpu-kernel.md",
+      "x": 2462,
+      "y": 1455,
+      "width": 400,
+      "height": 300,
+      "color": "4"
+    },
+    {
+      "id": "papers/new-compiler-stack-survey-synergy-llms",
+      "type": "file",
+      "file": "papers/new-compiler-stack-survey-synergy-llms.md",
+      "x": 50,
+      "y": 520,
+      "width": 400,
+      "height": 300,
+      "color": "4"
+    },
+    {
+      "id": "papers/stitchcuda",
+      "type": "file",
+      "file": "papers/stitchcuda.md",
+      "x": 1910,
+      "y": 1672,
+      "width": 400,
+      "height": 300,
+      "color": "4"
+    },
+    {
+      "id": "papers/towards-automated-kernel-generation-era-llms",
+      "type": "file",
+      "file": "papers/towards-automated-kernel-generation-era-llms.md",
+      "x": 1576,
+      "y": 468,
+      "width": 400,
+      "height": 300,
+      "color": "4"
+    },
+    {
+      "id": "papers/towards-cold-start-drafting-continual-refining",
+      "type": "file",
+      "file": "papers/towards-cold-start-drafting-continual-refining.md",
+      "x": 2618,
+      "y": 490,
+      "width": 400,
+      "height": 300,
+      "color": "4"
+    },
+    {
+      "id": "papers/tritonbench",
+      "type": "file",
+      "file": "papers/tritonbench.md",
+      "x": 1705,
+      "y": 1297,
+      "width": 400,
+      "height": 300,
+      "color": "4"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-0",
+      "fromNode": "papers/kernelfoundry-hardware-aware-evolutionary-gpu-kernel",
+      "toNode": "concepts/map-elites",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-1",
+      "fromNode": "papers/kernelfoundry-hardware-aware-evolutionary-gpu-kernel",
+      "toNode": "concepts/quality-diversity-search",
+      "fromSide": "right",
+      "toSide": "left",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-2",
+      "fromNode": "papers/kernelfoundry-hardware-aware-evolutionary-gpu-kernel",
+      "toNode": "concepts/meta-prompt-evolution",
+      "fromSide": "right",
+      "toSide": "left",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-3",
+      "fromNode": "papers/kernelfoundry-hardware-aware-evolutionary-gpu-kernel",
+      "toNode": "concepts/gpu-kernel",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-4",
+      "fromNode": "papers/kernelfoundry-hardware-aware-evolutionary-gpu-kernel",
+      "toNode": "concepts/kernel-benchmark",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-5",
+      "fromNode": "papers/kernelfoundry-hardware-aware-evolutionary-gpu-kernel",
+      "toNode": "concepts/triton-language",
+      "fromSide": "left",
+      "toSide": "right",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-6",
+      "fromNode": "papers/kernelfoundry-hardware-aware-evolutionary-gpu-kernel",
+      "toNode": "concepts/sycl",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-7",
+      "fromNode": "papers/towards-automated-kernel-generation-era-llms",
+      "toNode": "concepts/gpu-kernel",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-8",
+      "fromNode": "papers/towards-automated-kernel-generation-era-llms",
+      "toNode": "concepts/kernel-benchmark",
+      "fromSide": "right",
+      "toSide": "left",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-9",
+      "fromNode": "papers/towards-automated-kernel-generation-era-llms",
+      "toNode": "concepts/triton-language",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-10",
+      "fromNode": "papers/towards-automated-kernel-generation-era-llms",
+      "toNode": "concepts/kernel-generation-sft",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-11",
+      "fromNode": "papers/towards-automated-kernel-generation-era-llms",
+      "toNode": "concepts/kernel-generation-rl",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-12",
+      "fromNode": "papers/towards-automated-kernel-generation-era-llms",
+      "toNode": "concepts/llm-agent-kernel-generation",
+      "fromSide": "left",
+      "toSide": "right",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-13",
+      "fromNode": "papers/kernelbench-llms-write-efficient-gpu-kernels",
+      "toNode": "concepts/kernel-benchmark",
+      "fromSide": "right",
+      "toSide": "left",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-14",
+      "fromNode": "papers/kernelbench-llms-write-efficient-gpu-kernels",
+      "toNode": "concepts/gpu-kernel",
+      "fromSide": "right",
+      "toSide": "left",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-15",
+      "fromNode": "papers/kernelbench-llms-write-efficient-gpu-kernels",
+      "toNode": "concepts/triton-language",
+      "fromSide": "right",
+      "toSide": "left",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-16",
+      "fromNode": "papers/stitchcuda",
+      "toNode": "concepts/kernel-benchmark",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-17",
+      "fromNode": "papers/stitchcuda",
+      "toNode": "concepts/gpu-kernel",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-18",
+      "fromNode": "papers/stitchcuda",
+      "toNode": "concepts/multi-agent-gpu-programming",
+      "fromSide": "left",
+      "toSide": "right",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-19",
+      "fromNode": "papers/stitchcuda",
+      "toNode": "concepts/rubric-based-reinforcement-learning",
+      "fromSide": "right",
+      "toSide": "left",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-20",
+      "fromNode": "papers/stitchcuda",
+      "toNode": "concepts/reward-hacking-prevention",
+      "fromSide": "right",
+      "toSide": "left",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-21",
+      "fromNode": "papers/new-compiler-stack-survey-synergy-llms",
+      "toNode": "concepts/llm-enabled-compilation",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-22",
+      "fromNode": "papers/new-compiler-stack-survey-synergy-llms",
+      "toNode": "concepts/llm-as-selector",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-23",
+      "fromNode": "papers/new-compiler-stack-survey-synergy-llms",
+      "toNode": "concepts/llm-as-translator",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-24",
+      "fromNode": "papers/new-compiler-stack-survey-synergy-llms",
+      "toNode": "concepts/llm-as-generator",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-25",
+      "fromNode": "papers/kernelbench-comprehensive-benchmark-evaluating-llm-generated",
+      "toNode": "concepts/gpu-kernel",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-26",
+      "fromNode": "papers/kernelbench-comprehensive-benchmark-evaluating-llm-generated",
+      "toNode": "concepts/kernel-benchmark",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-27",
+      "fromNode": "papers/kernelbench-comprehensive-benchmark-evaluating-llm-generated",
+      "toNode": "concepts/triton-language",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-28",
+      "fromNode": "papers/towards-cold-start-drafting-continual-refining",
+      "toNode": "concepts/gpu-kernel",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-29",
+      "fromNode": "papers/towards-cold-start-drafting-continual-refining",
+      "toNode": "concepts/kernel-benchmark",
+      "fromSide": "left",
+      "toSide": "right",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-30",
+      "fromNode": "papers/towards-cold-start-drafting-continual-refining",
+      "toNode": "concepts/cold-start-kernel-synthesis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-31",
+      "fromNode": "papers/towards-cold-start-drafting-continual-refining",
+      "toNode": "concepts/value-driven-retrieval",
+      "fromSide": "right",
+      "toSide": "left",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-32",
+      "fromNode": "papers/towards-cold-start-drafting-continual-refining",
+      "toNode": "concepts/memory-based-mdp",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "introduces_concept"
+    },
+    {
+      "id": "edge-33",
+      "fromNode": "papers/tritonbench",
+      "toNode": "concepts/kernel-benchmark",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-34",
+      "fromNode": "papers/tritonbench",
+      "toNode": "concepts/triton-language",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "uses_concept"
+    },
+    {
+      "id": "edge-35",
+      "fromNode": "papers/tritonbench",
+      "toNode": "concepts/gpu-kernel",
+      "fromSide": "right",
+      "toSide": "left",
+      "label": "uses_concept"
+    }
+  ]
+}

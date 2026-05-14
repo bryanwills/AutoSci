@@ -4,7 +4,7 @@ aliases: [gpu-benchmark, kernel-evaluation]
 tags: [benchmark, evaluation, gpu, kernel, performance]
 maturity: active
 definition: "A kernel benchmark is a standardized set of GPU kernel tasks with reference implementations and performance metrics, used to evaluate the quality of generated or optimized kernel code."
-key_papers: [kernelfoundry-hardware-aware-evolutionary-gpu-kernel, kernelbench-llms-write-efficient-gpu-kernels, tritonbench-benchmarking-large-language-model-capabilities]
+key_papers: [kernelfoundry-hardware-aware-evolutionary-gpu-kernel, kernelbench-llms-write-efficient-gpu-kernels, tritonbench, ascendoptimizer, kernelbench-comprehensive-benchmark-evaluating-llm-generated, stitchcuda, towards-automated-kernel-generation-era-llms, towards-cold-start-drafting-continual-refining]
 first_introduced: ""
 date_updated: 2026-05-14
 related_concepts: [gpu-kernel, triton-language]
@@ -22,7 +22,7 @@ Just as ImageNet standardized evaluation for computer vision, kernel benchmarks 
 ## Variants
 
 - [[kernelbench-llms-write-efficient-gpu-kernels]] — first comprehensive LLM kernel benchmark
-- [[tritonbench-benchmarking-large-language-model-capabilities]] — Triton-focused
+- [[tritonbench]] — Triton-focused
 - [[kernelbench-comprehensive-benchmark-evaluating-llm-generated]] — extended coverage
 
 ## Comparison

@@ -1,7 +1,9 @@
 ---
 title: "GPU Kernel Optimization with LLMs and Agents"
+scope: "Research area covering the use of LLMs and agents for automated GPU kernel generation, optimization, and benchmarking"
 tags: [gpu, kernel-optimization, llm, agents, code-generation]
 date_updated: 2026-05-14
+key_topics: [llm-kernel-synthesis, gpu-kernel-optimization, ai-compilation]
 ---
 
 ## Overview
@@ -32,7 +34,7 @@ The field progressed from traditional auto-tuning (OpenCL, CUDA autotuners) thro
 
 - [[kernelfoundry-hardware-aware-evolutionary-gpu-kernel]] — evolutionary approach to kernel optimization
 - [[kernelbench-llms-write-efficient-gpu-kernels]] — foundational benchmark for LLM kernel generation
-- [[stitchcuda-automated-multi-agents-end-end]] — multi-agent GPU programming framework
+- [[stitchcuda]] — multi-agent GPU programming framework
 - [[new-compiler-stack-survey-synergy-llms]] — survey on LLM-compiler synergy
 
 ## Related

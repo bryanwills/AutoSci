@@ -109,6 +109,7 @@ KernelBench establishes the first comprehensive benchmark for LLM kernel generat
 
 ## Related
 
+- [[fast-p-metric]]
 - [[kernel-benchmark]]
 - [[gpu-kernel]]
 - [[triton-language]]

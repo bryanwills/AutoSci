@@ -20,7 +20,7 @@ Using large language models to automatically generate GPU kernel code from natur
 ## Seminal works
 
 - [[kernelbench-llms-write-efficient-gpu-kernels]] — first comprehensive benchmark
-- [[tritonbench-benchmarking-large-language-model-capabilities]] — Triton-focused evaluation
+- [[tritonbench]] — Triton-focused evaluation
 - [[kernelbench-comprehensive-benchmark-evaluating-llm-generated]] — extended benchmark coverage
 
 ## SOTA tracker
@@ -34,7 +34,7 @@ Using large language models to automatically generate GPU kernel code from natur
 ## Key benchmarks
 
 - [[kernelbench-llms-write-efficient-gpu-kernels]]
-- [[tritonbench-benchmarking-large-language-model-capabilities]]
+- [[tritonbench]]
 - [[kernelbench-comprehensive-benchmark-evaluating-llm-generated]]
 
 ## Open problems

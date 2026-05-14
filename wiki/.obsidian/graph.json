@@ -1,0 +1,84 @@
+{
+  "collapse-filter": false,
+  "search": "path:papers/ OR path:concepts/ OR path:topics/ OR path:people/ OR path:ideas/ OR path:methods/ OR path:experiments/ OR path:Summary/ OR path:foundations/",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:papers/",
+      "color": {
+        "a": 1,
+        "rgb": 4886745
+      }
+    },
+    {
+      "query": "path:concepts/",
+      "color": {
+        "a": 1,
+        "rgb": 15485081
+      }
+    },
+    {
+      "query": "path:topics/",
+      "color": {
+        "a": 1,
+        "rgb": 15105058
+      }
+    },
+    {
+      "query": "path:people/",
+      "color": {
+        "a": 1,
+        "rgb": 3066993
+      }
+    },
+    {
+      "query": "path:ideas/",
+      "color": {
+        "a": 1,
+        "rgb": 15965202
+      }
+    },
+    {
+      "query": "path:methods/",
+      "color": {
+        "a": 1,
+        "rgb": 8702998
+      }
+    },
+    {
+      "query": "path:experiments/",
+      "color": {
+        "a": 1,
+        "rgb": 15158460
+      }
+    },
+    {
+      "query": "path:Summary/",
+      "color": {
+        "a": 1,
+        "rgb": 1763716
+      }
+    },
+    {
+      "query": "path:foundations/",
+      "color": {
+        "a": 1,
+        "rgb": 9807270
+      }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": true,
+  "textFadeMultiplier": -2,
+  "nodeSizeMultiplier": 1,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": true,
+  "centerStrength": 0.5,
+  "repelStrength": 10,
+  "linkStrength": 1,
+  "linkDistance": 250
+}

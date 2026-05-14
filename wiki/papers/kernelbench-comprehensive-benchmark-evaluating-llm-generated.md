@@ -104,7 +104,7 @@ This paper provides valuable empirical grounding for the LLM kernel synthesis fi
 ## Related
 
 - [[kernelbench-llms-write-efficient-gpu-kernels]]
-- [[tritonbench-benchmarking-large-language-model-capabilities]]
+- [[tritonbench]]
 - [[gpu-kernel]]
 - [[kernel-benchmark]]
 - [[triton-language]]

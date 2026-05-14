@@ -6,7 +6,7 @@ origin: "User research direction: LLM/agent for GPU kernel optimization"
 origin_gaps: [llm-kernel-synthesis, gpu-kernel-optimization]
 tags: [llm, agents, gpu, kernel-optimization, code-generation]
 target_venue: ""
-novelty_score: 0
+novelty_score: 3
 priority: 3
 pilot_result: ""
 failure_reason: ""
