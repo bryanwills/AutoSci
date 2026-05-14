@@ -1,0 +1,3 @@
+{"from": "papers/kernelbench-comprehensive-benchmark-evaluating-llm-generated", "to": "concepts/gpu-kernel", "type": "uses_concept", "evidence": "Paper evaluates GPU kernel generation methods", "date": "2026-05-14", "confidence": "high"}
+{"from": "papers/kernelbench-comprehensive-benchmark-evaluating-llm-generated", "to": "concepts/kernel-benchmark", "type": "uses_concept", "evidence": "Paper introduces KernelBenchX benchmark", "date": "2026-05-14", "confidence": "high"}
+{"from": "papers/kernelbench-comprehensive-benchmark-evaluating-llm-generated", "to": "concepts/triton-language", "type": "uses_concept", "evidence": "Paper evaluates Triton kernel generation", "date": "2026-05-14", "confidence": "high"}
