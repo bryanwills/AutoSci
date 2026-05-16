@@ -8,12 +8,11 @@ For each candidate, `tools/discover.py` extracts the `arxiv_id` from the candida
 
 This catches the typical case: an already-ingested paper bubbles up as a recommendation again. Surfacing such a paper would waste the user's review attention; dropping it is correct.
 
-For venue mode, candidates are also filtered by normalized title against `wiki/papers/*.md`. Paper Copilot records often lack arXiv IDs, so title fallback is a practical dedup layer for that source. Those title fallback removals are included in `wiki_dedup_count`.
+Candidates are also filtered by normalized exact title against `wiki/papers/*.md` in every seed mode. Paper Copilot records often lack arXiv IDs, and S2/DeepXiv records can disagree on IDs, so exact-title fallback is a practical dedup layer. Those title fallback removals are included in `wiki_dedup_count`.
 
 ## What it does not catch
 
-- **Title-only matches outside venue mode**: a paper in the wiki without `arxiv` or `arxiv_id` (e.g., a journal article ingested via `/edit`) will not match anchor/topic/wiki candidates by title alone. This is intentional — broad fuzzy title matching produces false positives that hide legitimate candidates.
-- **Loose fuzzy titles**: venue title fallback uses normalized exact title keys, not semantic/fuzzy title matching.
+- **Loose fuzzy titles**: title fallback uses normalized exact title keys, not semantic/fuzzy title matching.
 - **Cross-source duplicates within the candidate set**: the dedup pass before wiki filtering uses `_candidate_key` (arxiv → S2 paperId → title-slug) which catches most cross-source duplicates from S2 and DeepXiv. Fully missing IDs and titles are dropped silently.
 
 ## What to do with a "high dedup" report

@@ -14,6 +14,8 @@ Together they form a real literature-graph walk: semantic neighbors + ancestors 
 
 ## What discovery scores on
 
+All modes preserve per-channel provenance in the JSON payload and use RRF-style fusion over available channels before final scoring. When `--wiki-root` is present, the tool builds a wiki interest profile from `wiki/papers/`, `wiki/concepts/`, `wiki/topics/`, and `wiki/methods/`; it separates specific terms/phrases from broad research terms so popularity cannot replace relevance.
+
 Anchor mode (rough weight order):
 
 1. **Aggregate influential citation count** — log-scaled. Reflects the candidate's general prestige. Weighted heavier than raw `citationCount`.
@@ -23,17 +25,17 @@ Anchor mode (rough weight order):
 5. **Freshness** — mild bonus for recent years. Recent ≠ better, so the curve is flat-ish (1.0 / 0.85 / 0.6 / 0.4 / 0.25 across age buckets).
 6. **Author h-index** (max across authors) — capped tie-breaker. The list endpoints do not return `authors.hIndex`, so this signal mostly fires for topic-mode candidates that came via the richer single-paper graph API.
 
-Topic / wiki mode: same signals minus anchor overlap and minus the anchor-influence edge (no anchor exists in topic mode; wiki-derived anchors do score the edge signal). Influence and freshness carry more weight to compensate.
+Topic mode: S2/DeepXiv result rank, DeepXiv relevance score, wiki/profile overlap, and RRF evidence carry the ranking. Citation count is only a tie-breaker. Wiki mode still uses derived anchors, so anchor edge and anchor overlap remain valid signals, with wiki/profile evidence as an additional check.
 
 Venue mode:
 
-1. **Wiki relevance** — primary signal. `tools/discover.py` builds a small BM25-style local corpus from `wiki/papers/`, `wiki/concepts/`, and `wiki/topics/`, with stronger weights for page titles and frontmatter than body text. Candidate titles, abstracts, keywords, TLDRs, and track names are scored against that corpus. If the wiki is too sparse, or no venue candidate matches the corpus, the tool fails instead of pretending the ranking is personalized.
-2. **Citation count** — Paper Copilot's available citation field, log-scaled as a secondary signal.
-3. **Freshness** — mild tie-breaker; most venue runs use one year, so this normally does not move much.
-4. **Paper Copilot rating / review metadata** — used only as secondary tie-breakers when present.
-5. **Paper Copilot status / decision** — small tie-breaker so accepted/oral/spotlight records edge out rejected or withdrawn records at similar wiki relevance.
+1. **Wiki/profile relevance** — primary signal. Candidate titles, abstracts, keywords, TLDRs, track names, and Paper Copilot topic/area fields are scored against the wiki profile. If the wiki is too sparse, or no venue candidate has local or semantic evidence, the tool fails instead of pretending the ranking is personalized.
+2. **RRF channel evidence** — fuses Paper Copilot list position, wiki BM25, specific profile overlap, optional semantic match, and metadata channels by rank rather than raw-score scale.
+3. **Optional semantic boost** — when S2/DeepXiv credentials are configured, the tool may search using the wiki profile and match hits back to Paper Copilot candidates by arXiv ID or exact normalized title. These hits boost existing venue candidates only; they never add new venue candidates.
+4. **Paper Copilot metadata** — rating, review count, status, track, and citations are tie-breakers, not primary relevance signals.
+5. **Anti-hub penalty** — high-citation papers with only broad/generic matches are demoted unless they also have specific profile evidence, anchor-specific evidence, or semantic-channel evidence.
 
-Venue mode uses Paper Copilot's public GitHub JSON data (`papercopilot/paperlists`) for the venue/year list and does not scrape the live website or vendor the dataset.
+Venue mode uses Paper Copilot's public GitHub JSON data (`papercopilot/paperlists`) as the venue/year candidate list and does not scrape the live website or vendor the dataset.
 
 Paper Copilot normalization must not drop relevance-bearing fields documented by the source. Preserve title, abstract, TLDR, keywords / primary area / topic, track, status, citations, ratings, review metadata, and paper URLs (`url`, `site`, `openreview`, `pdf`, project/GitHub links when present) in the shortlist payload where practical. These fields are either ranked directly or left visible as secondary evidence for the user.
 
@@ -41,10 +43,20 @@ Paper Copilot normalization must not drop relevance-bearing fields documented by
 
 They answer different questions:
 
-- `influentialCitationCount` = "does the field cite this paper substantively?" — a proxy for general importance
+- `influentialCitationCount` = "does the field cite this paper substantively?" — a proxy for general importance and only a tie-breaker without relevance evidence
 - `isInfluential` on the anchor edge = "does *this anchor* specifically build on / get built on by this paper?" — a proxy for anchor-specific relevance
 
 A paper can score high on one and low on the other. Example: a well-known benchmark paper has a high aggregate count (everyone cites it) but rarely a True edge from a method paper (the benchmark is used, not built upon). Our ranking uses both, so benchmarks surface when there's no better signal, but papers the anchor literally built on outrank them.
+
+## What discovery does **not** score on
+
+This is where `/discover` deliberately differs from `/init`'s planner (`tools/init_discovery.py`):
+
+- **No survey preference**. `/init` favors survey/review papers because a fresh wiki benefits from them as anchor coverage. `/discover` is invoked when a user already knows the area (anchor mode) or is exploring (topic mode); they rarely need yet another survey, and surfacing surveys above novel work would be noise.
+- **No "older canonical anchor" bonus**. `/init`'s bootstrap mode promotes one older citation-heavy paper to broaden coverage. `/discover` users typically want forward-looking recommendations, not foundational re-anchoring.
+- **No notes/web priority terms**. `/init` reads `raw/notes/` and `raw/web/` to extract the user's stated intent. `/discover` does not — its inputs are explicit (anchor, topic, or wiki state).
+
+If a future ranking signal seems shared between `/init` and `/discover`, prefer keeping two implementations rather than extracting a shared scorer. The objectives genuinely differ; a shared scorer would force one skill to compromise.
 
 ## Field-set restrictions on S2 endpoints
 

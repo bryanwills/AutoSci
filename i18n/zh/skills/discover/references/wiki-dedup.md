@@ -8,12 +8,11 @@
 
 这覆盖典型场景：某篇已 ingest 的论文又被当推荐冒上来。把它继续展示给用户是浪费 review 时间，剔掉是对的。
 
-venue 模式还会把候选标题规范化后，与 `wiki/papers/*.md` 的标题做精确 key 匹配。Paper Copilot 记录常常缺少 arXiv ID，因此标题 fallback 是这个来源上实用的 dedup 层。这类按标题 fallback 剔除的候选也计入 `wiki_dedup_count`。
+所有 seed 模式都会把候选标题规范化后，与 `wiki/papers/*.md` 的标题做精确 key 匹配。Paper Copilot 记录常常缺少 arXiv ID，S2/DeepXiv 记录之间也可能 ID 不一致，因此精确标题 fallback 是实用的 dedup 层。这类按标题 fallback 剔除的候选也计入 `wiki_dedup_count`。
 
 ## 抓不到的情况
 
-- **venue 之外的仅标题匹配**：wiki 里一篇没有 `arxiv` 或 `arxiv_id` 的论文（如通过 `/edit` ingest 的期刊文章）不会与 anchor/topic/wiki 候选按标题匹配。这是有意为之 —— 宽松模糊标题匹配会引入假阳，反而遮蔽合法候选。
-- **宽松模糊标题**：venue 标题 fallback 使用规范化后的精确 title key，不做语义/模糊标题匹配。
+- **宽松模糊标题**：标题 fallback 使用规范化后的精确 title key，不做语义/模糊标题匹配。
 - **候选集内部的跨源重复**：wiki 过滤前的 dedup pass 使用 `_candidate_key`（arxiv → S2 paperId → title-slug 顺序），能抓住 S2 与 DeepXiv 之间的大多数跨源重复。完全缺失 ID 与 title 的记录会被静默丢弃。
 
 ## 遇到 "高 dedup" 如何处理

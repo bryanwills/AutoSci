@@ -30,6 +30,40 @@ class DiscoverVenueTests(unittest.TestCase):
         context.__enter__.return_value = response
         return context
 
+    @staticmethod
+    def _write_profile_wiki(root: Path) -> Path:
+        wiki = root / "wiki"
+        papers = wiki / "papers"
+        concepts = wiki / "concepts"
+        methods = wiki / "methods"
+        papers.mkdir(parents=True)
+        concepts.mkdir(parents=True)
+        methods.mkdir(parents=True)
+        (papers / "rag.md").write_text(
+            "---\n"
+            "title: Retrieval Augmented Reasoning With Sparse Adapters\n"
+            "arxiv: 2401.11111\n"
+            "---\n"
+            "# Retrieval Augmented Reasoning With Sparse Adapters\n"
+            "Sparse adapter reranking, citation attribution, long context retrieval, "
+            "query rewriting, factual grounding, evidence aggregation, repository reasoning, "
+            "tool planning, dense retrieval, answer synthesis, chunk selection, verifier traces.\n",
+            encoding="utf-8",
+        )
+        (concepts / "retrieval.md").write_text(
+            "# Retrieval Augmented Generation\n"
+            "Reranking, attribution, grounding, adapter routing, retrieval planning, "
+            "knowledge intensive question answering, and long context evidence are central.\n",
+            encoding="utf-8",
+        )
+        (methods / "sparse-adapters.md").write_text(
+            "# Sparse Adapter Reranking\n"
+            "Method notes for adapter routing, sparse updates, evidence reranking, "
+            "retrieval scoring, and tool-use reasoning.\n",
+            encoding="utf-8",
+        )
+        return wiki
+
     def test_neurips_alias_uses_papercopilot_nips_path(self) -> None:
         self.assertEqual(
             discover._papercopilot_url("neurips", 2024),
@@ -248,6 +282,110 @@ class DiscoverVenueTests(unittest.TestCase):
 
         self.assertEqual([candidate["title"] for candidate in filtered], ["New Venue Paper"])
 
+    def test_rrf_rewards_multiple_good_channels(self) -> None:
+        multi = {"title": "Multi Channel", "_retrieval": {"lexical": {"rank": 5}, "semantic": {"rank": 5}}}
+        single = {"title": "Single Channel", "_retrieval": {"semantic": {"rank": 1}}}
+
+        discover._apply_rrf([multi, single])
+
+        self.assertGreater(multi["_rrf_score"], single["_rrf_score"])
+
+    def test_deepxiv_normalization_preserves_semantic_fields(self) -> None:
+        norm = discover._normalize_candidate(
+            {
+                "arxiv_id": "2401.12345",
+                "title": "DeepXiv Result",
+                "authors": ["Ada Lovelace", "Grace Hopper"],
+                "categories": ["cs.CL", "cs.IR"],
+                "citation_count": 42,
+                "relevance_score": 0.87,
+            },
+            source="deepxiv_search",
+            rank=2,
+            score=0.87,
+        )
+
+        self.assertEqual(norm["authors"], ["Ada Lovelace", "Grace Hopper"])
+        self.assertEqual(norm["fields_of_study"], ["cs.CL", "cs.IR"])
+        self.assertEqual(norm["citation_count"], 42)
+        self.assertEqual(norm["relevance_score"], 0.87)
+        self.assertEqual(norm["_retrieval"]["deepxiv_search"]["rank"], 2)
+
+    def test_exact_title_dedup_applies_to_topic_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wiki = Path(tmp) / "wiki"
+            papers = wiki / "papers"
+            papers.mkdir(parents=True)
+            (papers / "existing.md").write_text(
+                "---\n"
+                "title: Existing Topic Paper\n"
+                "---\n"
+                "# Existing Topic Paper\n"
+                "Retrieval augmented generation and reranking.\n",
+                encoding="utf-8",
+            )
+            candidates = [
+                {"title": "Existing Topic Paper", "paperId": "duplicate", "abstract": "same title"},
+                {"title": "Fresh Topic Paper", "paperId": "fresh", "abstract": "retrieval reranking adapters"},
+            ]
+
+            with mock.patch.object(discover, "_gather_from_topic", return_value=candidates):
+                payload = discover.build_shortlist(mode="topic", topic="retrieval reranking", wiki_root=wiki, limit=5)
+
+        self.assertEqual([candidate["title"] for candidate in payload["shortlist"]], ["Fresh Topic Paper"])
+        self.assertEqual(payload["wiki_dedup_count"], 1)
+
+    def test_specific_relevance_beats_generic_high_citation_hub(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wiki = self._write_profile_wiki(Path(tmp))
+            candidates = [
+                {
+                    "title": "GPT-4 Technical Report",
+                    "paperId": "hub",
+                    "abstract": "Large language models, neural generation, benchmark evaluation, and training.",
+                    "citationCount": 100000,
+                    "year": 2025,
+                },
+                {
+                    "title": "Sparse Adapter Reranking for Retrieval Augmented Reasoning",
+                    "paperId": "specific",
+                    "abstract": "Adapter routing and retrieval reranking for grounded long-context reasoning with citation attribution.",
+                    "citationCount": 8,
+                    "year": 2025,
+                },
+            ]
+
+            with mock.patch.object(discover, "_gather_from_topic", return_value=candidates):
+                payload = discover.build_shortlist(mode="topic", topic="retrieval augmented reasoning", wiki_root=wiki, limit=2)
+
+        self.assertEqual(payload["shortlist"][0]["title"], "Sparse Adapter Reranking for Retrieval Augmented Reasoning")
+
+    def test_mocked_fixture_reduces_hub_intrusion_against_legacy_score(self) -> None:
+        hub = {
+            "title": "GPT-4 Technical Report",
+            "paperId": "hub",
+            "abstract": "Large language models, neural generation, benchmark evaluation, and training.",
+            "citationCount": 100000,
+            "year": 2025,
+        }
+        specific = {
+            "title": "Sparse Adapter Reranking for Retrieval Augmented Reasoning",
+            "paperId": "specific",
+            "abstract": "Adapter routing and retrieval reranking for grounded long-context reasoning with citation attribution.",
+            "citationCount": 8,
+            "year": 2025,
+        }
+        legacy_hub = 0.45 * discover._influence_score(0, hub["citationCount"]) + 0.25 * discover._freshness_score(hub["year"])
+        legacy_specific = 0.45 * discover._influence_score(0, specific["citationCount"]) + 0.25 * discover._freshness_score(specific["year"])
+        self.assertGreater(legacy_hub, legacy_specific)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            wiki = self._write_profile_wiki(Path(tmp))
+            with mock.patch.object(discover, "_gather_from_topic", return_value=[hub, specific]):
+                payload = discover.build_shortlist(mode="topic", topic="retrieval augmented reasoning", wiki_root=wiki, limit=2)
+
+        self.assertEqual(payload["shortlist"][0]["paperId"], "specific")
+
     def test_sparse_wiki_fails_before_fetching(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             wiki = Path(tmp) / "wiki"
@@ -327,6 +465,51 @@ class DiscoverVenueTests(unittest.TestCase):
             self.assertEqual(payload["wiki_dedup_count"], 1)
             self.assertFalse((wiki / "log.md").exists())
             self.assertFalse((Path(tmp) / "raw").exists())
+
+    def test_venue_semantic_boost_matches_papercopilot_candidate(self) -> None:
+        records = [
+            {
+                "id": "semantic",
+                "title": "Sparse Adapter Reranking for Retrieval Augmented Reasoning",
+                "abstract": "A short abstract with little lexical evidence.",
+                "rating_avg": 5.0,
+            },
+            {
+                "id": "metadata",
+                "title": "Generic Neural Language Model Evaluation",
+                "abstract": "Language model benchmark evaluation and training.",
+                "rating_avg": 9.5,
+                "gs_citation": "5000",
+            },
+        ]
+        s2_hits = [
+            {
+                "paperId": "s2-semantic",
+                "title": "Sparse Adapter Reranking for Retrieval Augmented Reasoning",
+                "abstract": "retrieval reranking adapter routing",
+                "externalIds": {"ArXiv": "2405.12345"},
+                "citationCount": 3,
+                "score": 0.93,
+            }
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            wiki = self._write_profile_wiki(Path(tmp))
+            with (
+                mock.patch.object(discover, "_fetch_papercopilot", return_value=records),
+                mock.patch.object(discover.fetch_s2, "S2_API_KEY", "test-key"),
+                mock.patch.object(discover.fetch_s2, "search", return_value=s2_hits),
+            ):
+                payload = discover.build_shortlist(
+                    mode="venue",
+                    venue="neurips",
+                    year=2024,
+                    wiki_root=wiki,
+                    limit=2,
+                )
+
+        self.assertEqual(payload["shortlist"][0]["title"], "Sparse Adapter Reranking for Retrieval Augmented Reasoning")
+        self.assertGreater(payload["shortlist"][0].get("_semantic_match_score", 0), 0)
 
     def test_venue_relevance_guard_runs_after_wiki_dedup(self) -> None:
         records = [

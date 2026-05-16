@@ -7,10 +7,12 @@ argument-hint: "(--anchor <id> [--anchor <id>] [--negative <id>] | --topic <str>
 
 > Produce a ranked shortlist of paper candidates from one of four seed modes. Surface them to the user (or to the calling skill) with rationales. Never auto-ingest — `/discover` is a proposal stage, `/ingest` is the action stage.
 
+`tools/discover.py` runs a lightweight search funnel: build a wiki interest profile, gather candidates from existing APIs, preserve per-channel provenance, fuse evidence, then rank with anti-hub penalties so generic high-citation papers do not substitute for relevance.
+
 Use these local references on demand:
 
 - `references/seed-modes.md` — when to pick anchor / topic / wiki / venue mode and how to translate the user's phrasing into one
-- `references/ranking-signals.md` — what `tools/discover.py` scores on.
+- `references/ranking-signals.md` — what `tools/discover.py` scores on and why discovery does **not** share `/init`'s survey preference
 - `references/wiki-dedup.md` — how candidates are filtered against `wiki/papers/` and what to do with matches
 
 ## Inputs
@@ -28,9 +30,9 @@ Exactly one of `--anchor`, `--topic`, `--from-wiki`, or `--venue` must be given.
 
 - `.checkpoints/discover-{seed-slug}-{YYYY-MM-DD}.json` — full shortlist payload, machine-readable; the seed slug is derived from the first anchor or the topic
 - a human-readable markdown summary printed to the user with rationale per candidate
-- `wiki/log.md` — one append line via `tools/research_wiki.py log`.
+- `wiki/log.md` — one append line via `tools/research_wiki.py log` for anchor/topic/wiki runs only
 
-`/discover` does not write anywhere else in `wiki/` and does not touch `raw/`.
+`/discover` does not write anywhere else in `wiki/` and does not touch `raw/`. `from-venue` is stricter: it does not write to `wiki/` at all, including `wiki/log.md`. Whether to actually pull a candidate into the wiki is the caller's decision (a follow-up `/ingest`).
 
 ## Wiki Interaction
 
@@ -38,11 +40,12 @@ Exactly one of `--anchor`, `--topic`, `--from-wiki`, or `--venue` must be given.
 
 - `wiki/papers/*.md` — frontmatter `arxiv` (or legacy `arxiv_id`) for dedup against already-ingested papers
 - `wiki/papers/*.md` modification times — for `--from-wiki` anchor selection
-- `wiki/papers/*.md`, `wiki/concepts/*.md`, `wiki/topics/*.md` — titles and body text for venue-mode relevance scoring
+- `wiki/papers/*.md`, `wiki/concepts/*.md`, `wiki/topics/*.md`, `wiki/methods/*.md` — titles and body text for profile-aware relevance scoring
 
 ### Writes
 
-- `wiki/log.md` — APPEND via `tools/research_wiki.py log`
+- anchor/topic/wiki runs: `wiki/log.md` — APPEND via `tools/research_wiki.py log`
+- venue runs: none
 
 ### Graph edges created
 
@@ -96,7 +99,9 @@ Or for topic / wiki modes:
 
 Anchor (and wiki) mode run three S2 channels per anchor by default — `recommend` + `references` + `citations`. This is what makes `/discover` meaningfully different from `/daily-arxiv`: references surface older canonical work the anchor built on, citations surface high-impact follow-ups. Pass `--no-citation-expand` only if API cost forces the narrower recommend-only path; the quality regression is sharp.
 
-The tool handles candidate gathering, wiki dedup, ranking, and writes the checkpoint. Always pass `--wiki-root wiki` so already-ingested papers are filtered out — surfacing duplicates wastes the user's review time.
+The tool handles candidate gathering, wiki dedup, evidence fusion, ranking, and writes the checkpoint. Always pass `--wiki-root wiki` so already-ingested papers are filtered out — surfacing duplicates wastes the user's review time.
+
+Venue mode remains Paper Copilot-driven: it ranks the full in-memory venue/year list and may use configured S2/DeepXiv profile search only as a boost for matching Paper Copilot candidates by arXiv ID or exact title. It must not add non-Paper-Copilot papers to a venue shortlist.
 
 If S2 is unavailable in topic mode, the tool will continue with whatever sources responded; check the output and report degraded discovery to the user. If every channel fails, abort with a clear message rather than emitting an empty shortlist as if it were a real recommendation.
 
@@ -114,7 +119,7 @@ Append a short "next step" hint:
 To ingest a candidate: /ingest https://arxiv.org/abs/<arxiv-id>
 ```
 
-**Do not ingest anything yourself. The user picks.**
+Do not ingest anything yourself. The user picks.
 
 ### Step 4: Log
 
@@ -132,12 +137,17 @@ Skip this step for `from-venue`; venue discovery must not write to `wiki/` or `r
 
 When `/ingest` is invoked with the optional `--discover` flag (default off), it calls `/discover` after the final report, with the just-ingested paper's arXiv ID as the single anchor. The shortlist is appended to `/ingest`'s report under a "Related papers you may want to ingest next" heading. `/ingest` never auto-ingests anything from this list.
 
+### From `/init`
+
+`/init` does not call `/discover`. `/init`'s planner (`tools/init_discovery.py plan`) has its own scoring that favors surveys, broad coverage, and seed anchors — appropriate for bootstrapping a wiki. `/discover`'s ranking is intentionally different (no survey preference; weights anchor similarity and influential citations) and would dilute `/init`'s shortlist if substituted in. Keep them separate.
+
 ## Constraints
 
 - **Never auto-ingest**: `/discover` returns a shortlist and stops. Even when called by `/ingest --discover`, the caller surfaces results and the user decides what to ingest.
 - **No content writes to `wiki/`**: paper pages, concepts, methods, graph edges all belong to `/ingest`. Anchor/topic/wiki runs may append `wiki/log.md`; `from-venue` must not write to `wiki/` at all.
 - **No writes to `raw/`**: `/discover` does not download papers. The user runs `/ingest <arxiv-url>` afterwards if they want a candidate.
-- **Always dedupe against the wiki**: pass `--wiki-root wiki` so the shortlist contains only papers not yet in the wiki. Surfacing duplicates is the most common low-quality failure mode.
+- **Always dedupe against the wiki**: pass `--wiki-root wiki` so the shortlist contains only papers not yet in the wiki. Exact title dedup applies across all seed modes; surfacing duplicates is the most common low-quality failure mode.
+- **Popularity is not relevance**: citation counts are secondary tie-breakers. Candidates need specific wiki/profile evidence, anchor-specific evidence, or semantic-channel evidence; broad high-citation hub papers should be penalized.
 - **Ranking is discovery-specific**: do not import or duplicate `tools/init_discovery.py`'s scoring helpers. The two skills have different objectives — `/init` wants broad foundational coverage; `/discover` wants relevant *next reads*. See `references/ranking-signals.md`.
 - **Three-channel anchor gather**: by default, anchor mode pulls from S2 `recommend` + `references` + `citations` per anchor. Removing the citation channels (via `--no-citation-expand`) collapses the result into a recency-biased semantic cluster that overlaps heavily with `/daily-arxiv`. Keep all three on unless API cost is a hard constraint. See `references/ranking-signals.md`.
 - **Some S2 endpoints have a flatter field set**: `/citations`, `/references`, and `/recommendations/*` reject nested selectors — no `authors.hIndex`, no `tldr`. `/paper/{id}` and `/paper/search` do accept them, so topic-mode candidates carry full enrichment; anchor-mode candidates that entered only via citations/references/recommend do not. That is a real API constraint, not a bug.
@@ -170,5 +180,5 @@ When `/ingest` is invoked with the optional `--discover` flag (default off), it 
 ### External APIs
 
 - Semantic Scholar — recommendations (`/recommendations/v1/papers/forpaper/{id}`, `POST /recommendations/v1/papers/`), search, paper detail (via `tools/fetch_s2.py`)
-- DeepXiv — search fallback in topic mode (via `tools/fetch_deepxiv.py`, optional; graceful fallback when unavailable)
+- DeepXiv — search fallback in topic mode and optional venue profile boost when configured (via `tools/fetch_deepxiv.py`; graceful fallback when unavailable)
 - Paper Copilot — public GitHub raw JSON (`papercopilot/paperlists`) for venue/year paper lists. Live-site scraping is not used; do not vendor the dataset. Venue normalization should preserve documented relevance fields such as title, abstract, TLDR, keywords / primary area / topic, track, status, citations, ratings, reviews, and paper URLs when present.

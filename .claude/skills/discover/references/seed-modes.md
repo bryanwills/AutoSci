@@ -55,10 +55,12 @@ Triggers:
 
 Venue mode fetches the full paper list for that venue/year from Paper Copilot's public GitHub JSON source (`papercopilot/paperlists`), normalizes each record, and ranks them by relevance to the user's existing wiki content. It requires a non-sparse wiki — if the wiki is too empty, the tool fails clearly rather than returning an unpersonalized list.
 
+Paper Copilot remains the venue candidate source. If S2/DeepXiv are configured, venue mode may use them only as a profile-search boost matched back to Paper Copilot records by arXiv ID or exact title. It does not write to `wiki/` or `raw/`.
+
 ## What if the user gave both an anchor and a topic?
 
 Prefer anchor mode. Anchors are a much stronger signal than a topic string. Mention the topic in the user-facing report so they know it was noted, but the discovery itself runs through `from-anchors`.
 
 ## What if the user gave both a venue and a topic?
 
-Prefer venue mode if the user explicitly named a venue and year. The topic can be mentioned in the report, but venue mode's ranking is driven by wiki relevance, not by the topic string. If the wiki is too sparse for venue mode, stop with a clear sparse-wiki failure and suggest ingesting more papers or running a separate topic discovery; do not silently fall back to an unpersonalized venue ranking.
+Prefer venue mode if the user explicitly named a venue and year. The topic can be mentioned in the report, but venue mode's ranking is driven by the wiki profile, not by the topic string. If the wiki is too sparse for venue mode, stop with a clear sparse-wiki failure and suggest ingesting more papers or running a separate topic discovery; do not silently fall back to an unpersonalized venue ranking.

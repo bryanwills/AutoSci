@@ -36,6 +36,7 @@ import time
 import urllib.parse
 import urllib.request
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -52,6 +53,60 @@ except Exception:  # pragma: no cover — defensive
 
 # ---------- candidate normalization ----------------------------------------
 
+def _record_retrieval(
+    candidate: dict[str, Any],
+    channel: str,
+    *,
+    rank: int | None = None,
+    score: float | None = None,
+    reason: str = "",
+) -> None:
+    """Attach per-channel provenance used by RRF and debugging payloads."""
+    if not channel:
+        return
+    retrieval = candidate.setdefault("_retrieval", {})
+    existing = retrieval.get(channel) or {}
+    merged = dict(existing)
+    rank_int: int | None = None
+    if rank is not None:
+        try:
+            rank_int = int(rank)
+        except (TypeError, ValueError):
+            rank_int = None
+    if rank_int is not None and (not merged.get("rank") or rank_int < int(merged["rank"])):
+        merged["rank"] = rank_int
+    score_float: float | None = None
+    if score is not None:
+        try:
+            score_float = float(score)
+        except (TypeError, ValueError):
+            score_float = None
+    if score_float is not None and score_float > float(merged.get("score") or 0.0):
+        merged["score"] = round(score_float, 6)
+    if reason and not merged.get("reason"):
+        merged["reason"] = reason
+    retrieval[channel] = merged
+
+
+def _normalize_authors(value: Any) -> tuple[list[str], list[int]]:
+    authors: list[str] = []
+    h_indexes: list[int] = []
+    if not isinstance(value, list):
+        return authors, h_indexes
+    for item in value:
+        if isinstance(item, dict):
+            name = str(item.get("name") or "").strip()
+            if name:
+                authors.append(name)
+            h = item.get("hIndex")
+            if isinstance(h, int) and h > 0:
+                h_indexes.append(h)
+        else:
+            name = str(item or "").strip()
+            if name:
+                authors.append(name)
+    return authors, h_indexes
+
 def _arxiv_id_from_external(external_ids: dict[str, Any] | None) -> str:
     if not external_ids:
         return ""
@@ -61,17 +116,35 @@ def _arxiv_id_from_external(external_ids: dict[str, Any] | None) -> str:
     return ""
 
 
-def _normalize_candidate(raw: dict[str, Any], *, source: str, anchor: str = "") -> dict[str, Any]:
+def _normalize_candidate(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    anchor: str = "",
+    rank: int | None = None,
+    score: float | None = None,
+) -> dict[str, Any]:
     """Flatten an S2/DeepXiv paper record into the discover shortlist schema."""
     if not raw:
         return {}
     external_ids = raw.get("externalIds") or {}
     arxiv_id = raw.get("arxiv_id") or _arxiv_id_from_external(external_ids)
-    authors = raw.get("authors") or []
-    h_indexes = [a.get("hIndex") for a in authors if isinstance(a, dict) and a.get("hIndex")]
+    authors, h_indexes = _normalize_authors(raw.get("authors") or [])
     tldr = raw.get("tldr")
     tldr_text = tldr.get("text") if isinstance(tldr, dict) else (tldr or "")
-    return {
+    categories = raw.get("categories") or []
+    keywords = raw.get("keywords") or []
+    fields = raw.get("fieldsOfStudy") or raw.get("fields_of_study") or categories
+    citation_count = (
+        raw.get("citationCount")
+        or raw.get("citation_count")
+        or raw.get("citation")
+        or raw.get("citations")
+        or 0
+    )
+    influential_count = raw.get("influentialCitationCount") or raw.get("influential_citation_count") or 0
+    relevance_score = raw.get("relevance_score", raw.get("score", 0.0))
+    candidate = {
         "paperId": raw.get("paperId") or raw.get("s2_id") or "",
         "arxiv_id": arxiv_id,
         "title": raw.get("title") or "",
@@ -79,13 +152,16 @@ def _normalize_candidate(raw: dict[str, Any], *, source: str, anchor: str = "") 
         "tldr": tldr_text,
         "year": raw.get("year"),
         "venue": raw.get("venue") or "",
-        "authors": [a.get("name", "") for a in authors if isinstance(a, dict)],
+        "authors": authors,
         "max_h_index": max(h_indexes) if h_indexes else 0,
-        "citation_count": raw.get("citationCount") or 0,
-        "influential_citation_count": raw.get("influentialCitationCount") or 0,
-        "fields_of_study": raw.get("fieldsOfStudy") or [],
-        "publication_types": raw.get("publicationTypes") or [],
-        "url": raw.get("url") or "",
+        "citation_count": _parse_int(citation_count),
+        "influential_citation_count": _parse_int(influential_count),
+        "fields_of_study": fields,
+        "keywords": keywords,
+        "categories": categories,
+        "publication_types": raw.get("publicationTypes") or raw.get("publication_types") or [],
+        "url": raw.get("url") or raw.get("src_url") or "",
+        "relevance_score": _normalize_relevance_score(relevance_score),
         # True when S2's per-edge `isInfluential` flag fired on the anchor↔candidate
         # citation/reference. Stronger signal than the aggregate `influentialCitationCount`:
         # it means the candidate specifically matters to (or was built on by) the anchor,
@@ -94,6 +170,8 @@ def _normalize_candidate(raw: dict[str, Any], *, source: str, anchor: str = "") 
         "_sources": [source],
         "_anchors": [anchor] if anchor else [],
     }
+    _record_retrieval(candidate, source, rank=rank, score=score, reason="source rank")
+    return candidate
 
 
 def _candidate_key(c: dict[str, Any]) -> str:
@@ -114,6 +192,15 @@ def _merge_candidate(existing: dict[str, Any], incoming: dict[str, Any]) -> None
     for anchor in incoming.get("_anchors", []):
         if anchor and anchor not in existing["_anchors"]:
             existing["_anchors"].append(anchor)
+    for channel, info in (incoming.get("_retrieval") or {}).items():
+        if isinstance(info, dict):
+            _record_retrieval(
+                existing,
+                str(channel),
+                rank=info.get("rank"),
+                score=info.get("score"),
+                reason=str(info.get("reason") or ""),
+            )
     for key in (
         "abstract",
         "tldr",
@@ -136,7 +223,7 @@ def _merge_candidate(existing: dict[str, Any], incoming: dict[str, Any]) -> None
             existing[key] = incoming[key]
     if not existing.get("authors") and incoming.get("authors"):
         existing["authors"] = incoming["authors"]
-    for key in ("fields_of_study", "keywords"):
+    for key in ("fields_of_study", "keywords", "categories", "publication_types"):
         if incoming.get(key):
             merged = list(existing.get(key) or [])
             seen = {_title_key(str(value)) for value in merged}
@@ -148,7 +235,12 @@ def _merge_candidate(existing: dict[str, Any], incoming: dict[str, Any]) -> None
             existing[key] = merged
     # Numeric fields: prefer the larger reading (S2 is authoritative; DeepXiv often lacks them).
     for key in ("max_h_index", "citation_count", "influential_citation_count"):
-        existing[key] = max(existing.get(key) or 0, incoming.get(key) or 0)
+        existing[key] = max(_parse_int(existing.get(key)), _parse_int(incoming.get(key)))
+    if "relevance_score" in existing or "relevance_score" in incoming:
+        existing["relevance_score"] = max(
+            _normalize_relevance_score(existing.get("relevance_score")),
+            _normalize_relevance_score(incoming.get("relevance_score")),
+        )
     if "_papercopilot_review_count" in existing or "_papercopilot_review_count" in incoming:
         existing["_papercopilot_review_count"] = max(
             existing.get("_papercopilot_review_count") or 0,
@@ -348,7 +440,13 @@ def _extract_arxiv_id_from_record(raw: dict[str, Any]) -> str:
     return ""
 
 
-def _normalize_papercopilot_record(raw: dict[str, Any], *, venue: str, year: int) -> dict[str, Any]:
+def _normalize_papercopilot_record(
+    raw: dict[str, Any],
+    *,
+    venue: str,
+    year: int,
+    rank: int | None = None,
+) -> dict[str, Any]:
     """Flatten a Paper Copilot record into the discover shortlist schema."""
     if not raw:
         return {}
@@ -385,7 +483,7 @@ def _normalize_papercopilot_record(raw: dict[str, Any], *, venue: str, year: int
     replies_avg = _parse_rating(raw.get("replies_avg") or raw.get("reply_avg"))
     rating_avg = _parse_rating(raw.get("rating_avg") or raw.get("rating"))
     record_year = _parse_int(raw.get("year")) or year
-    return {
+    candidate = {
         "paperId": s2_id or pc_id,
         "arxiv_id": arxiv_id,
         "title": title,
@@ -421,6 +519,8 @@ def _normalize_papercopilot_record(raw: dict[str, Any], *, venue: str, year: int
         "_topic": str(raw.get("topic") or raw.get("topics") or "").strip(),
         "_status": str(raw.get("status") or raw.get("decision") or "").strip(),
     }
+    _record_retrieval(candidate, "papercopilot", rank=rank, reason="venue list")
+    return candidate
 
 
 # ---------- wiki dedup -----------------------------------------------------
@@ -527,7 +627,36 @@ _WIKI_STOP_WORDS = {
     "has", "have", "in", "into", "is", "it", "of", "on", "or", "that",
     "the", "their", "this", "to", "we", "with", "you", "your",
 }
+_GENERIC_RESEARCH_TERMS = {
+    "ai", "ml", "llm", "llms", "model", "models", "learning", "neural",
+    "network", "networks", "deep", "language", "large", "data", "dataset",
+    "datasets", "benchmark", "benchmarks", "generation", "generative",
+    "training", "pretraining", "fine", "tuning", "prompt", "prompts",
+    "evaluation", "performance", "method", "methods", "approach",
+    "framework", "system", "systems", "task", "tasks", "paper", "papers",
+    "study", "analysis", "result", "results", "experiments", "using",
+    "based", "via", "towards", "toward", "new", "novel", "efficient",
+}
 _WIKI_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+/_-]*|[\u4e00-\u9fff]{1,}")
+
+
+@dataclass
+class WikiProfile:
+    corpus: dict[str, Any]
+    term_weights: Counter[str]
+    broad_terms: set[str]
+    specific_terms: set[str]
+    phrases: list[str]
+    query: str
+    known_title_keys: set[str]
+
+    @property
+    def is_sparse(self) -> bool:
+        return len(self.corpus.get("terms") or set()) < 20
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.corpus.get("docs")
 
 
 def _tokenize(text: str) -> list[str]:
@@ -562,10 +691,18 @@ def _split_frontmatter(text: str) -> tuple[str, str]:
 def _extract_wiki_relevance_corpus(wiki_root: Path) -> dict[str, Any]:
     """Build a deterministic BM25-style corpus from existing wiki documents."""
     if not wiki_root or not wiki_root.exists():
-        return {"docs": [], "postings": {}, "df": Counter(), "terms": set(), "avg_len": 0.0}
+        return {
+            "docs": [],
+            "postings": {},
+            "df": Counter(),
+            "terms": set(),
+            "term_weights": Counter(),
+            "titles": [],
+            "avg_len": 0.0,
+        }
 
     dirs_to_scan: list[Path] = []
-    for sub in ("papers", "concepts", "topics"):
+    for sub in ("papers", "concepts", "topics", "methods"):
         d = wiki_root / sub
         if d.exists():
             dirs_to_scan.append(d)
@@ -576,7 +713,9 @@ def _extract_wiki_relevance_corpus(wiki_root: Path) -> dict[str, Any]:
     docs: list[dict[str, Any]] = []
     postings: dict[str, list[tuple[int, float]]] = {}
     df: Counter[str] = Counter()
+    term_weights: Counter[str] = Counter()
     terms: set[str] = set()
+    titles: list[str] = []
     for d in dirs_to_scan:
         for path in d.rglob("*.md"):
             try:
@@ -604,8 +743,12 @@ def _extract_wiki_relevance_corpus(wiki_root: Path) -> dict[str, Any]:
             docs.append({
                 "path": str(path),
                 "kind": path.parent.name,
+                "title": title,
                 "length": length,
             })
+            term_weights.update(counts)
+            if title:
+                titles.append(title)
             for term, tf in counts.items():
                 postings.setdefault(term, []).append((doc_idx, float(tf)))
             doc_terms = set(counts)
@@ -613,7 +756,77 @@ def _extract_wiki_relevance_corpus(wiki_root: Path) -> dict[str, Any]:
             terms.update(doc_terms)
 
     avg_len = sum(float(doc["length"]) for doc in docs) / len(docs) if docs else 0.0
-    return {"docs": docs, "postings": postings, "df": df, "terms": terms, "avg_len": avg_len}
+    return {
+        "docs": docs,
+        "postings": postings,
+        "df": df,
+        "terms": terms,
+        "term_weights": term_weights,
+        "titles": titles,
+        "avg_len": avg_len,
+    }
+
+
+def _empty_wiki_profile(wiki_root: Path | None = None) -> WikiProfile:
+    return WikiProfile(
+        corpus=_extract_wiki_relevance_corpus(wiki_root) if wiki_root else {
+            "docs": [],
+            "postings": {},
+            "df": Counter(),
+            "terms": set(),
+            "term_weights": Counter(),
+            "titles": [],
+            "avg_len": 0.0,
+        },
+        term_weights=Counter(),
+        broad_terms=set(),
+        specific_terms=set(),
+        phrases=[],
+        query="",
+        known_title_keys=_wiki_known_title_keys(wiki_root) if wiki_root else set(),
+    )
+
+
+def _build_wiki_profile(wiki_root: Path | None) -> WikiProfile:
+    if not wiki_root or not wiki_root.exists():
+        return _empty_wiki_profile(None)
+    corpus = _extract_wiki_relevance_corpus(wiki_root)
+    term_weights: Counter[str] = Counter(corpus.get("term_weights") or {})
+    df: Counter[str] = Counter(corpus.get("df") or {})
+    docs = corpus.get("docs") or []
+    doc_count = max(1, len(docs))
+    broad_terms = set(_GENERIC_RESEARCH_TERMS)
+    broad_terms.update(
+        term for term, count in df.items()
+        if count >= max(3, int(doc_count * 0.45))
+    )
+    specific_terms = {
+        term
+        for term, _ in term_weights.most_common(120)
+        if term not in broad_terms and (len(term) >= 3 or re.search(r"[\u4e00-\u9fff]", term))
+    }
+    phrases: list[str] = []
+    seen_phrases: set[str] = set()
+    for title in corpus.get("titles") or []:
+        key = _title_key(str(title))
+        if not key or key in seen_phrases:
+            continue
+        if len(key.split()) >= 2 or re.search(r"[\u4e00-\u9fff]", key):
+            seen_phrases.add(key)
+            phrases.append(key)
+        if len(phrases) >= 32:
+            break
+    query_terms = [term for term, _ in term_weights.most_common(16) if term not in broad_terms]
+    query = " ".join(phrases[:3] + query_terms[:12])
+    return WikiProfile(
+        corpus=corpus,
+        term_weights=term_weights,
+        broad_terms=broad_terms,
+        specific_terms=specific_terms,
+        phrases=phrases,
+        query=query,
+        known_title_keys=_wiki_known_title_keys(wiki_root),
+    )
 
 
 def _candidate_relevance_terms(candidate: dict[str, Any]) -> Counter[str]:
@@ -673,6 +886,194 @@ def _wiki_relevance_score(candidate: dict[str, Any], corpus: dict[str, Any]) -> 
         for term, _ in sorted(matched_weights.items(), key=lambda item: (-item[1], item[0]))[:12]
     ]
     return min(score, 1.0), matched
+
+
+def _candidate_text_key(candidate: dict[str, Any]) -> str:
+    parts = [
+        candidate.get("title") or "",
+        candidate.get("abstract") or "",
+        candidate.get("tldr") or "",
+        " ".join(str(value) for value in candidate.get("fields_of_study") or []),
+        " ".join(str(value) for value in candidate.get("keywords") or []),
+        str(candidate.get("_track") or ""),
+        str(candidate.get("_primary_area") or ""),
+        str(candidate.get("_topic") or ""),
+    ]
+    return _title_key(" ".join(parts))
+
+
+def _profile_overlap_score(candidate: dict[str, Any], profile: WikiProfile) -> tuple[float, list[str], list[str], int]:
+    """Score candidate against specific profile terms, excluding broad field hubs."""
+    if profile.is_empty:
+        return 0.0, [], [], 0
+    terms = _candidate_relevance_terms(candidate)
+    specific_matches = [
+        term for term, _ in sorted(
+            ((term, weight) for term, weight in terms.items() if term in profile.specific_terms),
+            key=lambda item: (-item[1], item[0]),
+        )[:12]
+    ]
+    broad_count = sum(1 for term in terms if term in profile.broad_terms)
+    text_key = _candidate_text_key(candidate)
+    phrase_matches = [
+        phrase for phrase in profile.phrases
+        if phrase and phrase in text_key
+    ][:6]
+    specific_weight = sum(min(2.5, float(terms.get(term) or 0.0)) for term in specific_matches)
+    phrase_weight = 2.0 * len(phrase_matches)
+    score = min(1.0, (specific_weight + phrase_weight) / 14.0)
+    return score, specific_matches, phrase_matches, broad_count
+
+
+def _candidate_aliases(candidate: dict[str, Any]) -> set[str]:
+    aliases: set[str] = set()
+    arxiv_id = str(candidate.get("arxiv_id") or "").strip()
+    if arxiv_id:
+        bare = arxiv_id.removeprefix("arXiv:").removeprefix("ARXIV:").removeprefix("arxiv:").strip()
+        bare = re.sub(r"v[0-9]+$", "", bare, flags=re.IGNORECASE)
+        aliases.add(f"arxiv:{bare}")
+    paper_id = str(candidate.get("paperId") or "").strip()
+    if paper_id:
+        aliases.add(f"s2:{paper_id}")
+    title = _title_key(str(candidate.get("title") or ""))
+    if title:
+        aliases.add(f"title:{title}")
+    return aliases
+
+
+def _normalize_relevance_score(value: Any) -> float:
+    try:
+        score = float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    if score <= 0:
+        return 0.0
+    if score > 1.0:
+        return min(1.0, score / 100.0)
+    return score
+
+
+def _apply_rank_channel(
+    candidates: list[dict[str, Any]],
+    channel: str,
+    scorer,
+    *,
+    reason: str,
+    min_score: float = 0.0,
+) -> None:
+    ranked: list[tuple[dict[str, Any], float]] = []
+    for candidate in candidates:
+        score = float(scorer(candidate) or 0.0)
+        if score > min_score:
+            ranked.append((candidate, score))
+    ranked.sort(key=lambda item: item[1], reverse=True)
+    for rank, (candidate, score) in enumerate(ranked, start=1):
+        _record_retrieval(candidate, channel, rank=rank, score=score, reason=reason)
+
+
+def _apply_rrf(candidates: list[dict[str, Any]], *, k: int = 60) -> None:
+    raw_scores: list[float] = []
+    for candidate in candidates:
+        total = 0.0
+        for info in (candidate.get("_retrieval") or {}).values():
+            if not isinstance(info, dict) or not info.get("rank"):
+                continue
+            try:
+                rank = int(info["rank"])
+            except (TypeError, ValueError):
+                continue
+            total += 1.0 / (k + max(1, rank))
+        candidate["_rrf_raw"] = round(total, 6)
+        raw_scores.append(total)
+    max_score = max(raw_scores) if raw_scores else 0.0
+    for candidate in candidates:
+        candidate["_rrf_score"] = round((candidate.get("_rrf_raw") or 0.0) / max_score, 4) if max_score else 0.0
+
+
+def _apply_profile_features(candidates: list[dict[str, Any]], profile: WikiProfile) -> None:
+    if profile.is_empty:
+        _apply_rrf(candidates)
+        return
+    for candidate in candidates:
+        rel, matched = _wiki_relevance_score(candidate, profile.corpus)
+        candidate["_wiki_relevance"] = rel
+        candidate["_wiki_matched_terms"] = matched
+        specific, specific_terms, phrase_matches, broad_count = _profile_overlap_score(candidate, profile)
+        candidate["_profile_specific_score"] = specific
+        candidate["_profile_matched_terms"] = specific_terms
+        candidate["_profile_matched_phrases"] = phrase_matches
+        candidate["_profile_broad_match_count"] = broad_count
+    _apply_rank_channel(candidates, "wiki_bm25", lambda c: c.get("_wiki_relevance", 0.0), reason="wiki BM25")
+    _apply_rank_channel(candidates, "profile_specific", lambda c: c.get("_profile_specific_score", 0.0), reason="specific wiki profile")
+    _apply_rank_channel(candidates, "semantic_score", lambda c: _normalize_relevance_score(c.get("relevance_score")), reason="external semantic score")
+    _apply_rrf(candidates)
+
+
+def _semantic_boost_enabled() -> bool:
+    s2_ready = bool(getattr(fetch_s2, "S2_API_KEY", ""))
+    dx_ready = bool(
+        fetch_deepxiv is not None
+        and getattr(fetch_deepxiv, "HAS_DEEPXIV", False)
+        and getattr(fetch_deepxiv, "DEEPXIV_TOKEN", "")
+    )
+    return s2_ready or dx_ready
+
+
+def _venue_semantic_matches(profile: WikiProfile, *, limit: int = 30) -> dict[str, dict[str, Any]]:
+    """Return external semantic hits by arXiv/title alias without expanding venue candidates."""
+    if profile.is_empty or not profile.query or not _semantic_boost_enabled():
+        return {}
+    matches: dict[str, dict[str, Any]] = {}
+
+    def add(raw: dict[str, Any], source: str, rank: int) -> None:
+        candidate = _normalize_candidate(raw, source=source, rank=rank, score=raw.get("relevance_score", raw.get("score", 0.0)))
+        if not candidate:
+            return
+        score = _normalize_relevance_score(candidate.get("relevance_score")) or (1.0 / (rank + 1))
+        for alias in _candidate_aliases(candidate):
+            current = matches.get(alias)
+            if not current or score > float(current.get("score") or 0.0):
+                matches[alias] = {"score": score, "source": source, "rank": rank, "title": candidate.get("title") or ""}
+
+    if getattr(fetch_s2, "S2_API_KEY", ""):
+        try:
+            for rank, raw in enumerate(fetch_s2.search(profile.query, limit=limit), start=1):
+                add(raw, "s2_profile_search", rank)
+        except Exception as exc:
+            print(f"warn: S2 venue semantic boost failed: {exc}", file=sys.stderr)
+    if (
+        fetch_deepxiv is not None
+        and getattr(fetch_deepxiv, "HAS_DEEPXIV", False)
+        and getattr(fetch_deepxiv, "DEEPXIV_TOKEN", "")
+    ):
+        try:
+            for rank, raw in enumerate(fetch_deepxiv.search(profile.query, limit=limit), start=1):
+                add(raw, "deepxiv_profile_search", rank)
+        except Exception as exc:
+            print(f"warn: DeepXiv venue semantic boost failed: {exc}", file=sys.stderr)
+    return matches
+
+
+def _apply_venue_semantic_matches(candidates: list[dict[str, Any]], matches: dict[str, dict[str, Any]]) -> None:
+    if not matches:
+        return
+    for candidate in candidates:
+        best: dict[str, Any] | None = None
+        for alias in _candidate_aliases(candidate):
+            hit = matches.get(alias)
+            if hit and (best is None or float(hit.get("score") or 0.0) > float(best.get("score") or 0.0)):
+                best = hit
+        if not best:
+            continue
+        candidate["_semantic_match_score"] = float(best.get("score") or 0.0)
+        candidate["_semantic_match_source"] = best.get("source") or ""
+        _record_retrieval(
+            candidate,
+            "venue_semantic_match",
+            rank=best.get("rank"),
+            score=best.get("score"),
+            reason=str(best.get("source") or "semantic profile search"),
+        )
 
 
 # ---------- ranking --------------------------------------------------------
@@ -739,11 +1140,41 @@ def _anchor_influence_edge_score(c: dict[str, Any]) -> float:
     return 1.0 if c.get("is_influential_edge") else 0.0
 
 
+def _semantic_evidence_score(c: dict[str, Any]) -> float:
+    return max(
+        float(c.get("_semantic_match_score") or 0.0),
+        _normalize_relevance_score(c.get("relevance_score")),
+        float(c.get("_rrf_score") or 0.0) * 0.75,
+    )
+
+
+def _hub_penalty(c: dict[str, Any]) -> float:
+    """Suppress broad high-citation papers when profile evidence is only generic."""
+    if "_profile_specific_score" not in c and "_wiki_relevance" not in c:
+        return 0.0
+    citations = int(c.get("citation_count") or 0)
+    if citations < 1000:
+        return 0.0
+    specific = float(c.get("_profile_specific_score") or 0.0)
+    semantic = float(c.get("_semantic_match_score") or 0.0)
+    edge = _anchor_influence_edge_score(c)
+    if max(specific, semantic, edge) >= 0.18:
+        return 0.0
+    broad = int(c.get("_profile_broad_match_count") or 0)
+    if broad <= 0:
+        return 0.0
+    return min(0.35, 0.08 + math.log1p(citations) / math.log1p(100000) * 0.22)
+
+
 def _score(c: dict[str, Any], *, anchor_mode: bool) -> float:
     influence = _influence_score(c.get("influential_citation_count", 0), c.get("citation_count", 0))
     h = _hindex_score(c.get("max_h_index", 0))
     fresh = _freshness_score(c.get("year"))
     diversity = _channel_diversity_score(c)
+    rrf = float(c.get("_rrf_score") or 0.0)
+    rel = float(c.get("_wiki_relevance") or 0.0)
+    specific = float(c.get("_profile_specific_score") or 0.0)
+    semantic = _semantic_evidence_score(c)
     if anchor_mode:
         # With three channels plus the per-edge isInfluential flag:
         #   - influence: aggregate prestige (candidate's general importance)
@@ -753,17 +1184,28 @@ def _score(c: dict[str, Any], *, anchor_mode: bool) -> float:
         #   - freshness + h-index: supporting signals
         anchor = _anchor_overlap_score(c)
         edge = _anchor_influence_edge_score(c)
-        return (
-            0.25 * influence
+        return max(0.0, (
+            0.16 * influence
             + 0.20 * edge
             + 0.15 * anchor
-            + 0.15 * diversity
-            + 0.15 * fresh
-            + 0.10 * h
-        )
-    # Topic / wiki mode: no anchor signal — lean harder on influence and freshness.
-    # `is_influential_edge` is always False here (no anchor edge exists), so skip it.
-    return 0.45 * influence + 0.25 * fresh + 0.15 * h + 0.15 * diversity
+            + 0.12 * diversity
+            + 0.12 * rrf
+            + 0.10 * fresh
+            + 0.05 * h
+            + 0.06 * max(rel, specific)
+            + 0.04 * semantic
+            - _hub_penalty(c)
+        ))
+    # Topic mode is search-result evidence first; popularity is only a tie-breaker.
+    return max(0.0, (
+        0.30 * rrf
+        + 0.24 * semantic
+        + 0.22 * max(rel, specific)
+        + 0.10 * fresh
+        + 0.07 * h
+        + 0.07 * influence
+        - _hub_penalty(c)
+    ))
 
 
 def _rationale(c: dict[str, Any], *, anchor_mode: bool) -> str:
@@ -773,6 +1215,10 @@ def _rationale(c: dict[str, Any], *, anchor_mode: bool) -> str:
         bits.append("influential edge with anchor")
     if anchor_mode and c.get("_anchors"):
         bits.append(f"from {len(c['_anchors'])} anchor(s)")
+    if c.get("_profile_matched_terms"):
+        bits.append(f"profile terms {', '.join(c['_profile_matched_terms'][:3])}")
+    if c.get("_semantic_match_score"):
+        bits.append("semantic profile match")
     if c.get("influential_citation_count"):
         bits.append(f"{c['influential_citation_count']} influential citations")
     elif c.get("citation_count"):
@@ -806,19 +1252,26 @@ def _status_score(status: str) -> float:
 
 
 def _score_venue(c: dict[str, Any]) -> float:
-    """Rank venue-mode candidates by wiki relevance + secondary signals."""
+    """Rank venue-mode candidates by profile evidence; popularity is a tie-breaker."""
     rel = float(c.get("_wiki_relevance", 0.0))
+    specific = float(c.get("_profile_specific_score") or 0.0)
+    semantic = float(c.get("_semantic_match_score") or 0.0)
+    rrf = float(c.get("_rrf_score") or 0.0)
     influence = _influence_score(0, c.get("citation_count", 0))
     fresh = _freshness_score(c.get("year"))
     rating = _rating_score(c.get("_papercopilot_rating", 0))
     status = _status_score(str(c.get("_status") or ""))
-    return (
-        0.50 * rel
-        + 0.20 * influence
-        + 0.15 * fresh
-        + 0.10 * rating
-        + 0.05 * status
-    )
+    return max(0.0, (
+        0.34 * rel
+        + 0.24 * specific
+        + 0.16 * semantic
+        + 0.12 * rrf
+        + 0.06 * influence
+        + 0.04 * fresh
+        + 0.03 * rating
+        + 0.01 * status
+        - _hub_penalty(c)
+    ))
 
 
 def _rationale_venue(c: dict[str, Any]) -> str:
@@ -826,6 +1279,10 @@ def _rationale_venue(c: dict[str, Any]) -> str:
     matched = c.get("_wiki_matched_terms")
     if matched:
         bits.append(f"wiki relevance {len(matched)} term(s)")
+    if c.get("_profile_matched_terms"):
+        bits.append(f"profile terms {', '.join(c['_profile_matched_terms'][:3])}")
+    if c.get("_semantic_match_score"):
+        bits.append("semantic profile match")
     if c.get("citation_count"):
         bits.append(f"{c['citation_count']} citations")
     if c.get("year"):
@@ -873,8 +1330,8 @@ def _gather_from_anchors(
         except Exception as exc:
             print(f"warn: S2 recommend failed for {anchor}: {exc}", file=sys.stderr)
             recs = []
-        for raw in recs:
-            norm = _normalize_candidate(raw, source="s2_recommend", anchor=anchor)
+        for rank, raw in enumerate(recs, start=1):
+            norm = _normalize_candidate(raw, source="s2_recommend", anchor=anchor, rank=rank)
             if norm:
                 candidates.append(norm)
 
@@ -887,8 +1344,8 @@ def _gather_from_anchors(
         except Exception as exc:
             print(f"warn: S2 references failed for {anchor}: {exc}", file=sys.stderr)
             refs = []
-        for raw in refs:
-            norm = _normalize_candidate(raw, source="s2_reference", anchor=anchor)
+        for rank, raw in enumerate(refs, start=1):
+            norm = _normalize_candidate(raw, source="s2_reference", anchor=anchor, rank=rank)
             if norm:
                 candidates.append(norm)
 
@@ -900,8 +1357,8 @@ def _gather_from_anchors(
         except Exception as exc:
             print(f"warn: S2 citations failed for {anchor}: {exc}", file=sys.stderr)
             cits = []
-        for raw in cits:
-            norm = _normalize_candidate(raw, source="s2_citation", anchor=anchor)
+        for rank, raw in enumerate(cits, start=1):
+            norm = _normalize_candidate(raw, source="s2_citation", anchor=anchor, rank=rank)
             if norm:
                 candidates.append(norm)
     return candidates
@@ -914,8 +1371,8 @@ def _gather_from_topic(topic: str, limit: int) -> list[dict[str, Any]]:
     except Exception as exc:
         print(f"warn: S2 search failed for {topic!r}: {exc}", file=sys.stderr)
         s2_results = []
-    for raw in s2_results:
-        norm = _normalize_candidate(raw, source="s2_search")
+    for rank, raw in enumerate(s2_results, start=1):
+        norm = _normalize_candidate(raw, source="s2_search", rank=rank)
         if norm:
             candidates.append(norm)
 
@@ -924,8 +1381,9 @@ def _gather_from_topic(topic: str, limit: int) -> list[dict[str, Any]]:
             dx_results = fetch_deepxiv.search(topic, limit=limit)
         except Exception:
             dx_results = []
-        for raw in dx_results or []:
-            norm = _normalize_candidate(raw, source="deepxiv_search")
+        for rank, raw in enumerate(dx_results or [], start=1):
+            score = raw.get("relevance_score", raw.get("score", 0.0)) if isinstance(raw, dict) else 0.0
+            norm = _normalize_candidate(raw, source="deepxiv_search", rank=rank, score=score)
             if norm:
                 candidates.append(norm)
     return candidates
@@ -951,8 +1409,8 @@ def _gather_from_venue(venue: str, year: int) -> list[dict[str, Any]]:
     """Fetch and normalize Paper Copilot records for a venue/year."""
     raw_records = _fetch_papercopilot(venue, year)
     candidates: list[dict[str, Any]] = []
-    for raw in raw_records:
-        norm = _normalize_papercopilot_record(raw, venue=venue, year=year)
+    for rank, raw in enumerate(raw_records, start=1):
+        norm = _normalize_papercopilot_record(raw, venue=venue, year=year, rank=rank)
         if norm:
             candidates.append(norm)
     return candidates
@@ -978,6 +1436,7 @@ def build_shortlist(
     positive_ids = positive_ids or []
     negative_ids = negative_ids or []
     anchor_mode = mode in ("anchors", "wiki")
+    profile = _build_wiki_profile(wiki_root) if wiki_root else _empty_wiki_profile(None)
 
     if mode == "anchors":
         if not positive_ids:
@@ -1025,8 +1484,7 @@ def build_shortlist(
             raise ValueError("from-venue requires --year")
         if not wiki_root:
             raise ValueError("from-venue requires --wiki-root for relevance scoring")
-        wiki_corpus = _extract_wiki_relevance_corpus(wiki_root)
-        if len(wiki_corpus.get("terms") or set()) < 20:
+        if profile.is_sparse:
             raise ValueError(
                 "Wiki too sparse to compute relevance for venue mode. "
                 "Ingest some papers or use topic mode."
@@ -1035,23 +1493,37 @@ def build_shortlist(
         if not candidates:
             raise ValueError(f"Paper Copilot returned no records for venue mode: {venue} {year}")
         seed_summary = {"mode": "venue", "venue": venue, "year": year}
-        # Pre-compute relevance so we can score/rank later.
-        for c in candidates:
-            rel, matched = _wiki_relevance_score(c, wiki_corpus)
-            c["_wiki_relevance"] = rel
-            c["_wiki_matched_terms"] = matched
     else:
         raise ValueError(f"unknown mode: {mode}")
 
     candidates = _dedupe(candidates)
     known = _wiki_known_arxiv_ids(wiki_root) if wiki_root else set()
-    known_titles = _wiki_known_title_keys(wiki_root) if wiki_root and mode == "venue" else set()
+    known_titles = profile.known_title_keys if wiki_root else set()
     before_wiki_filter_count = len(candidates)
     candidates = _filter_against_wiki(candidates, known, known_title_keys=known_titles)
     wiki_dedup_count = before_wiki_filter_count - len(candidates)
 
     if mode == "venue":
-        candidates = [c for c in candidates if float(c.get("_wiki_relevance", 0.0)) > 0]
+        semantic_matches = _venue_semantic_matches(profile)
+        _apply_venue_semantic_matches(candidates, semantic_matches)
+        _apply_profile_features(candidates, profile)
+        _apply_rank_channel(
+            candidates,
+            "venue_metadata",
+            lambda c: 0.60 * _rating_score(c.get("_papercopilot_rating", 0))
+            + 0.25 * _status_score(str(c.get("_status") or ""))
+            + 0.15 * _influence_score(0, c.get("citation_count", 0)),
+            reason="venue metadata",
+        )
+        _apply_rrf(candidates)
+        candidates = [
+            c for c in candidates
+            if max(
+                float(c.get("_wiki_relevance", 0.0)),
+                float(c.get("_profile_specific_score", 0.0)),
+                float(c.get("_semantic_match_score", 0.0)),
+            ) > 0
+        ]
         if not candidates:
             raise ValueError(
                 "No venue candidates matched the existing wiki relevance corpus after filtering existing wiki papers. "
@@ -1061,6 +1533,7 @@ def build_shortlist(
             c["_score"] = round(_score_venue(c), 4)
             c["_rationale"] = _rationale_venue(c)
     else:
+        _apply_profile_features(candidates, profile)
         for c in candidates:
             c["_score"] = round(_score(c, anchor_mode=anchor_mode), 4)
             c["_rationale"] = _rationale(c, anchor_mode=anchor_mode)
