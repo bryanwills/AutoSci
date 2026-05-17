@@ -1,12 +1,13 @@
 ---
-description: 预实验执行 — 读取 Pilot Spec YAML，撰写预实验代码，运行实验，返回结果。由 /ideate Phase 5 调用。不修改 wiki 页面，不判定 pass/fail。
+description: 预实验执行 — 读取 Pilot Spec YAML，撰写预实验代码，运行实验(运行前需向用户确认，申请用户手动检查)，返回结果。由 /ideate Phase 5 调用。不修改 wiki 页面，不判定 pass/fail。
 argument-hint: <idea-slug> [--env local|remote]
 ---
 
 # /exp-pilot-run
 
 > 执行由 Pilot Spec YAML 文件描述的预实验。
-> 从 `experiments/pilot/{slug}.yaml` 读取 spec，撰写预实验代码，运行实验，返回原始结果给调用者。
+> 从 `experiments/pilot/{slug}.yaml` 读取 spec，撰写预实验代码，运行实验(运行前需向用户确认，申请用户手动检查)，返回原始结果给调用者。
+> **不论是哪种运行模式，在准备好实验代码，准备部署运行前需向用户确认，申请用户手动检查代码、实验配置相关信息，确认无误后运行，否则需执行修改直到用户确认执行**
 > 支持 **local**（本地 GPU）和 **remote**（通过 `tools/remote.py` SSH 部署）两种模式。
 > 不修改任何 wiki 页面。不判定 pass/fail — 结果由 `/exp-pilot-eval` 评估。
 
@@ -89,6 +90,12 @@ argument-hint: <idea-slug> [--env local|remote]
    - 用极小规模运行（10 steps / 小 subset）
    - 验证：代码无 crash、数据加载正确、GPU 可用、loss 有限
    - 若 sanity 失败 → 修复代码，重试一次；仍然失败则报告错误并停止
+
+
+**Gate： 用户手动检查**
+
+> **注意**：在准备好实验代码，准备部署运行前需向用户确认，申请用户手动检查代码、实验配置相关信息，确认无误后运行，否则需执行修改直到用户确认执行
+
 
 **Phase 2: 运行**
 

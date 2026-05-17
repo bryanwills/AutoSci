@@ -1,12 +1,13 @@
 ---
-description: Pilot experiment execution — read Pilot Spec YAML, write pilot code, run experiment, return results. Called by /ideate Phase 5. Does NOT modify wiki pages or judge pass/fail.
+description: Pilot experiment execution — read Pilot Spec YAML, write pilot code, run experiment(Confirm with the user before operation and require the applicant to conduct manual inspection), return results. Called by /ideate Phase 5. Does NOT modify wiki pages or judge pass/fail.
 argument-hint: <idea-slug> [--env local|remote]
 ---
 
 # /exp-pilot-run
 
 > Execute a pilot experiment described by a Pilot Spec YAML file.
-> Reads the spec from `experiments/pilot/{slug}.yaml`, writes pilot code, runs the experiment, and returns raw results to the caller.
+> Reads the spec from `experiments/pilot/{slug}.yaml`, writes pilot code, runs the experiment(Confirm with the user before operation and require the applicant to conduct manual inspection), and returns raw results to the caller.
+>**No matter which operating mode is adopted, before the experimental code is ready for deployment and operation, confirmation shall be obtained from users. Users need to manually check relevant information including codes and experimental configurations. The operation can only be launched after confirmation. Otherwise, revisions shall be made repeatedly until users approve the execution.**
 > Supports **local** (direct GPU) and **remote** (SSH deployment via `tools/remote.py`) modes.
 > Does NOT modify any wiki pages. Does NOT judge pass/fail — results are evaluated by `/exp-pilot-eval`.
 
@@ -22,7 +23,6 @@ argument-hint: <idea-slug> [--env local|remote]
 - Pilot code: `experiments/pilot/code/{slug}/` (train.py, config.yaml, run.sh, requirements.txt)
 - Pilot results: `experiments/pilot/code/{slug}/results/seed_{N}.json`
 - Pilot log: `experiments/pilot/code/{slug}/pilot.log`
-- Polling log: `experiments/pilot/{slug}/check.md` (**real-time progress updates during monitoring**)
 - **PILOT_REPORT** (printed to terminal) — results table, run details, anomalies
 - Returns raw results and key metrics to caller
 - NO wiki page modifications
@@ -41,7 +41,6 @@ argument-hint: <idea-slug> [--env local|remote]
   - `experiments/pilot/code/{slug}/requirements.txt` — dependencies
   - `experiments/pilot/code/{slug}/results/seed_{N}.json` — result files
   - `experiments/pilot/code/{slug}/pilot.log` — run log
-- `experiments/pilot/{slug}/check.md` — polling progress log (updated during monitoring)
 
 ### Graph edges created
 - None. Pilot experiments do not create graph edges.
@@ -92,6 +91,12 @@ Possible reference paths for the preliminary experiment code:
    - Verify: no code crash, data loads correctly, GPU available, loss is finite
    - If sanity fails → fix code, retry once; if still failing, report error and stop
 
+
+**Gate: Manual Inspection by Users**
+
+> **Note**: Before preparing experimental codes for deployment and operation, confirm with users and apply for users to manually inspect relevant information including codes and experimental configurations. Proceed with operation only after confirmation; otherwise, make revisions until users give approval for execution.
+
+
 **Phase 2: Run**
 
 > **Pilot purpose reminder**: This is a **short, diagnostic run** — not a full experiment. The run should finish quickly (reduced steps). If it diverges or hangs beyond 2× estimated time, that itself is a useful signal. Report it; do not attempt rescue runs.
@@ -107,47 +112,16 @@ Possible reference paths for the preliminary experiment code:
    | Single A100 + medium dataset (ImageNet / GLUE) | 30 min – 2h |
    | Multi-GPU or large model fine-tuning (≥7B) | 1 – 4h |
 
-   Set polling interval to ~5% of estimated duration, clamped to [120s, 900s]:
-
-   | Estimated duration | Polling interval |
-   |--------------------|------------------|
-   | < 30 min | 120s (2 min) |
-   | 30 min – 2h | 300s (5 min) |
-   | 2h – 4h | 600s (10 min) |
-   | > 4h | 900s (15 min) |
 
 3. **Launch**:
    ```bash
    screen -dmS pilot-{slug} bash -c \
      "cd $(pwd) && bash experiments/pilot/code/{slug}/run.sh 2>&1 | tee experiments/pilot/code/{slug}/pilot.log"
    ```
-   - Notify user: "Pilot launched. Polling progress will be written to `experiments/pilot/{slug}/check.md`"
+   - Notify user: "Pilot launched."
 
 4. **Monitor until completion**:
-   - Initialize `experiments/pilot/{slug}/check.md` with header (timestamp, slug, estimated duration, polling interval)
-   - Poll the screen session and tail the log to track progress and detect anomalies:
-     ```bash
-     while screen -ls | grep -q "pilot-{slug}"; do
-       tail -5 experiments/pilot/code/{slug}/pilot.log
-       sleep {polling_interval_seconds}
-     done
-     ```
-   - **Anomaly detection** (check on each poll iteration):
-     - NaN loss: detect `loss: nan` or `nan` in metric output
-     - OOM: `CUDA out of memory` or `torch.cuda.OutOfMemoryError`
-     - Traceback: Python exception stacktrace
-     - Inf loss: `loss: inf` or `inf` in metric output
-     - Divergence: loss shows no convergence trend (continuous growth or oscillation)
-   - **If anomaly detected**: log the anomaly, continue monitoring (do NOT kill the process — let it either self-recover or crash, both are useful signals). Record the anomaly for the final report.
-   - **If session persists beyond 2× estimated runtime**: warn user but do not force-terminate — a hung pilot is itself a useful diagnostic signal.
-   - **Progress reporting** (append to `experiments/pilot/{slug}/check.md` on each poll, NOT to terminal):
-     ```
-     ## {timestamp}
-     - Step: {current_step} / {max_steps}
-     - Latest loss: {value}
-     - Anomalies: {none | NaN detected | OOM detected | ...}
-     - Estimated remaining: ~{N} min
-     ```
+   Enable **monitor** in the terminal to poll and monitor the pre-experiment processes
 
 #### Remote mode (`--env remote`)
 
@@ -178,29 +152,10 @@ Possible reference paths for the preliminary experiment code:
      --gpu {gpu_index} \
      --log-file "experiments/pilot/code/{slug}/pilot.log"
    ```
-   - Notify user: "Pilot launched (remote). Polling progress will be written to `experiments/pilot/{slug}/check.md`"
+   - Notify user: "Pilot launched (remote)."
 
 7. **Monitor until completion**:
-   - Initialize `experiments/pilot/{slug}/check.md` with header (timestamp, slug, estimated duration, polling interval, environment: remote)
-   - Poll the remote session and tail the log:
-     ```bash
-     while true; do
-       python3 tools/remote.py check --name "pilot-{slug}"
-       python3 tools/remote.py tail-log --name "pilot-{slug}" --lines 10
-       sleep {polling_interval_seconds}
-     done
-     ```
-   - `remote.py check` already performs anomaly detection (NaN, OOM, traceback, infinite loss) and reports `exit_reason` when the session ends.
-   - **If anomaly detected**: log the anomaly, continue monitoring. Record the anomaly for the final report.
-   - **If session persists beyond 2× estimated runtime**: warn user but do not force-terminate.
-   - **Progress reporting** (append to `experiments/pilot/{slug}/check.md` on each poll, NOT to terminal):
-     ```
-     ## {timestamp}
-     - Latest log: {tail output}
-     - Anomalies: {check output}
-     - Estimated remaining: ~{N} min
-     ```
-   - Exit the monitoring loop when `remote.py check` reports `alive == false` (session ended).
+   Enable **monitor** in the terminal to poll and monitor the pre-experiment processes
 
 **Phase 3: Collect & Report**
 

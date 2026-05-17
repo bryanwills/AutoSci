@@ -1,11 +1,12 @@
 ---
-description: Full experiment execution pipeline — prepare code → deploy → monitor → collect results, supporting three run modes
+description: Full experiment execution pipeline — prepare code → deploy(Confirm with the user before operation and ask the applicant to conduct manual inspection) → monitor → collect results, supporting three run modes
 argument-hint: <experiment-slug> [--review] [--collect] [--full] [--env local|remote]
 ---
 
 # /exp-run
 
 > Execute an experiment that has been planned in wiki/experiments/.
+> **No matter which operation mode it is, before preparing the experimental codes and deploying them for operation, confirmation shall be obtained from users. Users need to manually check relevant information such as codes and experimental configurations. The operation can only be launched after confirmation; otherwise, revisions shall be made repeatedly until users approve the execution.**
 > **Three run modes** for different scenarios:
 > - **Default (deploy)**: Phase 1-2 only — deploy and return immediately. Best for experiments that take hours or days.
 > - **`--collect`**: Phase 3-4 only — check whether a deployed experiment has finished; collect results if so (`--check` is an alias).
@@ -122,6 +123,11 @@ argument-hint: <experiment-slug> [--review] [--collect] [--full] [--env local|re
    - Run at minimal scale (1 epoch / 100 steps / small subset)
    - Verify: no code crash, data loads correctly, GPU available, loss decreases
    - If sanity fails → fix code, retry once; if still failing, report error and stop
+
+
+**Gate: Manual User Inspection**
+
+> **Note**: Before preparing experimental code for deployment and execution, confirm with users and request them to manually check relevant information including codes and experimental configurations. Proceed with operation only after confirmation; otherwise, make revisions repeatedly until users approve the execution.
 
 **Phase 2: Deploy**
 

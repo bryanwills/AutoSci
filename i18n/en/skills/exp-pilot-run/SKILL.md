@@ -1,12 +1,13 @@
 ---
-description: Pilot experiment execution — read Pilot Spec YAML, write pilot code, run experiment, return results. Called by /ideate Phase 5. Does NOT modify wiki pages or judge pass/fail.
+description: Pilot experiment execution — read Pilot Spec YAML, write pilot code, run experiment(Confirm with the user before operation and require the applicant to conduct manual inspection), return results. Called by /ideate Phase 5. Does NOT modify wiki pages or judge pass/fail.
 argument-hint: <idea-slug> [--env local|remote]
 ---
 
 # /exp-pilot-run
 
 > Execute a pilot experiment described by a Pilot Spec YAML file.
-> Reads the spec from `experiments/pilot/{slug}.yaml`, writes pilot code, runs the experiment, and returns raw results to the caller.
+> Reads the spec from `experiments/pilot/{slug}.yaml`, writes pilot code, runs the experiment(Confirm with the user before operation and require the applicant to conduct manual inspection), and returns raw results to the caller.
+>**No matter which operating mode is adopted, before the experimental code is ready for deployment and operation, confirmation shall be obtained from users. Users need to manually check relevant information including codes and experimental configurations. The operation can only be launched after confirmation. Otherwise, revisions shall be made repeatedly until users approve the execution.**
 > Supports **local** (direct GPU) and **remote** (SSH deployment via `tools/remote.py`) modes.
 > Does NOT modify any wiki pages. Does NOT judge pass/fail — results are evaluated by `/exp-pilot-eval`.
 
@@ -89,6 +90,12 @@ Possible reference paths for the preliminary experiment code:
    - Run at minimal scale (10 steps / small subset)
    - Verify: no code crash, data loads correctly, GPU available, loss is finite
    - If sanity fails → fix code, retry once; if still failing, report error and stop
+
+
+**Gate: Manual Inspection by Users**
+
+> **Note**: Before preparing experimental codes for deployment and operation, confirm with users and apply for users to manually inspect relevant information including codes and experimental configurations. Proceed with operation only after confirmation; otherwise, make revisions until users give approval for execution.
+
 
 **Phase 2: Run**
 

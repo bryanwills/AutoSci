@@ -1,11 +1,12 @@
 ---
-description: 实验执行全流程：准备代码 → 部署运行 → 监控状态 → 收集结果，支持三种运行模式
+description: 实验执行全流程：准备代码 → 部署运行(运行前需向用户确认，申请用户手动检查) → 监控状态 → 收集结果，支持三种运行模式
 argument-hint: <experiment-slug> [--review] [--collect] [--full] [--env local|remote]
 ---
 
 # /exp-run
 
 > 执行 wiki/experiments/ 中已规划的实验。
+> **不论是哪种运行模式，在准备好实验代码，准备部署运行前需向用户确认，申请用户手动检查代码、实验配置相关信息，确认无误后运行，否则需执行修改直到用户确认执行**
 > **三种运行模式**，适应不同场景：
 > - **默认（deploy）**：仅 Phase 1-2，部署后立即返回，适合需要数小时/天的实验。
 > - **`--collect`**：仅 Phase 3-4，检查已部署实验是否完成，完成则收集结果（`--check` 为 alias）。
@@ -122,6 +123,12 @@ argument-hint: <experiment-slug> [--review] [--collect] [--full] [--env local|re
    - 用极小规模运行（1 epoch / 100 steps / 小 subset）
    - 验证：代码无 crash、数据加载正确、GPU 可用、loss 下降
    - 若 sanity 失败 → 修复代码，重试一次；仍然失败则报告错误并停止
+
+
+**Gate： 用户手动检查**
+
+> **注意**：在准备好实验代码，准备部署运行前需向用户确认，申请用户手动检查代码、实验配置相关信息，确认无误后运行，否则需执行修改直到用户确认执行
+
 
 **Phase 2: 部署（Deploy）**
 
