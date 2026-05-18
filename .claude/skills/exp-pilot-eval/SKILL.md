@@ -78,10 +78,10 @@ If verdict == `fail`:
   - The `[pilot]` prefix distinguishes pilot failures from `[filter]` eliminations (Phase 3) and post-experiment failures from `/exp-eval`
 - Transition status to `failed`:
   ```bash
-  python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md status "failed"
-  python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md failure_reason "[pilot] <specific failure>"
-  python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md date_resolved "$(date +%Y-%m-%d)"
+  python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md pilot_result "fail — <specific failure>"
+  python3 tools/research_wiki.py transition wiki/ideas/{slug}.md --to failed --reason "[pilot] <specific failure description>"
   ```
+  - `transition` validates lifecycle rules (e.g. refuses to downgrade `validated` → `failed`) and auto-sets `failure_reason` and `date_resolved`.
 - Example failure_reason: `"[pilot] loss diverged after 50 steps (reached 1e5 vs baseline 0.3)"`
 
 If verdict == `inconclusive`:
@@ -149,7 +149,8 @@ If verdict == `inconclusive`:
 - None
 
 ### Tools (via Bash)
-- `python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md <field> "<value>"` — update idea fields
+- `python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md <field> "<value>"` — update idea fields (e.g. pilot_result)
+- `python3 tools/research_wiki.py transition wiki/ideas/{slug}.md --to <status> [--reason "..."]` — transition idea lifecycle status
 - `python3 tools/research_wiki.py log wiki/ "<message>"` — append log
 
 ### Claude Code Native

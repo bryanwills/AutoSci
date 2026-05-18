@@ -142,7 +142,7 @@ mcp__llm-review__chat:
 #### 路径 A: SUPPORTED（实验支持 idea 的 hypothesis）
 
 1. **更新 idea**：
-   - 若 idea 只覆盖单一 hypothesis 且本实验是 validation 块，把 idea 推进到 `validated`：
+   - 若 idea 只覆盖单一 hypothesis 且本实验是 主实验 块，把 idea 推进到 `validated`：
      ```bash
      python3 tools/research_wiki.py transition wiki/ideas/{linked-idea}.md --to validated
      ```

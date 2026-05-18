@@ -78,10 +78,10 @@ argument-hint: <idea-slug> [--auto]
   - `[pilot]` 前缀区分于 Phase 3 的 `[filter]` 淘汰和 `/exp-eval` 的实验后失败
 - 将 status 转为 `failed`：
   ```bash
-  python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md status "failed"
-  python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md failure_reason "[pilot] <具体失败>"
-  python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md date_resolved "$(date +%Y-%m-%d)"
+  python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md pilot_result "fail — <具体失败>"
+  python3 tools/research_wiki.py transition wiki/ideas/{slug}.md --to failed --reason "[pilot] <具体失败描述>"
   ```
+  - `transition` 会校验生命周期规则（如拒绝从 `validated` 降级到 `failed`）并自动设置 `failure_reason` 和 `date_resolved`。
 - failure_reason 示例：`"[pilot] loss diverged after 50 steps (reached 1e5 vs baseline 0.3)"`
 
 若 verdict == `inconclusive`：
@@ -149,7 +149,8 @@ argument-hint: <idea-slug> [--auto]
 - 无
 
 ### Tools (via Bash)
-- `python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md <field> "<value>"` — 更新 idea 字段
+- `python3 tools/research_wiki.py set-meta wiki/ideas/{slug}.md <field> "<value>"` — 更新 idea 字段（如 pilot_result）
+- `python3 tools/research_wiki.py transition wiki/ideas/{slug}.md --to <status> [--reason "..."]` — 转换 idea 生命周期状态
 - `python3 tools/research_wiki.py log wiki/ "<message>"` — 追加日志
 
 ### Claude Code Native

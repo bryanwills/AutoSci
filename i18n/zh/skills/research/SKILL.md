@@ -331,6 +331,9 @@ Args: "{experiment_slug} --collect"
   python3 tools/research_wiki.py log wiki/ \
     "research | stage3c | collected {N} experiments | pipeline: {slug}"
   ```
+
+- 更新linked idea 的 status: in_progress-> tested
+
 - 继续进入 Stage 4
 
 ### Stage 4: Verdict & Iteration
@@ -346,11 +349,11 @@ Args: "{experiment_slug}" --auto
 1. 读取主要 linked idea（及任何辅助 idea）的最新状态
 2. 判断是否需要迭代：
    - **充分**（主要 linked idea 已切换为 `validated`，或 ≥1 个支持性实验 `outcome=succeeded`）→ 进入 Gate 2
-   - **不足**（idea 仍为 `proposed` 且所有关联实验都是 `failed`/`inconclusive`，或 idea 为 `invalidated`）→ 进入迭代
+   - **不足**（idea 仍为 `proposed`或`in_progress`或`tested` 且所有关联实验都是 `failed`/`inconclusive`，或 idea 为 `failed`）→ 进入迭代
 
 **迭代路径**（不足时，最多 1 次重试）：
 1. 分析失败原因
-2. 调用 `/refine` 改进 experiment plan：
+2. 对相应的需要改进的实验块调用 `/refine` 改进 experiment plan：
    ```
    Skill: refine
    Args: "{experiment_plan_slug}" --max-rounds 2 --focus evidence

@@ -142,7 +142,7 @@ Record Review LLM's verdict.
 #### Path A: SUPPORTED (experiment supports the idea's hypothesis)
 
 1. **Update idea**:
-   - If the idea covers a single hypothesis and this experiment is the validation block, transition the idea to `validated`:
+   - If the idea covers a single hypothesis and this experiment is the main experiment block, transition the idea to `validated`:
      ```bash
      python3 tools/research_wiki.py transition wiki/ideas/{linked-idea}.md --to validated
      ```
