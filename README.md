@@ -179,7 +179,7 @@ Full per-item rationale and lint metrics across the migration: [`docs/bio-adapta
 | 图 8 | daily-arxiv DeepSeek 排序 + digest | [`assets/demo-08-digest.png`](assets/demo-08-digest.png) |
 | 图 9 | Obsidian Canvas 策展知识地图 | [`assets/demo-09-canvas.png`](assets/demo-09-canvas.png) |
 
-bio fork 入口文档：[`docs/bio-adaptation/README.zh.md`](docs/bio-adaptation/README.zh.md)。同一 idea graph 端到端产出的 ICLR 论文：[`paper/main.tex`](paper/main.tex)。
+bio fork 入口文档（双语 EN/中）：[`docs/bio-adaptation/README.md`](docs/bio-adaptation/README.md)。同一 idea graph 端到端产出的 ICLR 论文：[`paper/main.tex`](paper/main.tex)。
 
 ### Try the demo locally
 
