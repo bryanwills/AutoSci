@@ -40,3 +40,10 @@ wiki/canvases/
 # Skill checkpoints (local state for /init, /daily-arxiv, /research, etc.)
 .checkpoints/
 wiki/.checkpoints/
+
+# Daily-arxiv / demo run outputs (regenerated every run; the tracked pinned
+# references are examples/output/bio-*.md and examples/output/digest-sample.md)
+examples/output/context.json
+examples/output/decisions.json
+examples/output/digest.json
+examples/output/digest.md
