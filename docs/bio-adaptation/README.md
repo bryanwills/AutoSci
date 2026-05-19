@@ -77,14 +77,7 @@ This fork applies 12 schema + skill + tooling adaptations on top of upstream, **
 | **Lint** | `tools/lint.py` | **+ `tools/lint_bio.py`** (5 bio-specific cross-checks) |
 | **Domain slugs** | free text | **15 canonical slugs** (`bioinformatics` · `comp-drug-discovery` · `protein-engineering` ...) |
 
-### Live snapshot
-
-- **Wiki entities**: 11 papers · 25 concepts · 22 ideas (11 validated / 2 failed / 9 other) · 8 experiments (all in-silico) · 1 dataset · 1 topic · 16 people
-- **Knowledge graph**: 84 edges, including 7 live bio relations (4 carrying typed metadata)
-- **Lint status**: base `0🔴 / 0🟡 / 11🔵` (info) + bio `0🔴 / 0🟡 / 0🔵`
-- **End-to-end paper**: [`paper/main.tex`](../../paper/main.tex) (ICLR 8p / 7962 words / 4 TikZ-inline figures / 4 tables / auto-derived from the same idea graph)
-
-Full changelog: [`CHANGELOG.zh.md`](CHANGELOG.zh.md) (39 pilot entries). Full design + migration: [`REPORT.zh.md`](REPORT.zh.md) / [`REPORT.en.md`](REPORT.en.md).
+Full changelog: [`CHANGELOG.zh.md`](CHANGELOG.zh.md). Full design + migration: [`REPORT.zh.md`](REPORT.zh.md) / [`REPORT.en.md`](REPORT.en.md). End-to-end paper produced from the same idea graph: [`paper/main.tex`](../../paper/main.tex).
 
 ## Quick Start
 
@@ -300,22 +293,6 @@ Each concept picks one scale; **mixing is prohibited** (lint detects). The bio c
 | `tools/lint.py` | base 5 checks | unchanged |
 | `tools/lint_bio.py` | _(new)_ | 5 bio cross-checks |
 
-## Compatibility, Limits, Roadmap
-
-**Backwards compatible**: all new fields are optional with defaults. An upstream wiki can pull this fork without any migration. Existing CS experiment / idea / concept pages continue to lint cleanly.
-
-**Current limits**:
-- 7 of 14 bio edge types are live (7 bio relations among 80 total edges); the remaining 7 await usage scenarios
-- 5 of 14 edge types have closed-set metadata schemas; the other 9 accept arbitrary metadata for now
-- `lint_bio.py` cellosaurus `CVCL_[A-Z0-9]{4}` format check is pending
-- 8 experiments are all `status: planned`; paper §4 numbers carry [SIMULATED] markers, to be replaced after GPU runs
-
-**In progress**:
-- Add cellosaurus format check
-- Add 3 live bio relation edges (lenalidomide–CRBN / thalidomide–CRBN / pomalidomide–CRBN `binds`)
-- `/ingest` PROTAC-DB / DegronMD / DeepTernary into the wiki to drop the 7 [UNCONFIRMED] paper citations to 0
-- v2 paper with real GPU experiments replacing the [SIMULATED] numbers
-
 ---
 
 # <a id="chinese"></a>中文
@@ -352,14 +329,7 @@ upstream ΩmegaWiki 默认是 CS 形态——`arXiv` 是论文主 ID、单一 da
 | **Lint** | `tools/lint.py` | **+ `tools/lint_bio.py`**（5 项 bio 专用 cross-check）|
 | **领域 slug** | 自由文本 | **15 个受控词表**（`bioinformatics` · `comp-drug-discovery` · `protein-engineering` ...）|
 
-### 当前 live 数据
-
-- **wiki 实体**：11 papers · 25 concepts · 22 ideas（11 validated / 2 failed / 9 其他）· 8 experiments（全 in_silico）· 1 dataset · 1 topic · 16 people
-- **knowledge graph**：84 条边，含 7 条 live bio relation（4 条带 typed metadata）
-- **lint 状态**：base `0🔴 / 0🟡 / 11🔵`（info）+ bio `0🔴 / 0🟡 / 0🔵`
-- **端到端论文**：[`paper/main.tex`](../../paper/main.tex)（ICLR 8p / 7962 words / 4 figs TikZ inline / 4 tables / 由同一 idea graph 自动派生）
-
-完整 changelog: [`CHANGELOG.zh.md`](CHANGELOG.zh.md)（39 条 pilot entry）。完整设计文档与迁移表: [`REPORT.zh.md`](REPORT.zh.md) / [`REPORT.en.md`](REPORT.en.md)。
+完整 changelog: [`CHANGELOG.zh.md`](CHANGELOG.zh.md)。完整设计文档与迁移表: [`REPORT.zh.md`](REPORT.zh.md) / [`REPORT.en.md`](REPORT.en.md)。同一 idea graph 端到端产出的论文: [`paper/main.tex`](../../paper/main.tex)。
 
 ## Quick Start
 
@@ -468,36 +438,7 @@ maturity: <one of>
 
 每个 concept 自选 scale，**禁止混用**（lint 检测）。bio 概念的认知演进维度（`hypothesis → contested → well-supported → consensus` 或 `→ falsified`）跟 CS 概念的工程成熟度（`emerging → active → stable → deprecated`）是两套正交的轴。
 
-## 兼容性 / 限制 / 下一步
-
-**向下兼容**：所有新字段都是 optional + 有 default。upstream wiki 直接 pull 本 fork 不需要任何迁移。已有 CS 实验页 / idea 页 / concept 页都能继续 lint pass。
-
-**当前限制**：
-- 7 / 14 类生物关系边已 live（80 总边中 7 条 bio）；剩 7 类（degrades · phosphorylates · sumoylates · acetylates · methylates · glycosylates · wet_lab_validated）还在等使用场景
-- 5 / 14 类边类型的 metadata schema 是 closed-set；其余 9 类暂时允许任意 metadata
-- `lint_bio.py` 的 cellosaurus `CVCL_[A-Z0-9]{4}` 格式 check 待补
-- 8 个实验全部 `status: planned`，paper §4 现有结果都带 [SIMULATED] 标记，等 GPU 跑通后替换
-
-**正在做**：
-- 补 cellosaurus 格式 check
-- 加 3 条 live 生物关系边（lenalidomide-CRBN binds / thalidomide-CRBN binds / pomalidomide-CRBN binds）
-- 给 PROTAC-DB / DegronMD / DeepTernary 等关键论文做 `/ingest`，把 `paper/references.bib` 的 7 个 [UNCONFIRMED] 引用降到 0
-- v2 论文跑真实 GPU 实验替换 paper §4 现有的 [SIMULATED] 数字
-
 ---
-
-## Citing this fork / 引用本 fork
-
-If you use the bio fork's schema / lint / typed-metadata mechanisms in your work, please cite:
-
-```bibtex
-@misc{omegawiki-bio-2026,
-  author = {Di, Chenyang and DAIR Lab},
-  title  = {ΩmegaWiki / bio-adaptation: bioinformatics-shaped fork of LLM-Wiki},
-  year   = {2026},
-  url    = {https://github.com/skyllwt/OmegaWiki/tree/dev-dcy-biology}
-}
-```
 
 ## Acknowledgments / 致谢
 
