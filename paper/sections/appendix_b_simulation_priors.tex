@@ -13,22 +13,23 @@ Table~\ref{tab:appb-priors} reports the prior mean $\mu_{\text{prior}}$, prior s
 
 \begin{table}[h]
 \centering
-\caption{Simulation prior distributions per experiment. The ``$\hat x$ vs threshold'' column is the simulated value's distance from its success threshold in prior-$\sigma$ units. The methylation track failure (row Exp~7 methyl) is engineered by setting $\mu_{\text{prior}}$ below the threshold; the simulated value is essentially at $\mu_{\text{prior}}$. The other simulated values are within $\pm 1\sigma$ of their prior means, none in the upper tail. $\simmark$}
+\caption{Simulation prior distributions per experiment, with the published variance-band anchor for each prior $\sigma_{\text{prior}}$ (rightmost column, per Stanford Agentic Reviewer revision). The ``$\hat x$ vs $\theta$'' column reports the simulated value's distance from its success threshold in prior-$\sigma$ units. The methylation-track failure (row Exp~7 methyl) is engineered by setting $\mu_{\text{prior}}$ below the threshold; the simulated value is essentially at $\mu_{\text{prior}}$. None of the other simulated values sit in the upper tail of their prior (e.g., the headline Exp~3 is at $+0.85\sigma$ from prior $\mu$, not in the $> 2\sigma$ tail). $\simmark$}
 \label{tab:appb-priors}
-\begin{tabular}{llccccc}
+\footnotesize
+\begin{tabular}{p{0.13\linewidth}p{0.14\linewidth}cccccp{0.21\linewidth}}
 \toprule
-Experiment & Metric & $\mu_{\text{prior}}$ & $\sigma_{\text{prior}}$ & $\theta$ (success) & $\hat x$ (simulated) & $(\hat x{-}\theta)/\sigma_{\text{prior}}$ \\
+Experiment & Metric & $\mu_{\text{prior}}$ & $\sigma_{\text{prior}}$ & $\theta$ & $\hat x$ & $(\hat x{-}\theta)/\sigma$ & Anchor ref. for $\sigma_{\text{prior}}$ \\
 \midrule
-Exp~1 (baseline reproduction) & MAD vs published $\downarrow$ & $0.025$ & $0.010$ & $< 0.050$ & $0.023$ & $-2.7\sigma$ (pass) \\
-Exp~2 (Phase-0 calibration) & probe-set fraction cleared & $0.60$ & $0.12$ & $\geq 0.30$ & $0.70$ & $+3.3\sigma$ above threshold \\
-Exp~3 (phospho-PROTAC, HEADLINE) & $\auclift$ vs PTM-blind & $0.07$ & $0.02$ & $\geq 0.05$ & $0.087$ & $+1.85\sigma$ above threshold \\
-Exp~4 (calibration ablation) & AUC drop when uncalibrated & $0.045$ & $0.010$ & $\geq 0.030$ & $0.041$ & $+1.1\sigma$ above threshold \\
-Exp~5 (route ablation) & Pearson $r$ Boltz-2 vs MD & $0.70$ & $0.10$ & $\geq 0.70$ & $0.74$ & $+0.4\sigma$ above threshold \\
-Exp~6 (scorer ablation) & $|\auclift|$ DeepTernary vs PROTAC-STAN & $0.030$ & $0.015$ & $< 0.050$ & $0.021$ & $-1.9\sigma$ (pass) \\
-Exp~7 phospho track & $\auclift$ vs PTM-blind & $0.085$ & $0.020$ & $\geq 0.030$ & $0.087$ & $+2.85\sigma$ above threshold \\
-Exp~7 mono-Ub track & $\auclift$ vs PTM-blind & $0.040$ & $0.020$ & $\geq 0.030$ (marginal $0.020$) & $0.034$ & $+0.2\sigma$ above marginal\\
-Exp~7 methyl track & $\auclift$ vs PTM-blind & $\mathbf{0.020}$ & $0.020$ & $\mathbf{\geq 0.030}$ & $\mathbf{0.021}$ & $\mathbf{-0.45\sigma}$ (\textbf{FAILS by design}) \\
-Exp~8 mutant-isoform & $|\Delta\auclift|$ vs phospho & $0.060$ & $0.020$ & $\geq 0.050$ & $0.058$ & $+0.4\sigma$ above threshold \\
+Exp~1 baseline reproduction & MAD vs published $\downarrow$ & $0.025$ & $0.010$ & $< 0.050$ & $0.023$ & $-2.7\sigma$ pass & DeepTernary per-tuple reproducibility band~\cite{deepternary-2025} \\
+Exp~2 Phase-0 calibration & probe-set fraction cleared & $0.60$ & $0.12$ & $\geq 0.30$ & $0.70$ & $+3.3\sigma$ above $\theta$ & UbiBrowser 5-fold AUROC CI~\cite{ubibrowser-2017} \\
+Exp~3 phospho headline & $\auclift$ vs PTM-blind & $0.07$ & $0.02$ & $\geq 0.05$ & $0.087$ & $+1.85\sigma$ above $\theta$ & AF3 vs AF-Multimer DockQ lift variance~\cite{af3-2024} \\
+Exp~4 calibration ablation & AUC drop, uncal & $0.045$ & $0.010$ & $\geq 0.030$ & $0.041$ & $+1.1\sigma$ above $\theta$ & AF3 cross-distillation ablation~\cite{af3-2024} \\
+Exp~5 route ablation & Pearson $r$ B2 vs MD & $0.70$ & $0.10$ & $\geq 0.70$ & $0.74$ & $+0.4\sigma$ above $\theta$ & AF3-phospho vs AF2 correlation~\cite{bouvier-2025} \\
+Exp~6 scorer ablation & $|\auclift|$ DT vs PS & $0.030$ & $0.015$ & $< 0.050$ & $0.021$ & $-1.9\sigma$ pass & Cross-scorer variance: DT~\cite{deepternary-2025} + PS~\cite{protac-stan-2025} \\
+Exp~7 phospho track & $\auclift$ vs PTM-blind & $0.085$ & $0.020$ & $\geq 0.030$ & $0.087$ & $+2.85\sigma$ above $\theta$ & DeepTernary seed-to-seed variance~\cite{deepternary-2025} \\
+Exp~7 mono-Ub track & $\auclift$ vs PTM-blind & $0.040$ & $0.020$ & $\geq 0.030$ & $0.034$ & $+0.2\sigma$ above $\theta$ & DeepTernary cross-PTM band~\cite{deepternary-2025} \\
+Exp~7 methyl track & $\auclift$ vs PTM-blind & $\mathbf{0.020}$ & $0.020$ & $\mathbf{\geq 0.030}$ & $\mathbf{0.021}$ & $\mathbf{-0.45\sigma}$ \textbf{FAIL} & AF3-phospho sub-\AA{} limit~\cite{bouvier-2025,af3-2024} \\
+Exp~8 mutant-isoform & $|\Delta\auclift|$ vs phospho & $0.060$ & $0.020$ & $\geq 0.050$ & $0.058$ & $+0.4\sigma$ above $\theta$ & UbiBrowser C2$\to$C3 generalization gap~\cite{ubibrowser-2017} \\
 \bottomrule
 \end{tabular}
 \end{table}

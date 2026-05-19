@@ -10,7 +10,7 @@ We bridge this gap with a deliberately conservative method. We introduce $\dpt$,
 \paragraph{Contributions.} We make three contributions:
 \begin{itemize}[leftmargin=*,itemsep=2pt,topsep=2pt]
 \item The $\dpt$ score: a noise-floor-calibrated PTM-selectivity axis that drops in on top of any existing ternary-complex scorer without retraining.
-\item A Phase-0 fail-fast gate: the per-POI null distribution determines, before any held-out evaluation, whether the chosen scorer can resolve the PTM-perturbation magnitude of interest.
+\item A Phase-0 fail-fast gate (named by analogy to clinical-trial Phase-0 micro-dose studies: a small pre-screening pass executed \emph{before} any held-out evaluation). The per-POI null distribution determines whether the chosen scorer can resolve the PTM-perturbation magnitude of interest; if not, the entire pipeline fails fast on the calibration step rather than after expensive ranking experiments.
 \item A pre-registered multi-track benchmark: four mechanistically distinct PTM/mutation tracks reported on independent held-out sets, with separation-of-tracks evidence against pooling and a deliberate negative result on methylation (full numbers in Results preview below) that bounds the headline scope honestly.
 \end{itemize}
 
