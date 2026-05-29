@@ -44,8 +44,8 @@ fields:
   # Topic curation — what papers / concepts anchor this research area.
   topics.key_papers:        { writers: [ingest, init, edit] }
 
-  # Concept taxonomy — which topic this concept belongs to.
-  concepts.parent_topic:    { writers: [ingest, init, edit] }
+  # Concept taxonomy — which topics this concept belongs to.
+  concepts.parent_topics:   { writers: [ingest, init, edit] }
 
   # Idea lifecycle and judgement scores.
   ideas.status:             { writers: [ideate, exp-eval, exp-pilot-eval, refine] }
@@ -63,6 +63,11 @@ fields:
   experiments.run_log:      { writers: [exp-run, exp-status] }
   experiments.remote:       { writers: [exp-run, exp-status] }
   experiments.evaluates_methods: { writers: [exp-design, edit] }
+
+  # Active research memory — manuscript / review lifecycle.
+  manuscripts.status:        { writers: [paper-plan, paper-draft, refine, rebuttal, decision, edit] }
+  reviews.feedback_type:     { writers: [review, rebuttal, decision, edit] }
+  reviews.resolution_status: { writers: [refine, rebuttal, decision, edit] }
 
 edges:
 
@@ -82,6 +87,18 @@ edges:
   uses_concept:             [ingest]
   extends_concept:          [ingest]
   critiques_concept:        [ingest]
+
+  # Paper-method / paper-foundation semantic — only /ingest produces these.
+  proposes_method:          [ingest]
+  applies_method:           [ingest]
+  extends_method:           [ingest]
+  contributes_to_foundation: [ingest]
+
+  # Concept-concept typed relations — symmetric, only /ingest produces these.
+  shares_mechanism_with:       [ingest]
+  shares_assumption_with:      [ingest]
+  related_problem_formulation: [ingest]
+  contrasts_with_concept:      [ingest]
 
   # Workflow edges — multiple skills can produce these. The endpoints are
   # broad ('*' on both ends in edges.yaml), so a single edge type can serve

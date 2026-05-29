@@ -51,8 +51,9 @@ CANVAS_COLOR_MAP = {
     "ideas": "3",         # orange
     "experiments": "1",   # red
     "methods": "6",       # purple
-    "Summary": "5",       # green
     "foundations": "2",   # yellow
+    "manuscripts": "6",   # purple
+    "reviews": "2",       # yellow
 }
 
 # Node dimensions for Canvas

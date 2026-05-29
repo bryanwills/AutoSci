@@ -247,34 +247,24 @@ def check_field_values(wiki_dir: Path, pages: dict[str, Path]) -> list[LintIssue
         rel = str(fpath.relative_to(wiki_dir))
         page_type = fpath.parent.name
 
-        # Check enum fields
-        enum_checks = {
-            "papers": [("importance", "papers.importance")],
-            "concepts": [("maturity", "concepts.maturity")],
-            "ideas": [("status", "ideas.status"), ("priority", "ideas.priority")],
-            "experiments": [("status", "experiments.status"), ("outcome", "experiments.outcome")],
-            "methods": [("type", "methods.type")],
-            "foundations": [("status", "foundations.status")],
-        }
-
-        for field, valid_key in enum_checks.get(page_type, []):
-            val = extract_frontmatter_value(content, field)
-            if val is not None and val not in VALID_VALUES[valid_key]:
+        # Validate enum + int-range fields against the schema. VALID_VALUES is
+        # derived from entities.yaml (enums AND int-range fields both populate
+        # it via loader._valid_values_for), so any new enum/range field is
+        # covered here with no code change — replaces the old hardcoded
+        # enum_checks dict and novelty_score special-case.
+        ent = ENTITIES.get(page_type)
+        if not ent:
+            continue
+        for fname in ent['fields']:
+            valid_key = f"{page_type}.{fname}"
+            if valid_key not in VALID_VALUES:
+                continue
+            val = extract_frontmatter_value(content, fname)
+            if val is None:
+                continue
+            if val not in VALID_VALUES[valid_key]:
                 issues.append(LintIssue("🔴", "invalid-value", rel,
-                                        f"{field}={val!r} not in {VALID_VALUES[valid_key]}"))
-
-        # Idea novelty_score range check (1-5)
-        if page_type == "ideas":
-            val = extract_frontmatter_value(content, "novelty_score")
-            if val is not None and val != "":
-                try:
-                    score = int(val)
-                    if not (1 <= score <= 5):
-                        issues.append(LintIssue("🔴", "invalid-value", rel,
-                                                f"novelty_score={score} out of range [1, 5]"))
-                except ValueError:
-                    issues.append(LintIssue("🔴", "invalid-value", rel,
-                                            f"novelty_score={val!r} is not an integer"))
+                                        f"{fname}={val!r} not in {VALID_VALUES[valid_key]}"))
 
     return issues
 

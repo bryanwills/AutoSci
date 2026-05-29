@@ -7,10 +7,11 @@
 // Future-proofing: if a new entity type is ever added (e.g. `protocols`),
 // extend it here in one place and all views pick it up automatically.
 
-// Canonical directory names, exact case (note: "Summary" is capitalized).
+// Canonical directory names, exact case. Mirrors runtime/schema/entities.yaml.
 export const ENTITY_DIRS = Object.freeze([
   "papers", "concepts", "topics", "people",
-  "ideas", "experiments", "methods", "Summary", "foundations",
+  "ideas", "experiments", "methods", "foundations",
+  "manuscripts", "reviews",
 ]);
 
 // Set form for fast `has()` checks (router uses this).
@@ -21,7 +22,7 @@ export const VALID_TYPES = new Set(ENTITY_DIRS);
 // are the most-referenced surfaces; foundations is terminal.
 export const TYPE_PRECEDENCE = Object.freeze([
   "papers", "concepts", "topics", "methods", "people",
-  "ideas", "experiments", "Summary", "foundations",
+  "ideas", "experiments", "foundations", "manuscripts", "reviews",
 ]);
 
 // Human-readable display labels for the topnav, breadcrumb, and cards.
@@ -33,8 +34,9 @@ export const ENTITY_LABEL = Object.freeze({
   ideas: "Ideas",
   experiments: "Experiments",
   methods: "Methods",
-  Summary: "Summary",
   foundations: "Foundations",
+  manuscripts: "Manuscripts",
+  reviews: "Reviews",
 });
 
 // Edge-workflow color palette (used by Graph view to color edges by their
@@ -67,16 +69,38 @@ export const EDGE_CATEGORY_GROUPS = Object.freeze({
     "introduces_concept", "uses_concept",
     "extends_concept", "critiques_concept",
     "fm_concepts_key_papers", "fm_concepts_related_concepts",
-    "fm_concepts_linked_ideas", "fm_concepts_parent_topic",
+    "fm_concepts_linked_ideas", "fm_concepts_parent_topics",
+  ],
+  "Paper ↔ Method": [
+    "proposes_method", "applies_method", "extends_method",
   ],
   "Method genealogy": [
     "fm_methods_source_papers", "fm_methods_parent_methods",
     "fm_methods_child_methods", "fm_methods_realizes_concepts",
   ],
-  "Topics & People": [
+  "Foundation grounding": [
+    "fm_concepts_grounded_in", "fm_methods_grounded_in",
+    "contributes_to_foundation",
+  ],
+  "Topic membership": [
     "fm_topics_key_papers", "fm_topics_key_people",
-    "fm_topics_related_topics", "fm_topics_linked_ideas",
-    "fm_Summary_key_topics",
+    "fm_topics_key_foundations", "fm_topics_key_concepts",
+    "fm_topics_key_methods", "fm_topics_related_topics",
+    "fm_topics_parent_topics", "fm_topics_linked_ideas",
+    "fm_papers_parent_topics", "fm_foundations_parent_topics",
+    "fm_concepts_parent_topics", "fm_methods_parent_topics",
+    "fm_people_parent_topics",
+  ],
+  "People contributions": [
+    "fm_people_key_papers", "fm_people_contributed_methods",
+    "fm_people_contributed_foundations",
+  ],
+  "Concept relations": [
+    "shares_mechanism_with", "shares_assumption_with",
+    "related_problem_formulation", "contrasts_with_concept",
+  ],
+  "Active research": [
+    "fm_reviews_linked_manuscript",
   ],
   "Workflow (ideas / experiments)": [
     "fm_experiments_linked_idea", "fm_experiments_evaluates_methods",
@@ -91,13 +115,16 @@ export const EDGE_CATEGORY_GROUPS = Object.freeze({
 // clicking one TOGGLES that category in the visible set.
 export const EDGE_PRESETS = Object.freeze({
   "Citations":      ["Citations"],
-  "Methods":        ["Method genealogy", "Paper ↔ Concept"],
+  "Methods":        ["Method genealogy", "Paper ↔ Method", "Paper ↔ Concept"],
   "Ideas":          ["Workflow (ideas / experiments)"],
-  "People":         ["Topics & People"],
-  "Concepts":       ["Paper ↔ Concept"],
+  "People":         ["Topic membership", "People contributions"],
+  "Concepts":       ["Paper ↔ Concept", "Concept relations"],
+  "Foundations":    ["Foundation grounding"],
+  "Active":         ["Active research"],
   "All":            ["Citations", "Paper relations", "Paper ↔ Concept",
-                     "Method genealogy", "Topics & People",
-                     "Workflow (ideas / experiments)"],
+                     "Paper ↔ Method", "Method genealogy", "Foundation grounding",
+                     "Topic membership", "People contributions", "Concept relations",
+                     "Active research", "Workflow (ideas / experiments)"],
 });
 
 // Edge-type → workflow mapping. Mirrors runtime/schema/edges.yaml (each
@@ -114,6 +141,14 @@ export const EDGE_TYPE_WORKFLOW = Object.freeze({
   uses_concept: "ingest",
   extends_concept: "ingest",
   critiques_concept: "ingest",
+  proposes_method: "ingest",
+  applies_method: "ingest",
+  extends_method: "ingest",
+  contributes_to_foundation: "ingest",
+  shares_mechanism_with: "ingest",
+  shares_assumption_with: "ingest",
+  related_problem_formulation: "ingest",
+  contrasts_with_concept: "ingest",
   cites: "citation",
   // evidence — supports/contradicts now travel between ideas, methods, and papers
   // (the legacy standalone claim entity was retired in the schema refactor).

@@ -33,8 +33,9 @@ const ENTITY_HEX = Object.freeze({
   ideas: "#F39C12",       // amber
   experiments: "#E74C3C", // red
   methods: "#84CC16",     // lime green
-  Summary: "#1ABC9C",     // teal
   foundations: "#95A5A6", // gray
+  manuscripts: "#9B59B6", // amethyst
+  reviews: "#16A085",     // teal-green
 });
 
 // Module-scoped Cytoscape instance — destroyed before re-init on each

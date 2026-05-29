@@ -130,6 +130,8 @@ function renderHeadline() {
     { label: "People", value: counts.people || 0, color: "#2ECC71" },
     { label: "Experiments", value: counts.experiments || 0, color: "#E74C3C" },
     { label: "Ideas", value: counts.ideas || 0, color: "#F39C12" },
+    { label: "Manuscripts", value: counts.manuscripts || 0, color: "#9B59B6" },
+    { label: "Reviews", value: counts.reviews || 0, color: "#16A085" },
     { label: "Edges", value: edgeCount, color: "#1ABC9C" },
   ];
   return `

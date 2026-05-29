@@ -71,8 +71,44 @@ rules:
   - forward: { kind: topics,      frontmatter_field: key_papers,        target: papers }
     reverse: { kind: papers,      body_section: Related,                action: append_slug }
 
-  # concepts.parent_topic → topics ## Concepts
-  - forward: { kind: concepts,    frontmatter_field: parent_topic,      target: topics }
-    reverse: { kind: topics,      body_section: "Concepts",             action: append_slug }
+  # entity.parent_topics ↔ topics.key_<kind>  (stable topic membership)
+  - forward: { kind: papers,      frontmatter_field: parent_topics, target: topics }
+    reverse: { kind: topics,      frontmatter_field: key_papers,      action: append_slug }
+  - forward: { kind: foundations, frontmatter_field: parent_topics, target: topics }
+    reverse: { kind: topics,      frontmatter_field: key_foundations, action: append_slug }
+  - forward: { kind: concepts,    frontmatter_field: parent_topics, target: topics }
+    reverse: { kind: topics,      frontmatter_field: key_concepts,    action: append_slug }
+  - forward: { kind: methods,     frontmatter_field: parent_topics, target: topics }
+    reverse: { kind: topics,      frontmatter_field: key_methods,     action: append_slug }
+  - forward: { kind: people,      frontmatter_field: parent_topics, target: topics }
+    reverse: { kind: topics,      frontmatter_field: key_people,      action: append_slug }
 
-terminal_targets: [foundations]
+  # topics.parent_topics → topics ## Subtopics ; topics.related_topics → topics ## Related topics
+  - forward: { kind: topics,      frontmatter_field: parent_topics,  target: topics }
+    reverse: { kind: topics,      body_section: "Subtopics",         action: append_slug }
+  - forward: { kind: topics,      frontmatter_field: related_topics, target: topics }
+    reverse: { kind: topics,      body_section: "Related topics",    action: append_slug }
+
+  # Foundation grounding reverses (foundations is no longer terminal)
+  - forward: { kind: concepts,    frontmatter_field: grounded_in,    target: foundations }
+    reverse: { kind: foundations, body_section: "Grounds concepts",  action: append_slug }
+  - forward: { kind: methods,     frontmatter_field: grounded_in,    target: foundations }
+    reverse: { kind: foundations, body_section: "Grounds methods",   action: append_slug }
+
+  # Paper → Method typed edges → method body sections
+  - forward: { kind: papers,      edge_type: proposes_method,        target: methods }
+    reverse: { kind: methods,     body_section: "Proposed by",       action: append_slug }
+  - forward: { kind: papers,      edge_type: applies_method,         target: methods }
+    reverse: { kind: methods,     body_section: "Applied by",        action: append_slug }
+  - forward: { kind: papers,      edge_type: extends_method,         target: methods }
+    reverse: { kind: methods,     body_section: "Extended by",       action: append_slug }
+
+  # Paper → Foundation contribution edge → foundation body section
+  - forward: { kind: papers,      edge_type: contributes_to_foundation, target: foundations }
+    reverse: { kind: foundations, body_section: "Contributed by papers", action: append_slug }
+
+  # Active research memory: reviews.linked_manuscript → manuscripts ## Reviews
+  - forward: { kind: reviews,     frontmatter_field: linked_manuscript, target: manuscripts }
+    reverse: { kind: manuscripts, body_section: "Reviews",              action: append_slug }
+
+terminal_targets: []

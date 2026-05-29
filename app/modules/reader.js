@@ -607,20 +607,23 @@ async function refreshGraphIndex() {
 // --- Phase 4 edit popover --------------------------------------------------
 
 const EDITABLE_FIELDS = {
-  papers: ["tags", "importance", "tldr", "contribution_type", "datasets", "code_url", "venue", "year"],
-  concepts: ["tags", "aliases", "maturity", "definition", "related_concepts"],
-  topics: ["tags", "key_venues"],
-  people: ["research_areas", "affiliation", "homepage", "scholar"],
+  papers: ["tags", "importance", "tldr", "contribution_type", "datasets", "code_url", "venue", "year", "parent_topics"],
+  concepts: ["tags", "aliases", "maturity", "definition", "related_concepts", "parent_topics", "grounded_in"],
+  topics: ["tags", "topic_kind", "domains", "key_venues", "parent_topics", "related_topics", "key_foundations", "key_concepts", "key_methods"],
+  people: ["research_areas", "affiliation", "homepage", "scholar", "parent_topics", "key_papers", "contributed_methods", "contributed_foundations"],
   ideas: ["tags", "status", "priority", "target_venue", "novelty_score", "failure_reason"],
   experiments: ["tags", "status", "outcome", "key_result"],
-  methods: ["tags", "type", "code_repo", "source_papers"],
-  Summary: ["tags", "scope", "key_topics"],
-  foundations: ["tags", "aliases", "status"],
+  methods: ["tags", "type", "code_repo", "source_papers", "parent_topics", "grounded_in"],
+  foundations: ["tags", "aliases", "status", "parent_topics"],
+  manuscripts: ["tags", "status"],
+  reviews: ["tags", "feedback_type", "resolution_status"],
 };
 const LIST_FIELDS = new Set([
   "tags", "aliases", "related_concepts", "research_areas",
   "key_venues", "key_topics", "contribution_type", "datasets",
-  "source_papers",
+  "source_papers", "parent_topics", "related_topics", "grounded_in",
+  "domains", "key_foundations", "key_concepts", "key_methods",
+  "key_papers", "contributed_methods", "contributed_foundations",
 ]);
 
 function wireEditPopover(type, slug, fm) {

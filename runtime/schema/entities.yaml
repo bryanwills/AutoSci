@@ -32,6 +32,7 @@ papers:
     datasets:          { type: list_str, default: [] }
     code_url:          { type: str }
     cited_by:          { type: list_link, to: papers, default: [] }
+    parent_topics:     { type: list_link, to: topics, default: [] }
 
 concepts:
   dir: wiki/concepts/
@@ -47,17 +48,28 @@ concepts:
     date_updated:     { type: date }
     related_concepts: { type: list_link, to: concepts, default: [] }
     linked_ideas:     { type: list_link, to: ideas, default: [] }
-    parent_topic:     { type: link, to: topics }
+    parent_topics:    { type: list_link, to: topics, default: [] }
+    grounded_in:      { type: list_link, to: foundations, default: [] }
 
 topics:
   dir: wiki/topics/
   fields:
     title:          { type: str, required: true }
     tags:           { type: list_str, required: true, default: [] }
+    topic_kind:
+      type: enum
+      values: [domain, subfield, problem, bridge, project_area]
+      required: true
+      default: subfield
+    domains:        { type: list_str, default: [] }
+    parent_topics:  { type: list_link, to: topics, default: [] }
     key_venues:     { type: list_str, default: [] }
     related_topics: { type: list_link, to: topics, default: [] }
     key_people:     { type: list_link, to: people, default: [] }
     key_papers:     { type: list_link, to: papers, default: [] }
+    key_foundations: { type: list_link, to: foundations, default: [] }
+    key_concepts:   { type: list_link, to: concepts, default: [] }
+    key_methods:    { type: list_link, to: methods, default: [] }
     linked_ideas:   { type: list_link, to: ideas, default: [] }
 
 people:
@@ -69,6 +81,10 @@ people:
     homepage:       { type: str }
     scholar:        { type: str }
     date_updated:   { type: date }
+    parent_topics:           { type: list_link, to: topics, default: [] }
+    key_papers:              { type: list_link, to: papers, default: [] }
+    contributed_methods:     { type: list_link, to: methods, default: [] }
+    contributed_foundations: { type: list_link, to: foundations, default: [] }
     type:
       type: object
       fields:
@@ -116,6 +132,8 @@ methods:
     parent_methods:    { type: list_link, to: methods, default: [] }
     child_methods:     { type: list_link, to: methods, default: [] }
     realizes_concepts: { type: list_link, to: concepts, default: [] }
+    parent_topics:     { type: list_link, to: topics, default: [] }
+    grounded_in:       { type: list_link, to: foundations, default: [] }
     code_repo:         { type: str }
     date_updated:      { type: date }
 
@@ -159,18 +177,8 @@ experiments:
       planned: [running]
       running: [completed, abandoned]
 
-Summary:
-  dir: wiki/Summary/
-  fields:
-    title:        { type: str, required: true }
-    scope:        { type: str, required: true }
-    key_topics:   { type: list_link, to: topics, required: true, default: [] }
-    paper_count:  { type: int }
-    date_updated: { type: date }
-
 foundations:
   dir: wiki/foundations/
-  terminal: true
   fields:
     title:            { type: str, required: true }
     slug:             { type: str, required: true }
@@ -181,3 +189,40 @@ foundations:
     first_introduced: { type: str }
     date_updated:     { type: date }
     source_url:       { type: str }
+    parent_topics:    { type: list_link, to: topics, default: [] }
+
+# ── Active research memory ───────────────────────────────────────────────────
+
+manuscripts:
+  dir: wiki/manuscripts/
+  fields:
+    title:  { type: str, required: true }
+    slug:   { type: str, required: true }
+    status:
+      type: enum
+      values: [drafting, revised, submitted, final_version]
+      required: true
+      default: drafting
+    tags:   { type: list_str, required: true, default: [] }
+  lifecycle:
+    transitions:
+      drafting:      [revised, submitted]
+      revised:       [revised, submitted]
+      submitted:     [revised, final_version]
+      final_version: []
+
+reviews:
+  dir: wiki/reviews/
+  fields:
+    title: { type: str, required: true }
+    slug:  { type: str, required: true }
+    feedback_type:
+      type: enum
+      values: [feedback, rebuttal, final_decision]
+      required: true
+    resolution_status:
+      type: enum
+      values: [open, addressed, superseded]
+      required: true
+      default: open
+    linked_manuscript: { type: link, to: manuscripts, required: true }

@@ -91,6 +91,82 @@ critiques_concept:
     evidence:   { type: str, required: true }
 
 # -----------------------------------------------------------------------------
+# Concept ↔ Concept typed relations  (written by /ingest, symmetric)
+# -----------------------------------------------------------------------------
+
+shares_mechanism_with:
+  endpoints: { from: concepts, to: concepts }
+  direction: symmetric
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+shares_assumption_with:
+  endpoints: { from: concepts, to: concepts }
+  direction: symmetric
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+related_problem_formulation:
+  endpoints: { from: concepts, to: concepts }
+  direction: symmetric
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+contrasts_with_concept:
+  endpoints: { from: concepts, to: concepts }
+  direction: symmetric
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+# -----------------------------------------------------------------------------
+# Paper → Method semantic edges  (written by /ingest)
+# -----------------------------------------------------------------------------
+
+proposes_method:
+  endpoints: { from: papers, to: methods }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+applies_method:
+  endpoints: { from: papers, to: methods }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+extends_method:
+  endpoints: { from: papers, to: methods }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+# -----------------------------------------------------------------------------
+# Paper → Foundation contribution edge  (written by /ingest)
+# -----------------------------------------------------------------------------
+
+contributes_to_foundation:
+  endpoints: { from: papers, to: foundations }
+  direction: directed
+  workflow:  ingest
+  attributes:
+    confidence: { type: enum, values: [high, medium, low], required: true }
+    evidence:   { type: str, required: true }
+
+# -----------------------------------------------------------------------------
 # Workflow edges (evidence / experiments / ideas / provenance)
 # Endpoints stay broad because these span multiple entity kinds.
 # -----------------------------------------------------------------------------

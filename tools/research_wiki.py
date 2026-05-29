@@ -1450,7 +1450,9 @@ def get_stats(wiki_root: str, as_json: bool = False) -> dict:
         "ideas_failed": count_by_field("ideas", "status", "failed"),
         "experiments": count_md("experiments"),
         "methods": count_md("methods"),
-        "summaries": count_md("Summary"),
+        "foundations": count_md("foundations"),
+        "manuscripts": count_md("manuscripts"),
+        "reviews": count_md("reviews"),
         "edges": len(load_edges(wiki_root)),
         "citations": len(load_citations(wiki_root)),
     }
@@ -1467,7 +1469,9 @@ def get_stats(wiki_root: str, as_json: bool = False) -> dict:
               f"({stats['ideas_validated']} validated, {stats['ideas_failed']} failed)")
         print(f"  Experiments: {stats['experiments']}")
         print(f"  Methods:     {stats['methods']}")
-        print(f"  Summaries:   {stats['summaries']}")
+        print(f"  Foundations: {stats['foundations']}")
+        print(f"  Manuscripts: {stats['manuscripts']}")
+        print(f"  Reviews:     {stats['reviews']}")
         print(f"  Edges:       {stats['edges']}")
         print(f"  Citations:   {stats['citations']}")
 
@@ -1512,11 +1516,10 @@ def get_maturity(wiki_root: str, as_json: bool = False) -> dict:
         for e in edges
     )
 
-    # Total entities counted toward maturity. Terminal kinds (foundations) are
-    # excluded by their `terminal: true` flag; 'Summary' maps to the 'summaries'
-    # stats key for grammatical consistency in the output.
+    # Total entities counted toward maturity / density. Any kind flagged
+    # `terminal: true` is excluded; the stats key matches the entity kind.
     total_entities = sum(
-        stats.get("summaries" if k == "Summary" else k, 0)
+        stats.get(k, 0)
         for k, e in ENTITIES.items() if not e.get("terminal")
     )
 
