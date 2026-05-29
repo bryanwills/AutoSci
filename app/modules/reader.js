@@ -620,7 +620,7 @@ const EDITABLE_FIELDS = {
 };
 const LIST_FIELDS = new Set([
   "tags", "aliases", "related_concepts", "research_areas",
-  "key_venues", "key_topics", "contribution_type", "datasets",
+  "key_venues", "contribution_type", "datasets",
   "source_papers", "parent_topics", "related_topics", "grounded_in",
   "domains", "key_foundations", "key_concepts", "key_methods",
   "key_papers", "contributed_methods", "contributed_foundations",

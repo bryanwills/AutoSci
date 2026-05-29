@@ -83,6 +83,24 @@ rules:
   - forward: { kind: people,      frontmatter_field: parent_topics, target: topics }
     reverse: { kind: topics,      frontmatter_field: key_people,      action: append_slug }
 
+  # topics.key_<kind> → <entity>.parent_topics  (mirror of the rules above so the
+  # bidirectional frontmatter pair stays consistent no matter which side is edited;
+  # key_papers / key_people already reverse to body sections, so only these three)
+  - forward: { kind: topics,      frontmatter_field: key_concepts,    target: concepts }
+    reverse: { kind: concepts,    frontmatter_field: parent_topics,   action: append_slug }
+  - forward: { kind: topics,      frontmatter_field: key_methods,     target: methods }
+    reverse: { kind: methods,     frontmatter_field: parent_topics,   action: append_slug }
+  - forward: { kind: topics,      frontmatter_field: key_foundations, target: foundations }
+    reverse: { kind: foundations, frontmatter_field: parent_topics,   action: append_slug }
+
+  # People contribution roles → reverse body sections on the target
+  - forward: { kind: people,      frontmatter_field: key_papers,              target: papers }
+    reverse: { kind: papers,      body_section: "Contributors",               action: append_slug }
+  - forward: { kind: people,      frontmatter_field: contributed_methods,     target: methods }
+    reverse: { kind: methods,     body_section: "Contributors",               action: append_slug }
+  - forward: { kind: people,      frontmatter_field: contributed_foundations, target: foundations }
+    reverse: { kind: foundations, body_section: "Contributed by people",      action: append_slug }
+
   # topics.parent_topics → topics ## Subtopics ; topics.related_topics → topics ## Related topics
   - forward: { kind: topics,      frontmatter_field: parent_topics,  target: topics }
     reverse: { kind: topics,      body_section: "Subtopics",         action: append_slug }
