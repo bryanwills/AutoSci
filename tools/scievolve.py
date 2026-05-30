@@ -19,6 +19,7 @@ from pathlib import Path
 SCIEVOLVE_DIR = Path("outputs") / "evolution"
 SCIEVOLVE_SIGNALS = "signals.jsonl"
 SCIEVOLVE_PROPOSALS = "proposals.jsonl"
+SCIEVOLVE_APPLICATIONS = "applications.jsonl"
 
 SCIEVOLVE_SOURCE_VALUES = ("user", "task", "open")
 SCIEVOLVE_DIMENSION_VALUES = ("memory", "workflow", "orchestration")
@@ -103,6 +104,7 @@ This directory is managed by `tools/research_wiki.py scievolve-*` commands.
 - `proposals.jsonl` indexes proposal artifacts.
 - `proposals/` stores proposal Markdown/JSON pairs.
 - `reports/` stores dry-run evolution reports.
+- `applications.jsonl` records guarded proposal applications.
 
 Stage-specific skills extend this same substrate:
 
@@ -111,7 +113,8 @@ Stage-specific skills extend this same substrate:
 - `/morph` uses `dimension: orchestration`.
 
 The default mode is proposal-first. Recording signals and generating reports
-does not mutate wiki entity pages, skills, templates, or DAGs.
+does not mutate wiki entity pages, skills, templates, or DAGs. Stage-specific
+commands may add guarded application events when explicitly requested.
 """
 
 
@@ -123,6 +126,7 @@ def ensure_scievolve_store(wiki_root: str | Path) -> Path:
     _write_if_missing(store / "README.md", _store_readme())
     _write_if_missing(store / SCIEVOLVE_SIGNALS, "")
     _write_if_missing(store / SCIEVOLVE_PROPOSALS, "")
+    _write_if_missing(store / SCIEVOLVE_APPLICATIONS, "")
     return store
 
 
@@ -259,6 +263,20 @@ def _proposal_id(dimension: str, target: str, signals: list[dict]) -> str:
     return f"prop-{dimension}-{_slug_part(target)}-{digest}"
 
 
+def _custom_proposal_id(dimension: str, target: str, payload: dict) -> str:
+    digest = _json_digest({
+        "dimension": dimension,
+        "target": target,
+        "proposal_kind": payload.get("proposal_kind", ""),
+        "proposed_action": payload.get("proposed_action", ""),
+        "rationale": payload.get("rationale", ""),
+        "triggering_signals": sorted(payload.get("triggering_signals", [])),
+        "evidence": payload.get("evidence", []),
+    }, length=10)
+    kind = _slug_part(str(payload.get("proposal_kind", "")), "review", 24)
+    return f"prop-{dimension}-{kind}-{_slug_part(target)}-{digest}"
+
+
 def _proposal_rationale(signals: list[dict]) -> str:
     sources = Counter(str(s.get("source", "unknown")) for s in signals)
     kinds = Counter(str(s.get("kind", "unknown")) for s in signals)
@@ -327,35 +345,67 @@ def _proposal_markdown(record: dict, signals: list[dict]) -> str:
         f"- Status: {record['status']}",
         f"- Dimension: {record['dimension']}",
         f"- Skill view: {record['skill']}",
+        f"- Proposal kind: {record.get('proposal_kind', 'signal-group')}",
+        f"- Confidence: {record.get('confidence', '') or 'unspecified'}",
         f"- Target: {record['target'] or '(general)'}",
+        f"- Related entities: {', '.join(record.get('related_entities') or []) or '(none)'}",
         f"- Created: {record['created_at']}",
         "",
         "## Triggering Signals",
         "",
     ]
-    for signal in signals:
-        lines.append(
-            "- {id} ({source}/{kind}, severity={severity}, confidence={confidence}): "
-            "{summary}".format(
-                id=signal.get("id", ""),
-                source=signal.get("source", ""),
-                kind=signal.get("kind", ""),
-                severity=signal.get("severity", ""),
-                confidence=signal.get("confidence", ""),
-                summary=signal.get("summary", ""),
+    if signals:
+        for signal in signals:
+            lines.append(
+                "- {id} ({source}/{kind}, severity={severity}, confidence={confidence}): "
+                "{summary}".format(
+                    id=signal.get("id", ""),
+                    source=signal.get("source", ""),
+                    kind=signal.get("kind", ""),
+                    severity=signal.get("severity", ""),
+                    confidence=signal.get("confidence", ""),
+                    summary=signal.get("summary", ""),
+                )
             )
-        )
-        evidence_path = signal.get("evidence_path") or ""
-        evidence_text = signal.get("evidence_text") or ""
-        if evidence_path:
-            lines.append(f"  - Evidence path: `{evidence_path}`")
-        if evidence_text:
-            lines.append(f"  - Evidence text: {evidence_text}")
+            evidence_path = signal.get("evidence_path") or ""
+            evidence_text = signal.get("evidence_text") or ""
+            if evidence_path:
+                lines.append(f"  - Evidence path: `{evidence_path}`")
+            if evidence_text:
+                lines.append(f"  - Evidence text: {evidence_text}")
+    else:
+        signal_ids = record.get("triggering_signals") or []
+        if signal_ids:
+            for signal_id in signal_ids:
+                lines.append(f"- {signal_id}")
+        else:
+            lines.append("_No recorded signals directly triggered this proposal._")
+
+    evidence = record.get("evidence") or []
+    if evidence:
+        lines.extend(["", "## Evidence", ""])
+        for item in evidence:
+            if isinstance(item, dict):
+                source = item.get("source") or item.get("id") or item.get("entity_id") or ""
+                note = item.get("summary") or item.get("note") or item.get("evidence_text") or ""
+                ref = item.get("evidence_path") or item.get("path") or ""
+                label = f"- {source}" if source else "-"
+                if note:
+                    label += f": {note}"
+                lines.append(label)
+                if ref:
+                    lines.append(f"  - Path: `{ref}`")
+            else:
+                lines.append(f"- {item}")
 
     lines.extend([
         "",
         "## Proposed Action",
         "",
+    ])
+    if record.get("title"):
+        lines.extend([f"**{record['title']}**", ""])
+    lines.extend([
         record["proposed_action"],
         "",
         "## Rationale",
@@ -366,14 +416,47 @@ def _proposal_markdown(record: dict, signals: list[dict]) -> str:
         "",
         record["risk"],
         "",
+    ])
+    agent_trace = record.get("agent_trace") or {}
+    if agent_trace:
+        lines.extend([
+            "## Agent Trace",
+            "",
+            f"- Provider: {agent_trace.get('provider', 'manual-agent-response')}",
+            f"- Model: {agent_trace.get('model', 'unspecified')}",
+        ])
+        prompt_path = agent_trace.get("prompt_path")
+        response_path = agent_trace.get("response_path")
+        if prompt_path:
+            lines.append(f"- Prompt: `{prompt_path}`")
+        if response_path:
+            lines.append(f"- Response: `{response_path}`")
+        lines.append("")
+
+    lines.extend([
         "## Apply Semantics",
         "",
-        (
+    ])
+    if record.get("status") == "applied":
+        lines.append(
+            "This proposal has an application event. For `/dream --apply-safe`, "
+            "application is limited to reversible SciEvolve metadata on memory "
+            "pages; page bodies, graph edges, skills, schemas, and DAG templates "
+            "are not edited."
+        )
+        application = record.get("application") or {}
+        if application:
+            lines.append("")
+            lines.append(f"- Application: {application.get('id', '')}")
+            for change in application.get("changed_paths", []):
+                if isinstance(change, dict):
+                    lines.append(f"- Changed path: `{change.get('path', '')}`")
+    else:
+        lines.append(
             "This artifact is a proposal. It does not mutate wiki pages, skills, "
             "runtime schemas, or DAG templates."
-        ),
-        "",
-    ])
+        )
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -404,6 +487,148 @@ def _write_proposal(wiki_root: Path, record: dict, signals: list[dict]) -> dict:
             pass
 
     return {"created": created, **record}
+
+
+def scievolve_update_proposal_status(
+    wiki_root: str | Path,
+    proposal: dict,
+    status: str,
+    *,
+    note: str = "",
+    application: dict | None = None,
+) -> dict:
+    """Update a proposal artifact and index after review or application."""
+    _validate_choice("status", status, SCIEVOLVE_STATUS_VALUES)
+
+    root = Path(wiki_root)
+    store = ensure_scievolve_store(root)
+    proposal_id = str(proposal.get("id", ""))
+    if not proposal_id:
+        raise ValueError("proposal id is required")
+
+    updated = dict(proposal)
+    updated["status"] = status
+    updated["status_updated_at"] = _now_iso()
+    if note:
+        updated["status_note"] = note
+    if application:
+        updated["application"] = application
+
+    json_path = root / str(updated.get("json_path", ""))
+    md_path = root / str(updated.get("output_path", ""))
+    if json_path.exists():
+        try:
+            existing = json.loads(json_path.read_text(encoding="utf-8"))
+            existing.update(updated)
+            updated = existing
+        except json.JSONDecodeError:
+            pass
+
+    if json_path.parent:
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+    if md_path.parent:
+        md_path.parent.mkdir(parents=True, exist_ok=True)
+    json_path.write_text(
+        json.dumps(updated, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    md_path.write_text(_proposal_markdown(updated, []), encoding="utf-8")
+
+    index_path = store / SCIEVOLVE_PROPOSALS
+    records, _ = _load_jsonl(index_path)
+    replaced = False
+    next_records: list[dict] = []
+    for record in records:
+        if str(record.get("id", "")) == proposal_id:
+            next_records.append(updated)
+            replaced = True
+        else:
+            next_records.append(record)
+    if not replaced:
+        next_records.append(updated)
+    index_path.write_text(
+        "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in next_records),
+        encoding="utf-8",
+    )
+    return updated
+
+
+def scievolve_record_application(
+    wiki_root: str | Path,
+    application: dict,
+) -> dict:
+    """Append an auditable proposal application event."""
+    root = Path(wiki_root)
+    store = ensure_scievolve_store(root)
+    record = {
+        "id": application.get("id")
+        or f"app-{_compact_timestamp()}-{_json_digest(application)}",
+        "timestamp": _now_iso(),
+        **application,
+    }
+    with open(store / SCIEVOLVE_APPLICATIONS, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return record
+
+
+def scievolve_write_proposal(
+    wiki_root: str | Path,
+    dimension: str,
+    target: str,
+    proposed_action: str,
+    rationale: str,
+    risk: str,
+    *,
+    title: str = "",
+    triggering_signals: list[str] | None = None,
+    related_entities: list[str] | None = None,
+    proposal_kind: str = "review",
+    confidence: str = "medium",
+    evidence: list[dict] | None = None,
+    agent_trace: dict | None = None,
+    status: str = "proposed",
+) -> dict:
+    """Write a custom proposal through the shared SciEvolve artifact store."""
+    _validate_choice("dimension", dimension, SCIEVOLVE_DIMENSION_VALUES)
+    _validate_choice("status", status, SCIEVOLVE_STATUS_VALUES)
+    if confidence:
+        _validate_choice("confidence", confidence, SCIEVOLVE_CONFIDENCE_VALUES)
+
+    root = Path(wiki_root)
+    store = ensure_scievolve_store(root)
+    payload = {
+        "proposal_kind": proposal_kind,
+        "title": title,
+        "proposed_action": proposed_action,
+        "rationale": rationale,
+        "triggering_signals": triggering_signals or [],
+        "related_entities": related_entities or [],
+        "evidence": evidence or [],
+    }
+    proposal_id = _custom_proposal_id(dimension, target, payload)
+    md_path = store / "proposals" / f"{proposal_id}.md"
+    json_path = store / "proposals" / f"{proposal_id}.json"
+    record = {
+        "id": proposal_id,
+        "created_at": _now_iso(),
+        "dimension": dimension,
+        "skill": DIMENSION_SKILL[dimension],
+        "target": target,
+        "triggering_signals": triggering_signals or [],
+        "proposal_kind": proposal_kind,
+        "title": title,
+        "confidence": confidence,
+        "related_entities": related_entities or [],
+        "proposed_action": proposed_action,
+        "rationale": rationale,
+        "risk": risk,
+        "status": status,
+        "output_path": _relative_to_wiki(md_path, root),
+        "json_path": _relative_to_wiki(json_path, root),
+        "evidence": evidence or [],
+        "agent_trace": agent_trace or {},
+    }
+    return _write_proposal(root, record, [])
 
 
 def _group_for_proposals(signals: list[dict]) -> dict[tuple[str, str], list[dict]]:

@@ -15,7 +15,9 @@ storage:
   signals: wiki/outputs/evolution/signals.jsonl
   proposal_index: wiki/outputs/evolution/proposals.jsonl
   proposal_artifacts: wiki/outputs/evolution/proposals/
+  applications: wiki/outputs/evolution/applications.jsonl
   reports: wiki/outputs/evolution/reports/
+  dream_runs: wiki/outputs/evolution/dream/
 
 signal:
   required_fields:
@@ -48,6 +50,33 @@ proposal:
     status: proposed | approved | applied | rejected | superseded
     output_path: Markdown artifact path
     json_path: JSON artifact path
+  optional_fields:
+    proposal_kind: forgetting | consolidation | association | review
+    confidence: low | medium | high
+    related_entities: list of cited context entity ids involved in the proposal
+    evidence: list of cited signal/entity/candidate/edge evidence records
+    agent_trace: prompt/response/model metadata for agent-mediated proposals
+    application: application event when status is applied
+
+dream:
+  mode: agent-first
+  artifacts:
+    context_json: wiki/outputs/evolution/dream/<run>/dream_context.json
+    context_markdown: wiki/outputs/evolution/dream/<run>/dream_context.md
+    agent_prompt: wiki/outputs/evolution/dream/<run>/dream_agent_prompt.md
+    agent_response: wiki/outputs/evolution/dream/<run>/dream_agent_response.json
+    report: wiki/outputs/evolution/dream/<run>/dream_report.md
+    apply_report_json: wiki/outputs/evolution/dream/<run>/dream_apply_report.json
+    apply_report_markdown: wiki/outputs/evolution/dream/<run>/dream_apply_report.md
+  contract:
+    - deterministic tooling prepares memory cues only
+    - an agent chooses forgetting, consolidation, and association proposals
+    - validation requires cited context evidence before writing proposals
+    - --apply-safe can apply medium/high-confidence proposals as reversible
+      SciEvolve metadata on memory pages
+    - safe applications rebuild wiki/graph/context_brief.md so later skills can
+      consume applied memory guidance
+    - page bodies, graph edges, skills, schemas, and templates remain untouched
 
 safety:
   default_mode: proposal-first
@@ -56,7 +85,21 @@ safety:
     - skills
     - runtime schemas
     - DAG templates
-  apply_requires:
-    - explicit user approval
+  safe_apply:
+    allowed_command: dream --apply-safe
+    allowed_changes:
+      - scievolve_memory_weight frontmatter
+      - scievolve_consolidates_with frontmatter
+      - scievolve_associations frontmatter
+      - scievolve_last_dream frontmatter
+      - scievolve_dream_notes frontmatter
+    requires:
+      - validated agent proposal
+      - medium or high confidence
+      - existing target entity page
+      - auditable application event
+      - post-apply parse validation
+      - downstream context rebuild
+  manual_apply_requires:
     - auditable artifact
     - visible diff or changed-path report

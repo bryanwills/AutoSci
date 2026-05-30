@@ -53,18 +53,25 @@ Commands:
     scievolve-init <wiki_root>
     scievolve-record-signal <wiki_root> --source user|task|open --dimension memory|workflow|orchestration --target ... --kind ... --summary ...
     scievolve-report <wiki_root> [--dimension memory|workflow|orchestration] [--target ...] [--propose] [--json]
+    dream <wiki_root> [--agent-response path] [--use-llm] [--propose] [--apply-safe] [--json]
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    import requests
+except Exception:  # pragma: no cover - optional LLM path
+    requests = None  # type: ignore
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -97,9 +104,13 @@ try:
         SCIEVOLVE_DIMENSION_VALUES,
         SCIEVOLVE_SEVERITY_VALUES,
         SCIEVOLVE_SOURCE_VALUES,
+        load_scievolve_signals,
+        scievolve_record_application,
         scievolve_init,
         scievolve_record_signal,
         scievolve_report,
+        scievolve_update_proposal_status,
+        scievolve_write_proposal,
     )
 except ImportError:  # pragma: no cover - supports `python -m tools.research_wiki`
     from tools.scievolve import (  # noqa: E402
@@ -107,9 +118,13 @@ except ImportError:  # pragma: no cover - supports `python -m tools.research_wik
         SCIEVOLVE_DIMENSION_VALUES,
         SCIEVOLVE_SEVERITY_VALUES,
         SCIEVOLVE_SOURCE_VALUES,
+        load_scievolve_signals,
+        scievolve_record_application,
         scievolve_init,
         scievolve_record_signal,
         scievolve_report,
+        scievolve_update_proposal_status,
+        scievolve_write_proposal,
     )
 
 DERIVED_DIR = "graph"
@@ -1267,12 +1282,12 @@ def neighbors(wiki_root: str, node_id: str, depth: int = 1,
 # ---------------------------------------------------------------------------
 
 CONTEXT_BUDGETS = {
-    #                Methods Gaps  Failed  Papers  Experiments  Edges  Stale
-    "ideation":     (1500,  2000, 2000,   1000,   500,         500,   500),
-    "experiment":   (2500,  500,  500,    1000,   2500,        500,   0),
-    "writing":      (2000,  500,  200,    2500,   500,         800,   0),
-    "review":       (2500,  1000, 500,    1000,   1500,        500,   500),
-    "general":      (2000,  1500, 1500,   2000,   0,           1000,  0),
+    #                Methods Evolve Gaps  Failed  Papers  Experiments  Edges  Stale
+    "ideation":     (1500,  1200,  1800, 2000,   1000,   500,         500,   400),
+    "experiment":   (2500,  800,   500,  500,    1000,   2500,        500,   0),
+    "writing":      (2000,  600,   500,  200,    2500,   500,         800,   0),
+    "review":       (2500,  1200,  1000, 500,    1000,   1500,        500,   500),
+    "general":      (2000,  1200,  1500, 1500,   2000,   0,           1000,  0),
 }
 
 
@@ -1286,8 +1301,40 @@ def _entity_edge_counts(wiki_root: str) -> dict[str, int]:
     return dict(counts)
 
 
+def _scievolve_memory_guidance(root: Path) -> list[str]:
+    """Return applied /dream memory guidance for downstream context packs."""
+    lines: list[str] = []
+    for etype in ENTITY_DIRS:
+        edir = root / etype
+        if not edir.exists():
+            continue
+        for path in sorted(edir.glob("*.md")):
+            fm = _parse_frontmatter(path)
+            entity_id = f"{etype}/{path.stem}"
+            title = fm.get("title") or fm.get("name") or path.stem
+            weight = str(fm.get("scievolve_memory_weight") or "")
+            consolidates = _dream_as_list(fm.get("scievolve_consolidates_with"))
+            associations = _dream_as_list(fm.get("scievolve_associations"))
+            notes = _dream_as_list(fm.get("scievolve_dream_notes"))
+            note = f" — {notes[-1]}" if notes else ""
+            if weight:
+                lines.append(f"- downweight {entity_id} ({title}): {weight}{note}")
+            if consolidates:
+                lines.append(
+                    f"- consolidate {entity_id} ({title}) with "
+                    f"{', '.join(consolidates)}{note}"
+                )
+            if associations:
+                lines.append(
+                    f"- associate {entity_id} ({title}) with "
+                    f"{', '.join(associations)}{note}"
+                )
+    return lines
+
+
 def compile_context(wiki_root: str, purpose: str,
-                    max_chars: int = 8000) -> None:
+                    max_chars: int = 8000,
+                    emit: bool = True) -> dict:
     """Generate purpose-specific compressed context for downstream skills.
 
     Replaces the old one-size-fits-all rebuild_context_brief with budget
@@ -1295,7 +1342,16 @@ def compile_context(wiki_root: str, purpose: str,
     """
     root = Path(wiki_root)
     budgets = CONTEXT_BUDGETS.get(purpose, CONTEXT_BUDGETS["general"])
-    b_methods, b_gaps, b_failed, b_papers, b_experiments, b_edges, b_stale = budgets
+    (
+        b_methods,
+        b_evolution,
+        b_gaps,
+        b_failed,
+        b_papers,
+        b_experiments,
+        b_edges,
+        b_stale,
+    ) = budgets
 
     edge_counts = _entity_edge_counts(wiki_root)
     sections: list[str] = []
@@ -1317,7 +1373,14 @@ def compile_context(wiki_root: str, purpose: str,
                 text = "\n".join(line for _, line in items)[:b_methods]
                 sections.append(f"## Methods ({len(items)} total)\n{text}\n")
 
-    # 2. Gap map snapshot
+    # 2. Applied SciEvolve memory guidance — lets /dream affect future retrieval.
+    if b_evolution > 0:
+        guidance = _scievolve_memory_guidance(root)
+        if guidance:
+            text = "\n".join(guidance)[:b_evolution]
+            sections.append(f"## SciEvolve Memory Guidance\n{text}\n")
+
+    # 3. Gap map snapshot
     if b_gaps > 0:
         gap_path = root / DERIVED_DIR / "open_questions.md"
         if gap_path.exists():
@@ -1328,7 +1391,7 @@ def compile_context(wiki_root: str, purpose: str,
             if body.strip():
                 sections.append(f"## Open Gaps\n{body[:b_gaps]}\n")
 
-    # 3. Failed ideas (anti-repetition memory)
+    # 4. Failed ideas (anti-repetition memory)
     if b_failed > 0:
         ideas_dir = root / "ideas"
         if ideas_dir.exists():
@@ -1347,7 +1410,7 @@ def compile_context(wiki_root: str, purpose: str,
                 text = "\n".join(failed)[:b_failed]
                 sections.append(f"## Failed Ideas (avoid repeating)\n{text}\n")
 
-    # 4. Paper summaries
+    # 5. Paper summaries
     if b_papers > 0:
         papers_dir = root / "papers"
         if papers_dir.exists():
@@ -1367,7 +1430,7 @@ def compile_context(wiki_root: str, purpose: str,
                 text = "\n".join(line for _, line in items2[:15])[:b_papers]
                 sections.append(f"## Papers ({len(items2)} total)\n{text}\n")
 
-    # 5. Experiment summaries
+    # 6. Experiment summaries
     if b_experiments > 0:
         exp_dir = root / "experiments"
         if exp_dir.exists():
@@ -1388,7 +1451,7 @@ def compile_context(wiki_root: str, purpose: str,
                 text = "\n".join(exp_lines)[:b_experiments]
                 sections.append(f"## Experiments ({len(exp_lines)} total)\n{text}\n")
 
-    # 6. Recent edges
+    # 7. Recent edges
     if b_edges > 0:
         edges = load_edges(wiki_root)
         if edges:
@@ -1397,7 +1460,7 @@ def compile_context(wiki_root: str, purpose: str,
             text = "\n".join(chain_lines)[:b_edges]
             sections.append(f"## Recent Relationships ({len(edges)} total)\n{text}\n")
 
-    # 7. Stale entities
+    # 8. Stale entities
     if b_stale > 0:
         from datetime import timedelta
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
@@ -1439,7 +1502,16 @@ def compile_context(wiki_root: str, purpose: str,
     pack_path = root / DERIVED_DIR / "context_brief.md"
     pack_path.parent.mkdir(parents=True, exist_ok=True)
     pack_path.write_text(pack, encoding="utf-8")
-    print(json.dumps({"status": "ok", "purpose": purpose, "chars": len(pack)}))
+    result = {
+        "status": "ok",
+        "purpose": purpose,
+        "chars": len(pack),
+        "path": str(pack_path),
+        "scievolve_memory_items": len(_scievolve_memory_guidance(root)),
+    }
+    if emit:
+        print(json.dumps(result))
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -1610,6 +1682,1140 @@ def get_maturity(wiki_root: str, as_json: bool = False) -> dict:
         print(f"  Coverage: {int(coverage_score * 100)}%")
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# SciEvolve /dream: agent-first memory evolution
+# ---------------------------------------------------------------------------
+
+DREAM_OPERATIONS = ("forgetting", "consolidation", "association")
+DREAM_ASSOCIATION_KINDS = {
+    "papers",
+    "concepts",
+    "topics",
+    "ideas",
+    "methods",
+    "experiments",
+    "foundations",
+}
+
+
+def _dream_run_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+
+
+def _dream_parse_date(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    for candidate in (text, text.replace("Z", "+00:00")):
+        try:
+            parsed = datetime.fromisoformat(candidate)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        except ValueError:
+            pass
+    try:
+        return datetime.strptime(text[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _dream_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        out = []
+        for item in value:
+            if isinstance(item, dict):
+                slug = item.get("slug") or item.get("id") or item.get("title")
+                if slug:
+                    out.append(str(slug).strip())
+            elif str(item).strip():
+                out.append(str(item).strip())
+        return out
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def _dream_body(path: Path, max_chars: int = 1200) -> str:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+    match = FRONTMATTER_RE.match(text)
+    if match:
+        text = text[match.end():]
+    cleaned = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        cleaned.append(stripped)
+    return "\n".join(cleaned)[:max_chars]
+
+
+def _dream_label(kind: str, slug: str, fm: dict) -> str:
+    if kind == "methods":
+        return str(fm.get("name") or fm.get("title") or slug)
+    return str(fm.get("title") or fm.get("name") or slug)
+
+
+def _dream_collect_entities(root: Path, max_entities: int) -> list[dict]:
+    entities: list[dict] = []
+    for kind in ENTITY_DIRS:
+        directory = root / kind
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.glob("*.md")):
+            fm = _parse_frontmatter(path)
+            slug = path.stem
+            dates = {
+                key: fm.get(key)
+                for key in (
+                    "date_added",
+                    "date_updated",
+                    "date_proposed",
+                    "date_resolved",
+                    "date_planned",
+                    "date_completed",
+                )
+                if fm.get(key)
+            }
+            entities.append({
+                "id": f"{kind}/{slug}",
+                "kind": kind,
+                "slug": slug,
+                "path": str(path.relative_to(root)),
+                "label": _dream_label(kind, slug, fm),
+                "tags": _dream_list(fm.get("tags")),
+                "status": str(fm.get("status") or fm.get("maturity") or ""),
+                "importance": fm.get("importance"),
+                "scievolve_memory": {
+                    key: fm.get(key)
+                    for key in (
+                        "scievolve_memory_weight",
+                        "scievolve_consolidates_with",
+                        "scievolve_associations",
+                        "scievolve_last_dream",
+                    )
+                    if fm.get(key)
+                },
+                "dates": dates,
+                "links": {
+                    key: _dream_list(value)
+                    for key, value in fm.items()
+                    if isinstance(value, list) or key.endswith("_topic") or key.endswith("_idea")
+                },
+                "summary": (
+                    str(fm.get("tldr") or fm.get("definition") or fm.get("key_result")
+                        or fm.get("hypothesis") or fm.get("failure_reason") or "")
+                    or _dream_body(path, 600)
+                )[:600],
+                "body_excerpt": _dream_body(path, 600),
+            })
+            if max_entities > 0 and len(entities) >= max_entities:
+                return entities
+    return entities
+
+
+def _dream_edge_ref(edge: dict, index: int, source: str = "graph") -> dict:
+    return {
+        "id": f"{source}-edge-{index + 1}",
+        "from": str(edge.get("from", "")),
+        "to": str(edge.get("to", "")),
+        "type": str(edge.get("type", "")),
+        "evidence": str(edge.get("evidence", "")),
+    }
+
+
+def _dream_edge_counts(edges: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = defaultdict(int)
+    for edge in edges:
+        src = str(edge.get("from", ""))
+        dst = str(edge.get("to", ""))
+        if src:
+            counts[src] += 1
+        if dst:
+            counts[dst] += 1
+    return dict(counts)
+
+
+def _dream_pair_key(a: str, b: str) -> tuple[str, str]:
+    return tuple(sorted((a, b)))
+
+
+def _dream_existing_pairs(edges: list[dict]) -> set[tuple[str, str]]:
+    pairs: set[tuple[str, str]] = set()
+    for edge in edges:
+        src = str(edge.get("from", ""))
+        dst = str(edge.get("to", ""))
+        if src and dst:
+            pairs.add(_dream_pair_key(src, dst))
+    return pairs
+
+
+def _dream_signal_operation(signal: dict) -> str:
+    text = " ".join(
+        str(signal.get(key, ""))
+        for key in ("memory_operation", "proposal_kind", "category", "kind", "summary", "evidence_text")
+    ).lower()
+    if any(word in text for word in ("forget", "archive", "stale", "obsolete", "noise", "down-weight")):
+        return "forgetting"
+    if any(word in text for word in ("merge", "cluster", "consolidat", "duplicate", "organize")):
+        return "consolidation"
+    if any(word in text for word in ("associate", "association", "bridge", "link", "connect")):
+        return "association"
+    return ""
+
+
+def _dream_add_candidate(
+    candidates: list[dict],
+    operation: str,
+    title: str,
+    *,
+    target: str = "",
+    related_entities: list[str] | None = None,
+    evidence: list[dict] | None = None,
+    cues: list[str] | None = None,
+    confidence_hint: str = "medium",
+) -> None:
+    candidates.append({
+        "id": f"dream-candidate-{len(candidates) + 1:03d}",
+        "operation": operation,
+        "title": title,
+        "target": target,
+        "related_entities": related_entities or ([target] if target else []),
+        "evidence": evidence or [],
+        "cues": cues or [],
+        "confidence_hint": confidence_hint,
+        "note": (
+            "This is a context cue for the agent, not a proposal. "
+            "The agent must decide whether it is meaningful."
+        ),
+    })
+
+
+def _dream_candidate_context(
+    entities: list[dict],
+    edges: list[dict],
+    projected_edges: list[dict],
+    citations: list[dict],
+    signals: list[dict],
+    max_candidates: int,
+) -> list[dict]:
+    all_edges = edges + projected_edges + citations
+    edge_counts = _dream_edge_counts(all_edges)
+    existing_pairs = _dream_existing_pairs(all_edges)
+    by_id = {entity["id"]: entity for entity in entities}
+    candidates: list[dict] = []
+    now = datetime.now(timezone.utc)
+
+    for signal in signals:
+        operation = _dream_signal_operation(signal)
+        if not operation:
+            continue
+        target = str(signal.get("target") or "")
+        _dream_add_candidate(
+            candidates,
+            operation,
+            f"Recorded memory signal suggests {operation}",
+            target=target if target in by_id else "",
+            related_entities=[target] if target in by_id else [],
+            evidence=[{
+                "source": str(signal.get("id", "")),
+                "summary": str(signal.get("summary", "")),
+                "kind": str(signal.get("kind", "")),
+            }],
+            cues=["Recorded SciEvolve signal"],
+            confidence_hint=str(signal.get("confidence") or "medium"),
+        )
+
+    for entity in entities:
+        status = entity.get("status", "").lower()
+        latest = None
+        for raw in entity.get("dates", {}).values():
+            parsed = _dream_parse_date(raw)
+            if parsed and (latest is None or parsed > latest):
+                latest = parsed
+        age_days = (now - latest).days if latest else None
+        body_len = len(entity.get("body_excerpt", ""))
+        connectivity = edge_counts.get(entity["id"], 0)
+        cues = []
+        if status in {"deprecated", "historical", "failed", "abandoned"}:
+            cues.append(f"status is {status}")
+        if age_days is not None and age_days >= 180 and connectivity <= 1:
+            cues.append(f"latest timestamp is {age_days} days old with connectivity {connectivity}")
+        if body_len < 120 and connectivity == 0:
+            cues.append("short page body with no graph links")
+        if cues:
+            _dream_add_candidate(
+                candidates,
+                "forgetting",
+                f"Review low-signal memory trace: {entity['label']}",
+                target=entity["id"],
+                evidence=[{
+                    "source": entity["id"],
+                    "path": entity["path"],
+                    "summary": "; ".join(cues),
+                }],
+                cues=cues,
+                confidence_hint="low" if len(cues) == 1 else "medium",
+            )
+
+    comparable = [e for e in entities if e["kind"] in {"concepts", "methods", "foundations", "topics"}]
+    for i, left in enumerate(comparable):
+        for right in comparable[i + 1:]:
+            if left["kind"] != right["kind"]:
+                continue
+            name_score = _phrase_match_score(left["label"], right["label"])
+            shared_tags = sorted(set(left.get("tags", [])) & set(right.get("tags", [])))
+            if name_score >= 0.75 or len(shared_tags) >= 2:
+                _dream_add_candidate(
+                    candidates,
+                    "consolidation",
+                    f"Possible memory consolidation: {left['label']} / {right['label']}",
+                    target=left["id"],
+                    related_entities=[left["id"], right["id"]],
+                    evidence=[
+                        {"source": left["id"], "path": left["path"], "summary": left["summary"]},
+                        {"source": right["id"], "path": right["path"], "summary": right["summary"]},
+                    ],
+                    cues=[
+                        f"name_score={round(name_score, 3)}",
+                        f"shared_tags={', '.join(shared_tags) if shared_tags else 'none'}",
+                    ],
+                    confidence_hint="medium" if name_score >= 0.75 else "low",
+                )
+
+    tag_buckets: dict[str, list[dict]] = defaultdict(list)
+    for entity in entities:
+        if entity["kind"] not in DREAM_ASSOCIATION_KINDS:
+            continue
+        for tag in entity.get("tags", []):
+            tag_buckets[tag].append(entity)
+    for tag, members in sorted(tag_buckets.items()):
+        kinds = {member["kind"] for member in members}
+        if len(members) >= 3 and len(kinds) >= 2:
+            related = [member["id"] for member in members[:8]]
+            _dream_add_candidate(
+                candidates,
+                "consolidation",
+                f"Scattered memories share the theme '{tag}'",
+                related_entities=related,
+                evidence=[
+                    {"source": member["id"], "path": member["path"], "summary": member["label"]}
+                    for member in members[:8]
+                ],
+                cues=[f"{len(members)} pages across {len(kinds)} entity types share tag '{tag}'"],
+                confidence_hint="medium",
+            )
+
+    methods = [e for e in entities if e["kind"] == "methods"]
+    concepts = [e for e in entities if e["kind"] == "concepts"]
+    ideas = [e for e in entities if e["kind"] == "ideas"]
+    papers = [e for e in entities if e["kind"] == "papers"]
+    topics = [e for e in entities if e["kind"] == "topics"]
+    assoc_pairs: list[tuple[dict, dict, str]] = []
+    for method in methods:
+        for concept in concepts:
+            shared = sorted(set(method.get("tags", [])) & set(concept.get("tags", [])))
+            if len(shared) >= 2 and _dream_pair_key(method["id"], concept["id"]) not in existing_pairs:
+                assoc_pairs.append((method, concept, "method-concept shared tags: " + ", ".join(shared)))
+    for idea in ideas:
+        for method in methods:
+            shared = sorted(set(idea.get("tags", [])) & set(method.get("tags", [])))
+            if len(shared) >= 2 and _dream_pair_key(idea["id"], method["id"]) not in existing_pairs:
+                assoc_pairs.append((idea, method, "idea-method shared tags: " + ", ".join(shared)))
+    for paper in papers:
+        for concept in concepts + topics:
+            shared = sorted(set(paper.get("tags", [])) & set(concept.get("tags", [])))
+            if len(shared) >= 2 and _dream_pair_key(paper["id"], concept["id"]) not in existing_pairs:
+                assoc_pairs.append((paper, concept, "paper-memory shared tags: " + ", ".join(shared)))
+    for left, right, cue in assoc_pairs[: max(0, max_candidates)]:
+        _dream_add_candidate(
+            candidates,
+            "association",
+            f"Latent association candidate: {left['label']} <-> {right['label']}",
+            target=left["id"],
+            related_entities=[left["id"], right["id"]],
+            evidence=[
+                {"source": left["id"], "path": left["path"], "summary": left["summary"]},
+                {"source": right["id"], "path": right["path"], "summary": right["summary"]},
+            ],
+            cues=[cue, "No existing graph/frontmatter pair found"],
+            confidence_hint="low",
+        )
+
+    if max_candidates > 0:
+        return candidates[:max_candidates]
+    return candidates
+
+
+def _dream_build_context(
+    wiki_root: str,
+    max_entities: int,
+    max_signals: int,
+    max_candidates: int,
+) -> dict:
+    root = Path(wiki_root)
+    entities = _dream_collect_entities(root, max_entities)
+    edges = [_dream_edge_ref(edge, i, "graph") for i, edge in enumerate(load_edges(wiki_root))]
+    projected = [
+        _dream_edge_ref(edge, i, "projected")
+        for i, edge in enumerate(project_frontmatter_edges(root))
+    ]
+    citations = [
+        _dream_edge_ref(edge, i, "citation")
+        for i, edge in enumerate(load_citations(wiki_root))
+    ]
+    signals, malformed = load_scievolve_signals(root)
+    memory_signals = [s for s in signals if s.get("dimension") == "memory"]
+    if max_signals > 0:
+        memory_signals = memory_signals[-max_signals:]
+    counts = Counter(entity["kind"] for entity in entities)
+    candidates = _dream_candidate_context(
+        entities,
+        edges,
+        projected,
+        citations,
+        memory_signals,
+        max_candidates,
+    )
+    return {
+        "schema_version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "mode": "agent-first-dream",
+        "wiki_root": str(root),
+        "stats": {
+            "entities": dict(sorted(counts.items())),
+            "edges": len(edges),
+            "projected_edges": len(projected),
+            "citations": len(citations),
+            "memory_signals": len(memory_signals),
+            "malformed_signal_rows": malformed,
+        },
+        "entities": entities,
+        "edges": edges[-80:],
+        "projected_edges": projected[-80:],
+        "citations": citations[-80:],
+        "signals": memory_signals,
+        "candidate_memory_cues": candidates,
+    }
+
+
+def _dream_context_markdown(context: dict) -> str:
+    lines = [
+        "# Dream Context",
+        "",
+        "This is deterministic context for an agent. It is not the dream decision.",
+        "",
+        "## Stats",
+        "",
+    ]
+    for key, value in context.get("stats", {}).items():
+        lines.append(f"- {key}: {value}")
+    lines.extend(["", "## Candidate Memory Cues", ""])
+    for candidate in context.get("candidate_memory_cues", []):
+        lines.append(
+            f"- {candidate['id']} [{candidate['operation']}]: {candidate['title']}"
+        )
+        if candidate.get("related_entities"):
+            lines.append(f"  - related: {', '.join(candidate['related_entities'])}")
+        if candidate.get("cues"):
+            lines.append(f"  - cues: {'; '.join(candidate['cues'])}")
+    lines.extend(["", "## Memory Signals", ""])
+    for signal in context.get("signals", []):
+        lines.append(
+            "- {id} [{kind}] target={target}: {summary}".format(
+                id=signal.get("id", ""),
+                kind=signal.get("kind", ""),
+                target=signal.get("target", ""),
+                summary=signal.get("summary", ""),
+            )
+        )
+    lines.extend(["", "## Entity Snapshot", ""])
+    for entity in context.get("entities", [])[:80]:
+        tags = ", ".join(entity.get("tags", []))
+        memory_state = entity.get("scievolve_memory") or {}
+        suffix = ""
+        if memory_state:
+            suffix = f" scievolve={json.dumps(memory_state, ensure_ascii=False)}"
+        lines.append(f"- {entity['id']}: {entity['label']} ({tags}){suffix}")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _dream_agent_prompt(context: dict) -> str:
+    return (
+        "# /dream Agent Prompt\n\n"
+        "You are AutoSci's /dream agent. Your job is memory self-evolution, not lint repair.\n"
+        "A good proposal should explain how memory will behave differently in a later "
+        "retrieval, ideation, or experiment-planning cycle.\n\n"
+        "Use the supplied context to propose reversible memory-evolution operations:\n"
+        "- forgetting: archive, down-weight, or review low-signal/superseded traces\n"
+        "- consolidation: merge, cluster, summarize, or cross-link scattered related memories\n"
+        "- association: propose latent high-value links between existing pages\n\n"
+        "Rules:\n"
+        "- Use only evidence present in the context.\n"
+        "- Treat candidate_memory_cues as hints, not decisions.\n"
+        "- Do not propose deletion. Safe reversible metadata application may happen later.\n"
+        "- Do not repackage broken links or missing fields as the core dream output.\n"
+        "- Every proposal must cite candidate ids, entity ids, signal ids, or edge ids from the context.\n"
+        "- Prefer a few high-signal proposals over a broad mechanical list.\n\n"
+        "Return strict JSON only with this shape:\n\n"
+        "{\n"
+        "  \"proposals\": [\n"
+        "    {\n"
+        "      \"operation\": \"forgetting|consolidation|association\",\n"
+        "      \"target\": \"entities/slug or blank for cluster-level proposal\",\n"
+        "      \"title\": \"short title\",\n"
+        "      \"proposed_action\": \"reversible proposal-first action\",\n"
+        "      \"rationale\": \"why this is a meaningful memory operation and how it improves a future cycle\",\n"
+        "      \"confidence\": \"low|medium|high\",\n"
+        "      \"related_entities\": [\"kind/slug\"],\n"
+        "      \"candidate_ids\": [\"dream-candidate-001\"],\n"
+        "      \"evidence\": [\n"
+        "        {\"source\": \"entity/signal/candidate id\", \"summary\": \"supporting note\"}\n"
+        "      ]\n"
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Context JSON:\n\n"
+        "```json\n"
+        f"{json.dumps(context, ensure_ascii=False, indent=2)}\n"
+        "```\n"
+    )
+
+
+def _dream_extract_json_object(text: str) -> dict:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```(?:json)?\s*", "", stripped)
+        stripped = re.sub(r"\s*```$", "", stripped)
+    try:
+        data = json.loads(stripped)
+    except json.JSONDecodeError:
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start < 0 or end < start:
+            raise
+        data = json.loads(stripped[start:end + 1])
+    if not isinstance(data, dict):
+        raise ValueError("dream agent response must be a JSON object")
+    return data
+
+
+def _dream_call_openai_compatible(
+    prompt: str,
+    *,
+    timeout: int,
+    temperature: float,
+) -> tuple[dict, dict]:
+    if requests is None:
+        raise RuntimeError("LLM call unavailable; requests is not installed")
+    api_key = os.environ.get("LLM_API_KEY", "").strip()
+    base_url = os.environ.get("LLM_BASE_URL", "").strip().rstrip("/")
+    model = os.environ.get("LLM_MODEL", "").strip()
+    if not api_key or not base_url or not model:
+        raise RuntimeError("LLM call unavailable; set LLM_API_KEY, LLM_BASE_URL, and LLM_MODEL")
+    body = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are AutoSci /dream. Return strict JSON only. "
+                    "Use only the provided memory context."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": temperature,
+        "response_format": {"type": "json_object"},
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    response = requests.post(
+        f"{base_url}/chat/completions",
+        headers=headers,
+        json=body,
+        timeout=timeout,
+    )
+    if response.status_code >= 400 and body.get("response_format"):
+        body.pop("response_format", None)
+        response = requests.post(
+            f"{base_url}/chat/completions",
+            headers=headers,
+            json=body,
+            timeout=timeout,
+        )
+    response.raise_for_status()
+    payload = response.json()
+    content = payload["choices"][0]["message"]["content"]
+    trace = {"provider": "openai-compatible", "model": model, "base_url": base_url}
+    return _dream_extract_json_object(content), trace
+
+
+def _dream_allowed_refs(context: dict) -> set[str]:
+    refs = {entity["id"] for entity in context.get("entities", [])}
+    refs.update(candidate["id"] for candidate in context.get("candidate_memory_cues", []))
+    refs.update(str(signal.get("id", "")) for signal in context.get("signals", []))
+    for section in ("edges", "projected_edges", "citations"):
+        refs.update(str(edge.get("id", "")) for edge in context.get(section, []))
+    refs.discard("")
+    return refs
+
+
+def _dream_proposal_refs(raw: dict) -> set[str]:
+    refs: set[str] = set()
+    for key in ("target",):
+        if raw.get(key):
+            refs.add(str(raw[key]))
+    for key in ("related_entities", "candidate_ids", "triggering_signals"):
+        value = raw.get(key)
+        if isinstance(value, list):
+            refs.update(str(item) for item in value if str(item).strip())
+    evidence = raw.get("evidence")
+    if isinstance(evidence, list):
+        for item in evidence:
+            if isinstance(item, dict):
+                for key in ("source", "id", "entity_id", "signal_id", "candidate_id", "edge_id"):
+                    if item.get(key):
+                        refs.add(str(item[key]))
+            elif str(item).strip():
+                refs.add(str(item).strip())
+    return refs
+
+
+def _dream_normalize_evidence(raw: dict, context: dict) -> list[dict]:
+    entity_paths = {entity["id"]: entity.get("path", "") for entity in context.get("entities", [])}
+    evidence = []
+    for item in raw.get("evidence") or []:
+        if isinstance(item, dict):
+            source = str(
+                item.get("source")
+                or item.get("id")
+                or item.get("entity_id")
+                or item.get("signal_id")
+                or item.get("candidate_id")
+                or item.get("edge_id")
+                or ""
+            )
+            evidence.append({
+                "source": source,
+                "summary": str(item.get("summary") or item.get("note") or ""),
+                "path": entity_paths.get(source, ""),
+            })
+        elif str(item).strip():
+            source = str(item).strip()
+            evidence.append({"source": source, "summary": "", "path": entity_paths.get(source, "")})
+    for candidate_id in raw.get("candidate_ids") or []:
+        if not any(e.get("source") == candidate_id for e in evidence):
+            evidence.append({"source": str(candidate_id), "summary": "Agent cited candidate memory cue", "path": ""})
+    return evidence
+
+
+def _dream_normalize_agent_response(
+    payload: dict,
+    context: dict,
+    agent_trace: dict,
+) -> tuple[list[dict], list[dict]]:
+    allowed = _dream_allowed_refs(context)
+    signals = {str(signal.get("id", "")) for signal in context.get("signals", [])}
+    raw_proposals = payload.get("proposals")
+    if not isinstance(raw_proposals, list):
+        raise ValueError("dream agent response must contain a proposals list")
+
+    accepted: list[dict] = []
+    rejected: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for index, raw in enumerate(raw_proposals):
+        if not isinstance(raw, dict):
+            rejected.append({"index": index, "reason": "proposal is not an object"})
+            continue
+        operation = str(raw.get("operation") or raw.get("proposal_kind") or "").strip().lower()
+        if operation not in DREAM_OPERATIONS:
+            rejected.append({"index": index, "reason": f"invalid operation: {operation}"})
+            continue
+        target = str(raw.get("target") or "").strip()
+        related_entities = [
+            str(item).strip()
+            for item in (raw.get("related_entities") or [])
+            if str(item).strip()
+        ]
+        unknown_related = [ref for ref in related_entities if ref not in allowed]
+        if target and target not in allowed:
+            rejected.append({"index": index, "reason": f"unknown target: {target}"})
+            continue
+        if unknown_related:
+            rejected.append({"index": index, "reason": f"unknown related_entities: {unknown_related}"})
+            continue
+        refs = _dream_proposal_refs(raw)
+        if not refs or not (refs & allowed):
+            rejected.append({"index": index, "reason": "proposal cites no known context evidence"})
+            continue
+        action = str(raw.get("proposed_action") or raw.get("action") or "").strip()
+        rationale = str(raw.get("rationale") or "").strip()
+        if not action or not rationale:
+            rejected.append({"index": index, "reason": "missing proposed_action or rationale"})
+            continue
+        confidence = str(raw.get("confidence") or "medium").strip().lower()
+        if confidence not in SCIEVOLVE_CONFIDENCE_VALUES:
+            confidence = "medium"
+        title = str(raw.get("title") or operation.title()).strip()
+        proposal_target = target or (related_entities[0] if related_entities else "memory")
+        dedup_key = (operation, proposal_target, action)
+        if dedup_key in seen:
+            rejected.append({"index": index, "reason": "duplicate proposal"})
+            continue
+        seen.add(dedup_key)
+        evidence = _dream_normalize_evidence(raw, context)
+        signal_refs = sorted(ref for ref in refs if ref in signals)
+        accepted.append({
+            "dimension": "memory",
+            "target": proposal_target,
+            "proposal_kind": operation,
+            "title": title,
+            "confidence": confidence,
+            "related_entities": related_entities,
+            "triggering_signals": signal_refs,
+            "proposed_action": action,
+            "rationale": rationale,
+            "risk": (
+                "Agent-generated /dream proposal. Only safe metadata-level "
+                "application is allowed without a separate page-edit pass."
+            ),
+            "evidence": evidence,
+            "agent_trace": agent_trace,
+        })
+    return accepted, rejected
+
+
+def _dream_entity_path(root: Path, entity_id: str) -> Path | None:
+    parts = entity_id.split("/", 1)
+    if len(parts) != 2:
+        return None
+    kind, slug = parts
+    if kind not in ENTITY_DIRS or not slug:
+        return None
+    return root / kind / f"{slug}.md"
+
+
+def _dream_as_list(value: object) -> list[str]:
+    if value is None or value == "":
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item).strip()]
+    return [str(value)]
+
+
+def _dream_update_frontmatter_memory(
+    path: Path,
+    *,
+    set_fields: dict[str, object],
+    append_fields: dict[str, list[str]],
+) -> dict:
+    content = path.read_text(encoding="utf-8")
+    match = FRONTMATTER_RE.match(content)
+    if not match:
+        raise ValueError(f"No frontmatter found in {path}")
+
+    fm = _parse_yaml_block(match.group(1))
+    before = {
+        field: fm.get(field)
+        for field in sorted(set(set_fields) | set(append_fields))
+    }
+    for field, value in set_fields.items():
+        fm[field] = value
+    for field, additions in append_fields.items():
+        values = _dream_as_list(fm.get(field))
+        for item in additions:
+            if item and item not in values:
+                values.append(item)
+        if values:
+            fm[field] = values
+
+    after = {
+        field: fm.get(field)
+        for field in sorted(set(set_fields) | set(append_fields))
+    }
+    if before == after:
+        return {
+            "path": str(path),
+            "changed": False,
+            "before": before,
+            "after": after,
+        }
+
+    next_content = f"---\n{_serialize_frontmatter(fm)}---{content[match.end():]}"
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(next_content, encoding="utf-8")
+        tmp.replace(path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+    return {
+        "path": str(path),
+        "changed": True,
+        "before": before,
+        "after": after,
+    }
+
+
+def _dream_safe_apply_plan(root: Path, item: dict, proposal: dict) -> tuple[dict | None, str]:
+    operation = str(item.get("proposal_kind", ""))
+    confidence = str(item.get("confidence", ""))
+    target = str(item.get("target", ""))
+    target_path = _dream_entity_path(root, target)
+    if operation not in DREAM_OPERATIONS:
+        return None, f"unsupported operation: {operation}"
+    if confidence == "low":
+        return None, "low-confidence proposals remain review-only"
+    if target_path is None or not target_path.exists():
+        return None, "target is not a writable entity page"
+
+    related = []
+    for entity in item.get("related_entities", []):
+        related_path = _dream_entity_path(root, entity)
+        if entity and entity != target and related_path and related_path.exists():
+            related.append(entity)
+    note = (
+        f"{proposal.get('id', '')} {operation}: "
+        f"{item.get('title') or item.get('proposed_action', '')}"
+    )[:220]
+    set_fields: dict[str, object] = {
+        "scievolve_last_dream": proposal.get("id", ""),
+    }
+    append_fields: dict[str, list[str]] = {
+        "scievolve_dream_notes": [note],
+    }
+    if operation == "forgetting":
+        set_fields["scievolve_memory_weight"] = "downweighted"
+    elif operation == "consolidation":
+        if not related:
+            return None, "consolidation needs at least one related entity"
+        append_fields["scievolve_consolidates_with"] = related
+    elif operation == "association":
+        if not related:
+            return None, "association needs at least one related entity"
+        append_fields["scievolve_associations"] = related
+
+    return {
+        "proposal_id": proposal.get("id", ""),
+        "operation": operation,
+        "target": target,
+        "target_path": target_path,
+        "set_fields": set_fields,
+        "append_fields": append_fields,
+    }, ""
+
+
+def _dream_apply_safe(
+    root: Path,
+    run_dir: Path,
+    accepted: list[dict],
+    proposals: list[dict],
+) -> tuple[list[dict], list[dict], Path, Path]:
+    applied: list[dict] = []
+    skipped: list[dict] = []
+    for item, proposal in zip(accepted, proposals):
+        if proposal.get("status") == "applied":
+            skipped.append({"proposal_id": proposal.get("id", ""), "reason": "already applied"})
+            continue
+        plan, reason = _dream_safe_apply_plan(root, item, proposal)
+        if plan is None:
+            skipped.append({"proposal_id": proposal.get("id", ""), "reason": reason})
+            continue
+        try:
+            change = _dream_update_frontmatter_memory(
+                plan["target_path"],
+                set_fields=plan["set_fields"],
+                append_fields=plan["append_fields"],
+            )
+            validation = {
+                "frontmatter_parseable": bool(_parse_frontmatter(plan["target_path"])),
+            }
+            application = scievolve_record_application(root, {
+                "proposal_id": proposal.get("id", ""),
+                "skill": "/dream",
+                "operation": plan["operation"],
+                "target": plan["target"],
+                "mode": "safe-metadata",
+                "changed_paths": [change],
+                "validation": validation,
+            })
+            updated = scievolve_update_proposal_status(
+                root,
+                proposal,
+                "applied",
+                note="Applied by /dream --apply-safe as reversible memory metadata.",
+                application=application,
+            )
+            applied.append({
+                "proposal_id": proposal.get("id", ""),
+                "application_id": application.get("id", ""),
+                "target": plan["target"],
+                "path": change["path"],
+                "changed": change["changed"],
+                "proposal": updated,
+            })
+        except Exception as exc:
+            skipped.append({"proposal_id": proposal.get("id", ""), "reason": str(exc)})
+
+    context_rebuild = None
+    if applied:
+        context_rebuild = compile_context(str(root), "general", emit=False)
+
+    json_path = run_dir / "dream_apply_report.json"
+    md_path = run_dir / "dream_apply_report.md"
+    payload = {
+        "status": "ok",
+        "mode": "safe-metadata",
+        "applied": applied,
+        "skipped": skipped,
+        "context_rebuild": context_rebuild,
+    }
+    json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    md_lines = [
+        "# /dream Safe Apply Report",
+        "",
+        f"- Applied: {len(applied)}",
+        f"- Skipped: {len(skipped)}",
+        f"- Context rebuilt: {str(bool(context_rebuild)).lower()}",
+        "",
+        "## Applied",
+        "",
+    ]
+    if applied:
+        for item in applied:
+            md_lines.append(
+                f"- {item['proposal_id']} -> `{item['path']}` "
+                f"(changed={str(item['changed']).lower()})"
+            )
+    else:
+        md_lines.append("_No proposals were safely applied._")
+    if skipped:
+        md_lines.extend(["", "## Skipped", ""])
+        for item in skipped:
+            md_lines.append(f"- {item.get('proposal_id')}: {item.get('reason')}")
+    if context_rebuild:
+        md_lines.extend(["", "## Downstream Linkage", ""])
+        md_lines.append(
+            f"- Rebuilt `{context_rebuild.get('path')}` with "
+            f"{context_rebuild.get('scievolve_memory_items')} SciEvolve memory item(s)."
+        )
+    md_path.write_text("\n".join(md_lines).rstrip() + "\n", encoding="utf-8")
+    return applied, skipped, json_path, md_path
+
+
+def _dream_report_markdown(
+    context: dict,
+    *,
+    run_dir: Path,
+    context_path: Path,
+    prompt_path: Path,
+    response_path: Path | None,
+    proposals: list[dict],
+    rejected: list[dict],
+    proposed: bool,
+    applied: list[dict] | None = None,
+    apply_skipped: list[dict] | None = None,
+) -> str:
+    applied = applied or []
+    apply_skipped = apply_skipped or []
+    lines = [
+        "# /dream Memory Evolution Report",
+        "",
+        f"- Generated: {context['generated_at']}",
+        "- Mode: agent-first memory evolution",
+        f"- Context: `{context_path.name}`",
+        f"- Agent prompt: `{prompt_path.name}`",
+        f"- Agent response: `{response_path.name if response_path else '(not supplied)'}`",
+        f"- Proposal artifacts written: {len(proposals) if proposed else 0}",
+        f"- Safe applications: {len(applied)}",
+        "",
+        "## Interpretation",
+        "",
+        (
+            "Deterministic tooling prepared memory cues; an agent response is "
+            "required to turn those cues into SciEvolve proposals. The tool "
+            "validates, records, optionally applies safe memory metadata, and "
+            "rebuilds downstream context when the memory state changes."
+        ),
+        "",
+        "## Candidate Cue Counts",
+        "",
+    ]
+    counts = Counter(candidate["operation"] for candidate in context.get("candidate_memory_cues", []))
+    for operation in DREAM_OPERATIONS:
+        lines.append(f"- {operation}: {counts.get(operation, 0)}")
+    lines.extend(["", "## Proposals", ""])
+    if proposals and proposed:
+        for proposal in proposals:
+            lines.append(
+                f"- {proposal['id']} [{proposal.get('proposal_kind')}]: "
+                f"`{proposal['output_path']}`"
+            )
+    elif proposals:
+        lines.append("_Agent proposals were validated, but `--propose` was not set._")
+    else:
+        lines.append("_No validated agent proposals._")
+    if rejected:
+        lines.extend(["", "## Rejected Agent Items", ""])
+        for item in rejected:
+            lines.append(f"- index {item.get('index')}: {item.get('reason')}")
+    lines.extend(["", "## Apply Semantics", ""])
+    if applied:
+        lines.append(
+            "`--apply-safe` updated reversible SciEvolve metadata on memory pages. "
+            "The derived context brief is rebuilt so later skills can consume the "
+            "changed memory state. No page bodies, graph edges, schemas, skills, "
+            "or templates were edited."
+        )
+        lines.extend(["", "## Safe Applications", ""])
+        for item in applied:
+            lines.append(f"- {item['proposal_id']} -> `{item['path']}`")
+    else:
+        lines.append("No wiki entity pages are changed by this report.")
+    if apply_skipped:
+        lines.extend(["", "## Apply-Safe Skips", ""])
+        for item in apply_skipped:
+            lines.append(f"- {item.get('proposal_id')}: {item.get('reason')}")
+    return "\n".join(lines)
+
+
+def dream(
+    wiki_root: str,
+    *,
+    max_entities: int = 120,
+    max_signals: int = 30,
+    max_candidates: int = 30,
+    agent_response: str = "",
+    use_llm: bool = False,
+    propose: bool = False,
+    apply_safe: bool = False,
+    as_json: bool = False,
+    timeout: int = 90,
+    temperature: float = 0.2,
+) -> None:
+    root = Path(wiki_root)
+    if apply_safe:
+        propose = True
+    run_id = _dream_run_id()
+    run_dir = root / "outputs" / "evolution" / "dream" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    context = _dream_build_context(wiki_root, max_entities, max_signals, max_candidates)
+    context_path = run_dir / "dream_context.json"
+    context_md_path = run_dir / "dream_context.md"
+    prompt_path = run_dir / "dream_agent_prompt.md"
+    response_path: Path | None = None
+    context_path.write_text(json.dumps(context, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    context_md_path.write_text(_dream_context_markdown(context), encoding="utf-8")
+    prompt = _dream_agent_prompt(context)
+    prompt_path.write_text(prompt, encoding="utf-8")
+
+    payload: dict | None = None
+    agent_trace = {
+        "provider": "manual-agent-response",
+        "model": "external-agent",
+        "prompt_path": str(prompt_path.relative_to(root)),
+    }
+    if agent_response:
+        source = Path(agent_response)
+        payload = _dream_extract_json_object(source.read_text(encoding="utf-8"))
+        response_path = run_dir / "dream_agent_response.json"
+        response_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        agent_trace["response_path"] = str(response_path.relative_to(root))
+    elif use_llm:
+        payload, llm_trace = _dream_call_openai_compatible(
+            prompt,
+            timeout=timeout,
+            temperature=temperature,
+        )
+        response_path = run_dir / "dream_agent_response.json"
+        response_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        agent_trace.update(llm_trace)
+        agent_trace["response_path"] = str(response_path.relative_to(root))
+
+    accepted: list[dict] = []
+    rejected: list[dict] = []
+    proposals: list[dict] = []
+    if payload is not None:
+        accepted, rejected = _dream_normalize_agent_response(payload, context, agent_trace)
+        if propose:
+            for item in accepted:
+                proposals.append(scievolve_write_proposal(root, **item))
+    applied: list[dict] = []
+    apply_skipped: list[dict] = []
+    apply_report_json: Path | None = None
+    apply_report_md: Path | None = None
+    if apply_safe and proposals:
+        applied, apply_skipped, apply_report_json, apply_report_md = _dream_apply_safe(
+            root,
+            run_dir,
+            accepted,
+            proposals,
+        )
+        applied_by_id = {
+            item["proposal_id"]: item["proposal"]
+            for item in applied
+            if item.get("proposal")
+        }
+        proposals = [
+            applied_by_id.get(proposal.get("id"), proposal)
+            for proposal in proposals
+        ]
+
+    report_path = run_dir / "dream_report.md"
+    report_path.write_text(
+        _dream_report_markdown(
+            context,
+            run_dir=run_dir,
+            context_path=context_path,
+            prompt_path=prompt_path,
+            response_path=response_path,
+            proposals=proposals if propose else accepted,
+            rejected=rejected,
+            proposed=propose,
+            applied=applied,
+            apply_skipped=apply_skipped,
+        ),
+        encoding="utf-8",
+    )
+
+    result = {
+        "status": "ok",
+        "mode": "agent-first-dream",
+        "run_dir": str(run_dir),
+        "context_path": str(context_path),
+        "context_markdown_path": str(context_md_path),
+        "prompt_path": str(prompt_path),
+        "response_path": str(response_path) if response_path else "",
+        "report_path": str(report_path),
+        "candidate_count": len(context.get("candidate_memory_cues", [])),
+        "accepted_agent_proposals": len(accepted),
+        "rejected_agent_items": len(rejected),
+        "proposal_count": len(proposals),
+        "proposals": proposals,
+        "safe_application_count": len(applied),
+        "safe_applications": applied,
+        "safe_application_skips": apply_skipped,
+        "apply_report_path": str(apply_report_json) if apply_report_json else "",
+        "apply_report_markdown_path": str(apply_report_md) if apply_report_md else "",
+    }
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"/dream report: {report_path}")
+        print(f"Agent prompt: {prompt_path}")
+        if response_path:
+            print(f"Agent response: {response_path}")
+        print(f"Candidate cues: {result['candidate_count']}")
+        print(f"Proposals written: {result['proposal_count']}")
+        print(f"Safe applications: {result['safe_application_count']}")
 
 
 # ---------------------------------------------------------------------------
@@ -2833,6 +4039,27 @@ def main():
                    help="Write proposal artifacts for matching signal groups")
     p.add_argument("--json", action="store_true")
 
+    p = sub.add_parser("dream",
+                       help="Prepare and finalize agent-first /dream memory evolution")
+    p.add_argument("wiki_root")
+    p.add_argument("--max-entities", type=int, default=120,
+                   help="Maximum entity pages to include in the agent context")
+    p.add_argument("--max-signals", type=int, default=30,
+                   help="Maximum recent memory signals to include")
+    p.add_argument("--max-candidates", type=int, default=30,
+                   help="Maximum deterministic memory cues to include")
+    p.add_argument("--agent-response", default="",
+                   help="Path to strict JSON returned by the /dream agent")
+    p.add_argument("--use-llm", action="store_true",
+                   help="Call an OpenAI-compatible LLM using LLM_* environment variables")
+    p.add_argument("--propose", action="store_true",
+                   help="Write validated agent decisions as SciEvolve proposal artifacts")
+    p.add_argument("--apply-safe", action="store_true",
+                   help="Apply validated medium/high-confidence /dream proposals as reversible SciEvolve memory metadata")
+    p.add_argument("--timeout", type=int, default=90)
+    p.add_argument("--temperature", type=float, default=0.2)
+    p.add_argument("--json", action="store_true")
+
     args = parser.parse_args()
 
     if args.command == "init":
@@ -2941,6 +4168,20 @@ def main():
             args.limit,
             args.propose,
             args.json,
+        )
+    elif args.command == "dream":
+        dream(
+            args.wiki_root,
+            max_entities=args.max_entities,
+            max_signals=args.max_signals,
+            max_candidates=args.max_candidates,
+            agent_response=args.agent_response,
+            use_llm=args.use_llm,
+            propose=args.propose,
+            apply_safe=args.apply_safe,
+            as_json=args.json,
+            timeout=args.timeout,
+            temperature=args.temperature,
         )
     else:
         parser.print_help()
