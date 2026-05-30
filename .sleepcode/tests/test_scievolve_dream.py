@@ -168,7 +168,7 @@ Adjusts retrieval memory cache parameters.
                 str(wiki),
                 "--agent-response",
                 str(response_path),
-                "--propose",
+                "--propose-only",
                 "--json",
             )
             data = json.loads(finalized.stdout)
@@ -183,7 +183,8 @@ Adjusts retrieval memory cache parameters.
             self.assertTrue((wiki / proposal["output_path"]).exists())
             proposal_json = json.loads((wiki / proposal["json_path"]).read_text(encoding="utf-8"))
             self.assertIn("agent_trace", proposal_json)
-            self.assertEqual(proposal_json["agent_trace"]["provider"], "manual-agent-response")
+            self.assertEqual(proposal_json["agent_trace"]["provider"], "supplied-policy-response")
+            self.assertEqual(proposal_json["agent_trace"]["policy_runtime"], "caller-supplied")
 
     def test_dream_rejects_fabricated_context_refs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -213,7 +214,7 @@ Adjusts retrieval memory cache parameters.
                 str(wiki),
                 "--agent-response",
                 str(response_path),
-                "--propose",
+                "--propose-only",
                 "--json",
             )
             data = json.loads(result.stdout)
@@ -274,7 +275,6 @@ Adjusts retrieval memory cache parameters.
                 str(wiki),
                 "--agent-response",
                 str(response_path),
-                "--apply-safe",
                 "--json",
             )
             data = json.loads(finalized.stdout)

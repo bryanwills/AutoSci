@@ -70,29 +70,39 @@ dream:
     apply_report_markdown: wiki/outputs/evolution/dream/<run>/dream_apply_report.md
   contract:
     - deterministic tooling prepares memory cues only
-    - an agent chooses forgetting, consolidation, and association proposals
+    - a pluggable policy runtime chooses forgetting, consolidation, and
+      association proposals
+    - supported policy runtimes include Claude Code, OpenAI-compatible API
+      models, local models, or supplied agent-response JSON
     - validation requires cited context evidence before writing proposals
-    - --apply-safe can apply medium/high-confidence proposals as reversible
-      SciEvolve metadata on memory pages
+    - safe auto-apply can apply medium/high-confidence proposals as reversible
+      SciEvolve metadata and append-only audit notes on memory pages
     - safe applications rebuild wiki/graph/context_brief.md so later skills can
       consume applied memory guidance
-    - page bodies, graph edges, skills, schemas, and templates remain untouched
+    - page bodies are not rewritten; only append-only audit notes are allowed
+    - graph edges, skills, schemas, and templates remain untouched
 
 safety:
-  default_mode: proposal-first
+  default_mode: auto-apply
   no_silent_mutation:
-    - wiki entity pages
     - skills
     - runtime schemas
     - DAG templates
-  safe_apply:
-    allowed_command: dream --apply-safe
+    - index.md
+    - log.md
+  auto_apply:
+    allowed_command: dream (default when --agent-response is provided)
     allowed_changes:
       - scievolve_memory_weight frontmatter
       - scievolve_consolidates_with frontmatter
       - scievolve_associations frontmatter
       - scievolve_last_dream frontmatter
       - scievolve_dream_notes frontmatter
+      - tags frontmatter (append-only)
+      - related_concepts / parent_topics / linked_ideas / parent_methods /
+        key_papers / grounded_in frontmatter (append-only)
+      - maturity frontmatter (forgetting -> deprecated only)
+      - page body append-only SciEvolve Memory Evolution Note section
     requires:
       - validated agent proposal
       - medium or high confidence
@@ -100,6 +110,7 @@ safety:
       - auditable application event
       - post-apply parse validation
       - downstream context rebuild
+    opt_out: --propose-only
   manual_apply_requires:
     - auditable artifact
     - visible diff or changed-path report

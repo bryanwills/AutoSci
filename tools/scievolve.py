@@ -422,9 +422,12 @@ def _proposal_markdown(record: dict, signals: list[dict]) -> str:
         lines.extend([
             "## Agent Trace",
             "",
-            f"- Provider: {agent_trace.get('provider', 'manual-agent-response')}",
+            f"- Provider: {agent_trace.get('provider', 'supplied-policy-response')}",
             f"- Model: {agent_trace.get('model', 'unspecified')}",
         ])
+        policy_runtime = agent_trace.get("policy_runtime")
+        if policy_runtime:
+            lines.append(f"- Policy runtime: {policy_runtime}")
         prompt_path = agent_trace.get("prompt_path")
         response_path = agent_trace.get("response_path")
         if prompt_path:
@@ -439,10 +442,10 @@ def _proposal_markdown(record: dict, signals: list[dict]) -> str:
     ])
     if record.get("status") == "applied":
         lines.append(
-            "This proposal has an application event. For `/dream --apply-safe`, "
-            "application is limited to reversible SciEvolve metadata on memory "
-            "pages; page bodies, graph edges, skills, schemas, and DAG templates "
-            "are not edited."
+            "This proposal has an application event. For `/dream`, safe "
+            "auto-apply is limited to reversible SciEvolve metadata and "
+            "append-only audit notes on memory pages; graph edges, skills, "
+            "schemas, and DAG templates are not edited."
         )
         application = record.get("application") or {}
         if application:

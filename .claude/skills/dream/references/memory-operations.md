@@ -10,14 +10,23 @@ The agent should make semantic memory judgments from the prepared context. The
 tool's candidate cues are like sensory input during sleep: useful, incomplete,
 and not authoritative.
 
+`/dream` is policy-runtime agnostic. The semantic judgment may come from the
+Claude Code slash-command session, an OpenAI-compatible API model, a local model,
+or another agent that returns the same evidence-grounded JSON contract. This is
+not a weaker form of memory evolution: the self-evolving substrate is the
+closed loop that turns SciMem state into validated proposals, guarded memory
+mutations, and downstream context changes. The policy runtime is replaceable;
+the evidence, validation, provenance, and safe-apply semantics are not.
+
 A proposal is only a `/dream` proposal if it explains how accepting it would
 change the future behavior of memory. If the action merely repairs a schema
 issue, fills a missing field, or repeats a deterministic score, it belongs
 outside `/dream`.
 
-When `--apply-safe` is used, only medium/high-confidence proposals may become
-actual memory changes, and only as reversible `scievolve_*` frontmatter metadata.
-This gives `/dream` a closed loop without letting it rewrite scientific content.
+When safe auto-apply runs, only medium/high-confidence proposals may become
+actual memory changes, and only as reversible frontmatter metadata plus an
+append-only audit note. This gives `/dream` a closed loop without letting it
+rewrite scientific content.
 
 ## Forgetting
 

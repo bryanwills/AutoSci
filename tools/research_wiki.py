@@ -53,7 +53,7 @@ Commands:
     scievolve-init <wiki_root>
     scievolve-record-signal <wiki_root> --source user|task|open --dimension memory|workflow|orchestration --target ... --kind ... --summary ...
     scievolve-report <wiki_root> [--dimension memory|workflow|orchestration] [--target ...] [--propose] [--json]
-    dream <wiki_root> [--agent-response path] [--use-llm] [--propose] [--apply-safe] [--json]
+    dream <wiki_root> [--agent-response path] [--use-llm] [--propose-only] [--json]
 """
 
 from __future__ import annotations
@@ -2253,7 +2253,12 @@ def _dream_call_openai_compatible(
     response.raise_for_status()
     payload = response.json()
     content = payload["choices"][0]["message"]["content"]
-    trace = {"provider": "openai-compatible", "model": model, "base_url": base_url}
+    trace = {
+        "provider": "openai-compatible",
+        "model": model,
+        "base_url": base_url,
+        "policy_runtime": "openai-compatible-api",
+    }
     return _dream_extract_json_object(content), trace
 
 
@@ -2464,6 +2469,75 @@ def _dream_update_frontmatter_memory(
     }
 
 
+def _dream_link_frontmatter_append(
+    fm: dict,
+    append_fields: dict[str, list[str]],
+    entity: str,
+) -> None:
+    """Append a related entity to the appropriate standard frontmatter link field."""
+    kind = entity.split("/")[0] if "/" in entity else ""
+    mapping = {
+        "concepts": "related_concepts",
+        "topics": "parent_topics",
+        "ideas": "linked_ideas",
+        "methods": "parent_methods",
+        "papers": "key_papers",
+        "foundations": "grounded_in",
+    }
+    field = mapping.get(kind)
+    if field and field in fm:
+        append_fields.setdefault(field, [])
+        if entity not in append_fields[field]:
+            append_fields[field].append(entity)
+
+
+def _dream_append_evolution_note(
+    path: Path,
+    proposal_id: str,
+    operation: str,
+    related: list[str],
+    title: str = "",
+    rationale: str = "",
+) -> dict:
+    """Append a visible SciEvolve evolution note to the end of a page body."""
+    content = path.read_text(encoding="utf-8")
+    marker = f"<!-- /dream: {proposal_id} -->"
+    if marker in content:
+        return {"path": str(path), "changed": False, "reason": "note already present"}
+
+    lines = [
+        "",
+        "---",
+        "",
+        "## SciEvolve Memory Evolution Note",
+        "",
+        marker,
+        "",
+        f"**Operation:** `{operation}`",
+    ]
+    if title:
+        lines.append(f"**Title:** {title}")
+    if related:
+        lines.append(f"**Related entities:** {', '.join(f'`{r}`' for r in related)}")
+    if rationale:
+        lines.append(f"**Rationale:** {rationale}")
+    lines.append(f"**Proposal:** `{proposal_id}`")
+    lines.append("")
+
+    note = "\n".join(lines)
+    new_content = content.rstrip("\n") + "\n" + note
+
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(new_content, encoding="utf-8")
+        tmp.replace(path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+    return {"path": str(path), "changed": True, "note_length": len(note)}
+
+
 def _dream_safe_apply_plan(root: Path, item: dict, proposal: dict) -> tuple[dict | None, str]:
     operation = str(item.get("proposal_kind", ""))
     confidence = str(item.get("confidence", ""))
@@ -2481,6 +2555,12 @@ def _dream_safe_apply_plan(root: Path, item: dict, proposal: dict) -> tuple[dict
         related_path = _dream_entity_path(root, entity)
         if entity and entity != target and related_path and related_path.exists():
             related.append(entity)
+    if operation in ("consolidation", "association") and not related:
+        return None, f"{operation} needs at least one related entity"
+
+    # Read current frontmatter to determine safe standard-field mutations
+    fm = _parse_frontmatter(target_path)
+
     note = (
         f"{proposal.get('id', '')} {operation}: "
         f"{item.get('title') or item.get('proposed_action', '')}"
@@ -2493,14 +2573,25 @@ def _dream_safe_apply_plan(root: Path, item: dict, proposal: dict) -> tuple[dict
     }
     if operation == "forgetting":
         set_fields["scievolve_memory_weight"] = "downweighted"
+        # Promote deprecation into standard frontmatter when applicable
+        if fm.get("maturity") in ("stable", "active", "emerging"):
+            set_fields["maturity"] = "deprecated"
     elif operation == "consolidation":
-        if not related:
-            return None, "consolidation needs at least one related entity"
         append_fields["scievolve_consolidates_with"] = related
+        if "tags" in fm:
+            tags = _dream_as_list(fm.get("tags"))
+            if "consolidated" not in tags:
+                append_fields.setdefault("tags", []).append("consolidated")
+        for entity in related:
+            _dream_link_frontmatter_append(fm, append_fields, entity)
     elif operation == "association":
-        if not related:
-            return None, "association needs at least one related entity"
         append_fields["scievolve_associations"] = related
+        if "tags" in fm:
+            tags = _dream_as_list(fm.get("tags"))
+            if "associated" not in tags:
+                append_fields.setdefault("tags", []).append("associated")
+        for entity in related:
+            _dream_link_frontmatter_append(fm, append_fields, entity)
 
     return {
         "proposal_id": proposal.get("id", ""),
@@ -2509,6 +2600,13 @@ def _dream_safe_apply_plan(root: Path, item: dict, proposal: dict) -> tuple[dict
         "target_path": target_path,
         "set_fields": set_fields,
         "append_fields": append_fields,
+        "body_note": {
+            "proposal_id": proposal.get("id", ""),
+            "operation": operation,
+            "related": related,
+            "title": str(item.get("title", "")),
+            "rationale": str(item.get("rationale", "")),
+        },
     }, ""
 
 
@@ -2529,11 +2627,24 @@ def _dream_apply_safe(
             skipped.append({"proposal_id": proposal.get("id", ""), "reason": reason})
             continue
         try:
-            change = _dream_update_frontmatter_memory(
+            changed_paths: list[dict] = []
+
+            # Frontmatter mutations (scievolve_* + standard fields)
+            fm_change = _dream_update_frontmatter_memory(
                 plan["target_path"],
                 set_fields=plan["set_fields"],
                 append_fields=plan["append_fields"],
             )
+            changed_paths.append(fm_change)
+
+            # Body evolution note (visible self-evolution evidence)
+            if plan.get("body_note"):
+                body_change = _dream_append_evolution_note(
+                    plan["target_path"],
+                    **plan["body_note"],
+                )
+                changed_paths.append(body_change)
+
             validation = {
                 "frontmatter_parseable": bool(_parse_frontmatter(plan["target_path"])),
             }
@@ -2542,23 +2653,23 @@ def _dream_apply_safe(
                 "skill": "/dream",
                 "operation": plan["operation"],
                 "target": plan["target"],
-                "mode": "safe-metadata",
-                "changed_paths": [change],
+                "mode": "auto-apply",
+                "changed_paths": changed_paths,
                 "validation": validation,
             })
             updated = scievolve_update_proposal_status(
                 root,
                 proposal,
                 "applied",
-                note="Applied by /dream --apply-safe as reversible memory metadata.",
+                note="Applied by /dream auto-apply as reversible memory metadata and body note.",
                 application=application,
             )
             applied.append({
                 "proposal_id": proposal.get("id", ""),
                 "application_id": application.get("id", ""),
                 "target": plan["target"],
-                "path": change["path"],
-                "changed": change["changed"],
+                "path": str(plan["target_path"]),
+                "changed_paths": changed_paths,
                 "proposal": updated,
             })
         except Exception as exc:
@@ -2572,14 +2683,14 @@ def _dream_apply_safe(
     md_path = run_dir / "dream_apply_report.md"
     payload = {
         "status": "ok",
-        "mode": "safe-metadata",
+        "mode": "auto-apply",
         "applied": applied,
         "skipped": skipped,
         "context_rebuild": context_rebuild,
     }
     json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     md_lines = [
-        "# /dream Safe Apply Report",
+        "# /dream Auto-Apply Report",
         "",
         f"- Applied: {len(applied)}",
         f"- Skipped: {len(skipped)}",
@@ -2590,12 +2701,14 @@ def _dream_apply_safe(
     ]
     if applied:
         for item in applied:
-            md_lines.append(
-                f"- {item['proposal_id']} -> `{item['path']}` "
-                f"(changed={str(item['changed']).lower()})"
-            )
+            md_lines.append(f"- {item['proposal_id']} -> `{item['path']}`")
+            for change in item.get("changed_paths", []):
+                if isinstance(change, dict):
+                    md_lines.append(
+                        f"  - {change.get('path', '')}: changed={str(change.get('changed')).lower()}"
+                    )
     else:
-        md_lines.append("_No proposals were safely applied._")
+        md_lines.append("_No proposals were auto-applied._")
     if skipped:
         md_lines.extend(["", "## Skipped", ""])
         for item in skipped:
@@ -2669,10 +2782,10 @@ def _dream_report_markdown(
     lines.extend(["", "## Apply Semantics", ""])
     if applied:
         lines.append(
-            "`--apply-safe` updated reversible SciEvolve metadata on memory pages. "
-            "The derived context brief is rebuilt so later skills can consume the "
-            "changed memory state. No page bodies, graph edges, schemas, skills, "
-            "or templates were edited."
+            "Safe auto-apply updated reversible SciEvolve metadata and append-only "
+            "audit notes on memory pages. The derived context brief is rebuilt so "
+            "later skills can consume the changed memory state. No page body "
+            "sections, graph edges, schemas, skills, or templates were rewritten."
         )
         lines.extend(["", "## Safe Applications", ""])
         for item in applied:
@@ -2694,13 +2807,17 @@ def dream(
     max_candidates: int = 30,
     agent_response: str = "",
     use_llm: bool = False,
-    propose: bool = False,
-    apply_safe: bool = False,
+    propose: bool = True,
+    apply_safe: bool = True,
+    propose_only: bool = False,
     as_json: bool = False,
     timeout: int = 90,
     temperature: float = 0.2,
 ) -> None:
     root = Path(wiki_root)
+    if propose_only:
+        propose = True
+        apply_safe = False
     if apply_safe:
         propose = True
     run_id = _dream_run_id()
@@ -2719,8 +2836,9 @@ def dream(
 
     payload: dict | None = None
     agent_trace = {
-        "provider": "manual-agent-response",
-        "model": "external-agent",
+        "provider": "supplied-policy-response",
+        "model": "external-policy-runtime",
+        "policy_runtime": "caller-supplied",
         "prompt_path": str(prompt_path.relative_to(root)),
     }
     if agent_response:
@@ -4052,10 +4170,10 @@ def main():
                    help="Path to strict JSON returned by the /dream agent")
     p.add_argument("--use-llm", action="store_true",
                    help="Call an OpenAI-compatible LLM using LLM_* environment variables")
-    p.add_argument("--propose", action="store_true",
-                   help="Write validated agent decisions as SciEvolve proposal artifacts")
+    p.add_argument("--propose-only", action="store_true",
+                   help="Write proposal artifacts but do not auto-apply mutations")
     p.add_argument("--apply-safe", action="store_true",
-                   help="Apply validated medium/high-confidence /dream proposals as reversible SciEvolve memory metadata")
+                   help="Legacy alias; auto-apply is now the default when agent-response is provided")
     p.add_argument("--timeout", type=int, default=90)
     p.add_argument("--temperature", type=float, default=0.2)
     p.add_argument("--json", action="store_true")
@@ -4177,8 +4295,9 @@ def main():
             max_candidates=args.max_candidates,
             agent_response=args.agent_response,
             use_llm=args.use_llm,
-            propose=args.propose,
-            apply_safe=args.apply_safe,
+            propose=True,
+            apply_safe=not args.propose_only,
+            propose_only=args.propose_only,
             as_json=args.json,
             timeout=args.timeout,
             temperature=args.temperature,

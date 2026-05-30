@@ -53,9 +53,9 @@ wiki/outputs/evolution/dream/<run>/dream_agent_response.json
 Every proposal must cite at least one known context reference through
 `target`, `related_entities`, `candidate_ids`, or `evidence[*].source`.
 
-In `--apply-safe` mode, medium/high-confidence validated proposals may be
-applied as reversible `scievolve_*` frontmatter metadata. Low-confidence
-proposals are kept for review and are not auto-applied.
+In safe auto-apply mode, medium/high-confidence validated proposals may be
+applied as reversible frontmatter metadata plus an append-only audit note.
+Low-confidence proposals are kept for review and are not auto-applied.
 
 ## Evidence Records
 

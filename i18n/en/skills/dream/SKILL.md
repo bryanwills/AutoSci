@@ -1,17 +1,21 @@
 ---
 description: Run AutoSci's agent-first SciEvolve dream pass: reflect over SciMem and write proposal-first self-evolution artifacts for forgetting, consolidation, and association
-argument-hint: "[wiki-root] [--propose]"
+argument-hint: "[wiki-root] [--propose-only]"
 ---
 
 # /dream
 
-Reflect over SciMem as the memory-evolution agent. `/dream` is the visible
-self-evolution loop for reviewers: the system inspects its own scientific
-memory, decides what should fade, what should be reorganized, and what latent
-associations should be proposed for future work. Use tools to prepare the memory
-scene, then make the actual forgetting / consolidation / association judgments
-in this Claude Code session. The Python helper is a context and artifact layer;
-it is not the dream.
+Reflect over SciMem with a pluggable memory-evolution policy runtime. `/dream`
+is the visible self-evolution loop for reviewers: the system inspects its own
+scientific memory, decides what should fade, what should be reorganized, and
+what latent associations should be proposed for future work. The autonomy claim
+lives in the closed memory loop: SciMem state -> policy judgment -> validated
+proposal -> guarded memory mutation -> downstream context rebuild. Claude Code
+is the default user-facing policy runtime because AutoSci users already work
+there; the same substrate can also be driven by an OpenAI-compatible API call,
+a local model, or a supplied JSON response. The Python helper prepares context,
+validates evidence, records artifacts, and applies guarded memory updates; it
+does not replace the policy judgment.
 
 Use these local references on demand:
 
@@ -25,10 +29,9 @@ Open `docs/scievolve.md` only when you need reviewer-facing command examples.
 ## Inputs
 
 - `wiki-root` (optional): default `wiki/`
-- `--propose` (optional): write validated proposal artifacts after the agent
-  response is prepared. Without it, stop after the dream report / response draft.
-- `--apply-safe` (optional): imply `--propose`, then apply medium/high-confidence
-  validated proposals as reversible SciEvolve metadata on memory pages.
+- `--propose-only` (optional): write validated proposal artifacts but do not
+  auto-apply mutations. Without it, the default closed-loop behavior is to
+  propose and then auto-apply medium/high-confidence validated proposals.
 - Existing wiki pages, graph edges, projected frontmatter edges, citations, and
   SciEvolve memory signals.
 
@@ -60,15 +63,16 @@ Open `docs/scievolve.md` only when you need reviewer-facing command examples.
 - `wiki/outputs/evolution/dream/<run>/*`
 - `wiki/outputs/evolution/proposals/*` only when finalizing with `--propose`
 - `wiki/outputs/evolution/proposals.jsonl` only when finalizing with `--propose`
-- `wiki/outputs/evolution/applications.jsonl` only when finalizing with
-  `--apply-safe`
-- entity page frontmatter only when finalizing with `--apply-safe`, limited to
-  `scievolve_*` memory metadata fields
-- `wiki/graph/context_brief.md` rebuilt after successful `--apply-safe` so
+- `wiki/outputs/evolution/applications.jsonl` when safe applications are
+  attempted
+- entity page frontmatter and an append-only `SciEvolve Memory Evolution Note`
+  when safe applications are applied; no body sections are rewritten
+- `wiki/graph/context_brief.md` rebuilt after successful safe application so
   downstream skills consume the evolved memory state
 
-Do not edit entity page bodies, skills, templates, schemas, graph files,
-`index.md`, or `log.md` from `/dream`.
+Do not rewrite entity page bodies, skills, templates, schemas, graph files,
+`index.md`, or `log.md` from `/dream`. The only body change allowed by the safe
+apply path is an append-only `SciEvolve Memory Evolution Note`.
 
 ## Workflow
 
@@ -86,17 +90,16 @@ Set the wiki root:
 
 ```bash
 WIKI_ROOT=wiki
-DREAM_PROPOSE=false
-DREAM_APPLY_SAFE=false
+DREAM_PROPOSE_ONLY=false
 for arg in $ARGUMENTS; do
   case "$arg" in
-    --propose) DREAM_PROPOSE=true ;;
-    --apply-safe) DREAM_APPLY_SAFE=true; DREAM_PROPOSE=true ;;
+    --propose-only) DREAM_PROPOSE_ONLY=true ;;
+    --apply-safe) ;;  # legacy alias; safe auto-apply is now the default
     --*) ;;
     *) WIKI_ROOT="$arg" ;;
   esac
 done
-export WIKI_ROOT DREAM_PROPOSE DREAM_APPLY_SAFE
+export WIKI_ROOT DREAM_PROPOSE_ONLY
 ```
 
 ### Step 1: Prepare The Dream Scene
@@ -113,7 +116,13 @@ Read the returned `dream_context.md`, `dream_context.json`, and
 
 ### Step 2: Perform Agentic Memory Reflection
 
-Act as the `/dream` agent in this Claude Code session. Read
+Use the active policy runtime to act as the `/dream` memory-evolution agent. In
+the slash-command path, Claude Code is the policy runtime; in headless demos,
+`tools/research_wiki.py dream --use-llm` can call an OpenAI-compatible model;
+in tests or local-model runs, `--agent-response` can supply the same strict JSON
+contract. These runtimes are interchangeable at the `/dream` boundary: the
+reviewer-visible mechanism is the validated memory-evolution loop, not a claim
+that AutoSci ships a bespoke agent framework. Read
 `references/memory-operations.md` before deciding proposal types. Read
 `references/evidence-and-boundaries.md` before accepting any proposal that looks
 like lint repair, deletion, or unsupported science.
@@ -144,34 +153,34 @@ prepared context.
 
 ### Step 4: Finalize Through The Shared SciEvolve Store
 
-If the user did not pass `--propose` (`DREAM_PROPOSE=false`), stop after writing
-the agent response and summarize what would be proposed.
-
-If `--propose` was requested, run:
+The default closed-loop behavior is to finalize **and auto-apply** when an
+agent response is provided. Run:
 
 ```bash
 "$PYTHON_BIN" tools/research_wiki.py dream "$WIKI_ROOT" \
   --agent-response wiki/outputs/evolution/dream/<run>/dream_agent_response.json \
-  --propose \
   --json
 ```
 
-The finalizer validates references and writes proposal artifacts through the
-shared SciEvolve store. If it rejects an item, fix the response JSON rather than
-loosening the tool.
+The finalizer validates references, writes proposal artifacts, and auto-applies
+medium/high-confidence proposals as reversible memory metadata **and visible body
+notes**. This is the self-evolution path: it mutates both frontmatter
+(`scievolve_*`, `tags`, `related_concepts`, `maturity`, etc.) and page body
+(appending a `SciEvolve Memory Evolution Note` section), logs the application
+event, rebuilds downstream context, and marks applied proposals as `applied`.
 
-If `--apply-safe` was requested, run the same finalizer with `--apply-safe`
-instead of `--propose`. This is the closed-loop path: it validates the agent
-response, records proposals, applies only safe reversible memory metadata, logs
-the application event, rebuilds downstream context, and marks applied proposals
-as `applied`.
+If the user passed `--propose-only` (`DREAM_PROPOSE_ONLY=true`), stop after
+writing proposal artifacts and summarize what would be applied:
 
 ```bash
 "$PYTHON_BIN" tools/research_wiki.py dream "$WIKI_ROOT" \
   --agent-response wiki/outputs/evolution/dream/<run>/dream_agent_response.json \
-  --apply-safe \
+  --propose-only \
   --json
 ```
+
+If the finalizer rejects an item, fix the response JSON rather than loosening
+the tool.
 
 ### Step 5: Report To The User
 
@@ -180,24 +189,28 @@ Report:
 - dream run directory
 - number of candidate cues read
 - proposal count by operation
-- safe application count, when `--apply-safe` was used
+- safe application count, when safe applications were attempted
 - whether `context_brief.md` was rebuilt for downstream skills
 - rejected agent items, if any
-- proposal artifact paths, when `--propose` was used
-- whether any memory metadata was applied; page bodies are never mutated
+- proposal artifact paths
+- whether any memory metadata or append-only body note was applied
 
 ## Constraints
 
 - `/dream` is agent-first. Deterministic scans prepare context; they do not make
   the memory judgment.
+- `/dream` is policy-runtime agnostic. Claude Code, an API model, a local model,
+  or a supplied response can provide the judgment as long as it satisfies the
+  same evidence-grounded JSON contract.
 - Show self-evolution, not maintenance. A good proposal changes the future shape
   of memory by fading noise, consolidating fragments, or opening a useful new
   research association.
-- Proposal-first by default. No deletion, archival, edge write,
-  non-SciEvolve frontmatter edit, or page rewrite.
-- Closed-loop safe apply is allowed only through `--apply-safe`, and only for
-  reversible `scievolve_*` metadata produced from validated medium/high
-  confidence proposals.
+- Proposal-first by default. No deletion, archival, or edge write.
+- Closed-loop auto-apply is the default when an agent response is provided.
+  It mutates both `scievolve_*` metadata and standard frontmatter fields
+  (`tags`, `related_concepts`, `maturity`, etc.), and appends a visible
+  `SciEvolve Memory Evolution Note` to the page body.
+- Low-confidence proposals remain review-only and are never auto-applied.
 - Do not turn `/dream` into `/check`. Broken links, malformed graph rows,
   missing required fields, and xref asymmetry remain `/check` concerns.
 - Do not fabricate scientific associations. Low confidence is acceptable only

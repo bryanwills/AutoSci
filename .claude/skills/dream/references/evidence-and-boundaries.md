@@ -1,8 +1,8 @@
 # /dream Evidence And Boundaries
 
 `/dream` must look agentic without becoming unsafe. It can propose memory
-operations, and in `--apply-safe` mode it may apply a narrow reversible metadata
-change. It must not silently rewrite the wiki.
+operations, and safe auto-apply may apply narrow reversible metadata changes
+plus an append-only audit note. It must not silently rewrite the wiki.
 
 ## Evidence Sources
 
@@ -54,8 +54,8 @@ Allowed:
 - propose archive/down-weight/review
 - propose merge/cluster/summarize/cross-link
 - propose a low-confidence association for human review
-- apply medium/high-confidence proposals to `scievolve_*` frontmatter only when
-  `--apply-safe` is explicitly requested
+- apply medium/high-confidence proposals to reversible frontmatter metadata and
+  append-only audit notes through the safe auto-apply path
 - cite a `/check` issue as supporting evidence
 - leave the dream with zero proposals when evidence is thin
 
@@ -64,13 +64,15 @@ Allowed:
 The reviewer should see a trace like this:
 
 1. The system prepared a memory scene.
-2. The agent interpreted the scene as scientific memory, not just files.
+2. A pluggable policy runtime interpreted the scene as scientific memory, not
+   just files. The runtime may be Claude Code, an API model, a local model, or a
+   supplied agent response; the same validator and apply path are used.
 3. The agent selected a few meaningful self-evolution operations.
 4. Each operation explains how future memory retrieval, ideation, or planning
    would change if accepted.
 5. The finalizer validated cited evidence.
-6. Optional `--apply-safe` wrote reversible SciEvolve metadata and an
-   application ledger entry.
+6. Safe auto-apply wrote reversible SciEvolve metadata, an append-only audit
+   note, and an application ledger entry.
 7. The context brief was rebuilt so downstream skills can consume the changed
    memory state.
 8. The proposal store recorded artifacts and marked applied items `applied`.

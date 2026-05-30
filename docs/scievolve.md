@@ -57,25 +57,32 @@ runtime schemas, or DAG templates.
 
 ## `/dream` Agent Loop
 
-Stage 1 adds an agent-first memory evolution path. The natural interface is the
-Claude Code slash skill:
+Stage 1 adds an agent-first memory evolution path. The natural interface for
+interactive users is the Claude Code slash skill:
 
 ```text
-/dream wiki --propose
+/dream wiki
 ```
 
-For a closed-loop reviewer demo, use the guarded self-application mode:
+For an artifact-only reviewer demo, keep validated proposals review-only:
 
 ```text
-/dream wiki --apply-safe
+/dream wiki --propose-only
 ```
 
-The skill uses the current Claude Code session as the memory-evolution agent.
-The deterministic command is only a helper: it prepares compact memory context,
-writes a checkpoint prompt, validates the agent's JSON response, records
-accepted forgetting/consolidation/association proposals through the shared
-SciEvolve store, and can optionally apply medium/high-confidence proposals as
-reversible SciEvolve memory metadata.
+`/dream` separates the memory-evolution substrate from the policy runtime. The
+policy runtime may be the Claude Code session, an OpenAI-compatible API model
+via `--use-llm`, a local model, or any external agent that writes the same
+strict JSON response. The deterministic command is the substrate: it prepares
+compact memory context, writes a checkpoint prompt, validates the policy
+runtime's JSON response, records accepted forgetting/consolidation/association
+proposals through the shared SciEvolve store, and can optionally apply
+medium/high-confidence proposals as reversible SciEvolve memory metadata.
+
+The reviewer-facing autonomy claim is therefore not that AutoSci ships a
+bespoke agent framework. It is that the same closed loop works across policy
+runtimes: SciMem state -> policy judgment -> evidence validation -> proposal
+store -> guarded memory mutation -> rebuilt downstream context.
 
 For debugging or demos, prepare the same dream context directly:
 
@@ -83,22 +90,28 @@ For debugging or demos, prepare the same dream context directly:
 python3 tools/research_wiki.py dream wiki --json
 ```
 
-After the slash skill writes `dream_agent_response.json`, finalize directly:
+After the slash skill writes `dream_agent_response.json`, finalize directly and
+apply safe medium/high-confidence memory updates:
 
 ```bash
 python3 tools/research_wiki.py dream wiki \
   --agent-response path/to/dream_agent_response.json \
-  --propose \
   --json
 ```
 
-To finalize and safely apply in one pass:
+To finalize without applying mutations:
 
 ```bash
 python3 tools/research_wiki.py dream wiki \
   --agent-response path/to/dream_agent_response.json \
-  --apply-safe \
+  --propose-only \
   --json
+```
+
+To run the same loop without the Claude Code slash-command policy runtime:
+
+```bash
+python3 tools/research_wiki.py dream wiki --use-llm --json
 ```
 
 Each run writes:
@@ -108,17 +121,19 @@ Each run writes:
 - `wiki/outputs/evolution/dream/<run>/dream_agent_prompt.md`
 - `wiki/outputs/evolution/dream/<run>/dream_agent_response.json` when an agent response exists
 - `wiki/outputs/evolution/dream/<run>/dream_report.md`
-- `wiki/outputs/evolution/dream/<run>/dream_apply_report.*` when `--apply-safe` is used
+- `wiki/outputs/evolution/dream/<run>/dream_apply_report.*` when safe
+  applications are attempted
 
 The context includes deterministic memory cues, but those cues are not
 proposals. The agent must cite context evidence before the tool will write a
 proposal artifact.
 
-`--apply-safe` is intentionally narrow. It never edits page bodies, graph
+Safe auto-apply is intentionally narrow. It never rewrites page bodies, graph
 edges, skills, schemas, or templates. It only writes reversible frontmatter
 metadata such as `scievolve_memory_weight`,
 `scievolve_consolidates_with`, `scievolve_associations`,
-`scievolve_last_dream`, and `scievolve_dream_notes`, then records the
-application in `applications.jsonl`, marks the proposal `applied`, and rebuilds
+`scievolve_last_dream`, and `scievolve_dream_notes`, appends an audit-only
+`SciEvolve Memory Evolution Note`, records the application in
+`applications.jsonl`, marks the proposal `applied`, and rebuilds
 `wiki/graph/context_brief.md` so `/ideate`, `/research`, `/ask`, and other
 context-consuming skills can see the evolved memory state.
