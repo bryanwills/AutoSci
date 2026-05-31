@@ -473,5 +473,43 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(rp.classify_signal("all_ideas_failed"), "experiment_failed")
 
 
+class FeedbackCliTests(unittest.TestCase):
+    def _run(self, *args):
+        return subprocess.run([sys.executable, str(TOOLS / "research_pipeline.py"), "feedback", *args],
+                              capture_output=True, text=True)
+
+    def test_cli_feedback_emits_event_exit_0(self) -> None:
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        r = self._run(str(d), "--reason", "evidence:experiment", "--source", "gate", "--json")
+        self.assertEqual(r.returncode, 0)
+        payload = json.loads(r.stdout)
+        self.assertEqual(payload["category"], "evidence_gap")
+        self.assertEqual(payload["action"], "manual_gate")
+        rows = [json.loads(line) for line in (d / "graph" / "pipeline_feedback.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+        self.assertTrue(any(row.get("kind") == "feedback" for row in rows))
+
+    def test_cli_feedback_category_exit_0(self) -> None:
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        r = self._run(str(d), "--category", "schema_error")
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), "[schema_error] -> refine")
+
+    def test_cli_feedback_reason_plain_text(self) -> None:
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        r = self._run(str(d), "--reason", "evidence:experiment")  # no --json -> plain text
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), "[evidence_gap] -> manual_gate (evidence:experiment)")
+
+    def test_cli_feedback_no_args_exit_2(self) -> None:
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        r = self._run(str(d))
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("--category or --reason", r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -420,6 +420,13 @@ def main(argv=None) -> int:
     pg.add_argument("--manuscript", default=None)
     pg.add_argument("--override", action="store_true")
     pg.add_argument("--json", action="store_true")
+    pf = sub.add_parser("feedback")
+    pf.add_argument("wiki_root")
+    pf.add_argument("--category", default=None, choices=sorted(FEEDBACK_ROUTES.keys()))
+    pf.add_argument("--reason", default=None)
+    pf.add_argument("--source", default=None)
+    pf.add_argument("--detail", default=None)
+    pf.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
     if args.command == "status":
@@ -449,6 +456,19 @@ def main(argv=None) -> int:
             for c in verdict.checks:
                 print(f"  [{c.status}] {c.name}: {c.message}")
         return 1 if verdict.decision == "BLOCK" else 0
+    if args.command == "feedback":
+        if not args.category and not args.reason:
+            print("feedback requires --category or --reason", file=sys.stderr)
+            return 2
+        verdict = feedback(category=args.category, reason=args.reason,
+                           source=args.source, detail=args.detail)
+        wiki_events.append_event(args.wiki_root, "pipeline_feedback", verdict.to_event())
+        if args.json:
+            print(json.dumps(verdict.to_event(), ensure_ascii=False, indent=2))
+        else:
+            tag = f" ({verdict.reason})" if verdict.reason else ""
+            print(f"[{verdict.category}] -> {verdict.action}{tag}")
+        return 0
     return 1
 
 
