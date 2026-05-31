@@ -110,6 +110,16 @@ class CheckIntegrationTests(unittest.TestCase):
         self.assertEqual(verdict.status, "BLOCK")
         self.assertTrue(any(c.name == "form:missing-file" for c in verdict.checks))
 
+    def test_outside_wiki_is_block(self) -> None:
+        wiki, _ = self._wiki_with_page()
+        outside = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        page = outside / "stray.md"
+        page.write_text("---\nslug: stray\n---\n# Stray\n", encoding="utf-8")
+        verdict = trust_guard.check(wiki, page, content_reviewer=lambda t, c: None, emit_event=False)
+        self.assertEqual(verdict.status, "BLOCK")
+        self.assertTrue(any(c.name == "form:outside-wiki" for c in verdict.checks))
+
 
 class QuarantineAndEventTests(unittest.TestCase):
     def _wiki_with_page(self) -> tuple[Path, Path, str]:

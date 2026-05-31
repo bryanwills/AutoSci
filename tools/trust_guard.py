@@ -77,6 +77,14 @@ def _artifact_rel(wiki_dir: Path, artifact_path: Path) -> str:
         return str(artifact_path)
 
 
+def _is_under_wiki(wiki_dir: Path, artifact_path: Path) -> bool:
+    try:
+        Path(artifact_path).resolve().relative_to(Path(wiki_dir).resolve())
+        return True
+    except ValueError:
+        return False
+
+
 def check(wiki_dir: Path, artifact_path: Path, *,
           content_reviewer: Callable[[str, dict], trust_content_review.ContentVerdict | None] | None = None,
           repo_root: Path | None = None, emit_event: bool = True) -> TrustVerdict:
@@ -92,6 +100,10 @@ def check(wiki_dir: Path, artifact_path: Path, *,
     if not artifact_path.exists():
         verdict = TrustVerdict(artifact=rel, status=BLOCK,
                                checks=[TrustCheck("form:missing-file", BLOCK, f"{rel} does not exist")])
+    elif not _is_under_wiki(wiki_dir, artifact_path):
+        verdict = TrustVerdict(artifact=rel, status=BLOCK,
+                               checks=[TrustCheck("form:outside-wiki", BLOCK,
+                                                  f"{rel} is not under the wiki dir {wiki_dir}")])
     else:
         checks = run_form_checks(wiki_dir, rel)
         text = artifact_path.read_text(encoding="utf-8")
