@@ -276,7 +276,7 @@ def _edge_key(edge: dict) -> tuple[str, str, str]:
 
 def add_edge(wiki_root: str, from_id: str, to_id: str,
              edge_type: str, evidence: str = "", confidence: str = "",
-             symmetric: bool = False) -> None:
+             symmetric: bool = False, attrs: dict | None = None) -> None:
     """Append a typed edge to graph/edges.jsonl with dedup and entity validation."""
     if edge_type not in VALID_EDGE_TYPES:
         print(json.dumps({
@@ -288,6 +288,16 @@ def add_edge(wiki_root: str, from_id: str, to_id: str,
         print(json.dumps({
             "status": "error",
             "message": f"Unknown confidence '{confidence}'. Valid: {sorted(EDGE_CONFIDENCE_VALUES)}"
+        }))
+        sys.exit(1)
+    attrs = attrs or {}
+    allowed = set(EDGES.get(edge_type, {}).get("attributes", {}))
+    unknown = sorted(k for k in attrs if k not in allowed)
+    if unknown:
+        print(json.dumps({
+            "status": "error",
+            "message": f"Unknown attribute(s) {unknown} for edge '{edge_type}'. "
+                       f"Allowed: {sorted(allowed)}"
         }))
         sys.exit(1)
 
@@ -348,6 +358,8 @@ def add_edge(wiki_root: str, from_id: str, to_id: str,
         edge["confidence"] = confidence
     if is_symmetric:
         edge["symmetric"] = True
+    for k, v in attrs.items():
+        edge[k] = v
 
     with open(edges_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(edge, ensure_ascii=False) + "\n")
@@ -2692,6 +2704,8 @@ def main():
     p.add_argument("--confidence", default="",
                    choices=["", *sorted(EDGE_CONFIDENCE_VALUES)])
     p.add_argument("--symmetric", action="store_true")
+    p.add_argument("--attr", action="append", default=[], metavar="KEY=VALUE",
+                   help="Structured edge attribute (repeatable), e.g. --attr metric_value=94.2")
 
     # add-citation
     p = sub.add_parser("add-citation", help="Add paper citation to graph/citations.jsonl")
@@ -2878,9 +2892,17 @@ def main():
     elif args.command == "slug":
         print(slugify(args.title))
     elif args.command == "add-edge":
+        attrs: dict = {}
+        for kv in args.attr:
+            if "=" not in kv:
+                print(json.dumps({"status": "error",
+                                  "message": f"--attr must be KEY=VALUE, got {kv!r}"}))
+                sys.exit(1)
+            k, v = kv.split("=", 1)
+            attrs[k.strip()] = v.strip()
         add_edge(args.wiki_root, args.from_id, args.to_id,
                  args.edge_type, args.evidence, args.confidence,
-                 args.symmetric)
+                 args.symmetric, attrs)
     elif args.command == "add-citation":
         add_citation(args.wiki_root, args.from_id, args.to_id, args.source)
     elif args.command == "add-citations-batch":
