@@ -106,6 +106,22 @@ class ValidatePipelineTests(unittest.TestCase):
         issues = loader.validate_pipeline(_ok_fm(), log)
         self.assertTrue(any(s == "BLOCK" and "stage4" in m and "later" in m for s, m in issues))
 
+    def test_stage3_await_snapshot_passes(self) -> None:
+        # the real /research Stage-3b await state: experiments running, idea in_progress
+        fm = _ok_fm()
+        fm["current_stage"] = "stage3-await"
+        fm["experiment_slugs"] = ["e1"]
+        fm["idea_slug"] = "i1"
+        log = _ok_log()
+        for k in ("stage1", "gate1", "stage2", "stage3a"):
+            log[k] = "completed"
+        log["stage3b"] = "running"
+
+        def status(kind, slug):
+            return {"experiments:e1": "running", "ideas:i1": "in_progress"}.get(f"{kind}:{slug}")
+
+        self.assertEqual(loader.validate_pipeline(fm, log, entity_status=status), [])
+
     def test_at_verdict_via_stage4_completed_path(self) -> None:
         fm = _ok_fm(); fm["current_stage"] = "stage3"; fm["experiment_slugs"] = ["e1"]
         log = _ok_log()

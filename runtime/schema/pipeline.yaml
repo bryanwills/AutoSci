@@ -11,7 +11,7 @@ frontmatter:
     slug:               { type: str }
     direction:          { type: str }
     status:             { type: enum, values: [running, completed, failed, paused], default: running }
-    current_stage:      { type: enum, values: [stage0, stage1, stage2, stage3, stage4, stage5] }
+    current_stage:      { type: enum, values: [stage0, stage1, stage2, stage3, stage3-await, stage4, stage5] }
     started:            { type: date }
     mode:               { type: enum, values: [auto, interactive] }
     skip_paper:         { type: bool, default: false }
@@ -43,6 +43,7 @@ current_stage_map:
   stage1: [stage1, gate1]
   stage2: [stage2]
   stage3: [stage3a, stage3b, stage3c]
+  stage3-await: [stage3a, stage3b, stage3c]
   stage4: [stage4, gate2]
   stage5: [stage5]
 
@@ -60,5 +61,6 @@ paper_stage:
   stage1: Ideation
   stage2: Experiment
   stage3: Experiment
+  stage3-await: Experiment
   stage4: Experiment
   stage5: Writing

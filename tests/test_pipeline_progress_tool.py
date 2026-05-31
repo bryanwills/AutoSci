@@ -92,6 +92,18 @@ class PipelineProgressToolTests(unittest.TestCase):
         issues = pp.validate(d)
         self.assertTrue(any(s == "BLOCK" and "ghost" in m for s, m in issues))
 
+    def test_validate_stage3_await_snapshot_passes(self) -> None:
+        text = _GOOD.replace("current_stage: stage1", "current_stage: stage3-await")
+        text = text.replace("experiment_slugs: []", "experiment_slugs: [e1]")
+        text = text.replace("- Stage 1: pending", "- Stage 1: completed")
+        text = text.replace("- Gate 1: pending", "- Gate 1: completed")
+        text = text.replace("- Stage 2: pending", "- Stage 2: completed")
+        text = text.replace("- Stage 3a (Deploy): pending", "- Stage 3a (Deploy): completed")
+        text = text.replace("- Stage 3b (Await): pending", "- Stage 3b (Await): running")
+        d = _wiki(text, pages={"experiments/e1.md": "running"})
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        self.assertEqual(pp.validate(d), [])
+
     def test_validate_resolves_real_entity_status(self) -> None:
         text = _GOOD.replace("current_stage: stage1", "current_stage: stage4")
         text = text.replace("experiment_slugs: []", "experiment_slugs: [e1]")

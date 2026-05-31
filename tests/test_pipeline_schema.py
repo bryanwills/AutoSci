@@ -24,7 +24,7 @@ class PipelineSchemaTests(unittest.TestCase):
     def test_field_enums(self) -> None:
         enums = loader.pipeline_field_enums()
         self.assertEqual(enums["status"], {"running", "completed", "failed", "paused"})
-        self.assertEqual(enums["current_stage"], {"stage0", "stage1", "stage2", "stage3", "stage4", "stage5"})
+        self.assertEqual(enums["current_stage"], {"stage0", "stage1", "stage2", "stage3", "stage3-await", "stage4", "stage5"})
         self.assertEqual(enums["mode"], {"auto", "interactive"})
 
     def test_stage_log_keys_in_order(self) -> None:
