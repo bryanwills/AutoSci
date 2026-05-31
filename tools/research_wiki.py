@@ -1256,6 +1256,16 @@ CONTEXT_BUDGETS = {
     "general":      (2000,  1500, 1500,   2000,   0,           1000,  0),
 }
 
+STAGE_PURPOSE = {
+    "stage1": "ideation",
+    "stage2": "experiment",
+    "stage3": "experiment",
+    "stage3-await": "experiment",
+    "stage4": "review",
+    "stage5": "writing",
+    "rebuttal": "review",
+}
+
 
 def _entity_edge_counts(wiki_root: str) -> dict[str, int]:
     """Count edges per entity node for connectivity-based ranking."""
@@ -1267,19 +1277,78 @@ def _entity_edge_counts(wiki_root: str) -> dict[str, int]:
     return dict(counts)
 
 
-def compile_context(wiki_root: str, purpose: str,
-                    max_chars: int = 8000) -> None:
+def _entity_context_section(wiki_root: str, entity: str, depth: int, budget: int) -> tuple[str, int]:
+    """Return (markdown focus section, neighbor_count) centered on `entity`
+    ("<kind>/<slug>"): the entity summary, its graph neighborhood (incl.
+    frontmatter-projected edges), and related prior failures/lessons."""
+    root = Path(wiki_root)
+    kind, _, slug = entity.partition("/")
+    lines: list[str] = []
+
+    page = root / kind / f"{slug}.md"
+    if page.exists():
+        fm = _parse_frontmatter(page)
+        title = fm.get("title") or fm.get("name") or slug
+        status = fm.get("status", "")
+        head = f"## Focus: {kind}/{slug} — {title}"
+        if status:
+            head += f" [{status}]"
+        lines.append(head)
+    else:
+        lines.append(f"## Focus: {kind}/{slug} (page not found)")
+
+    nodes = graph_neighbors(wiki_root, entity, depth=depth, include_projected=True)
+
+    # Related prior failures / lessons first, so they survive budget truncation.
+    failures: list[str] = []
+    for n in nodes:
+        nkind, _, nslug = n["id"].partition("/")
+        npage = root / nkind / f"{nslug}.md"
+        if not npage.exists():
+            continue
+        nfm = _parse_frontmatter(npage)
+        if nkind == "ideas" and nfm.get("status") in ("failed", "rejected"):
+            failures.append(f"- idea {nslug}: {nfm.get('failure_reason', '')}".rstrip())
+        elif nkind == "experiments" and nfm.get("outcome") == "failed":
+            failures.append(f"- experiment {nslug}: failed ({nfm.get('key_result', '')})")
+    if failures:
+        lines.append("### Related prior failures / lessons")
+        lines.extend(failures)
+
+    if nodes:
+        lines.append(f"### Graph neighborhood (depth {depth}, {len(nodes)} nodes)")
+        for n in nodes:
+            ev = f" — {n['evidence']}" if n.get("evidence") else ""
+            lines.append(f"- [{n['edge']}/{n['direction']}] {n['id']}{ev}")
+
+    section = "\n".join(lines) + "\n"
+    return section[:budget], len(nodes)
+
+
+def compile_context(wiki_root: str, purpose: str | None = None,
+                    max_chars: int = 8000, *, entity: str | None = None,
+                    stage: str | None = None, neighbors_depth: int = 1) -> None:
     """Generate purpose-specific compressed context for downstream skills.
 
-    Replaces the old one-size-fits-all rebuild_context_brief with budget
-    allocations tuned per skill category.
+    When `entity` is given, prepend an entity-centered Focus section (graph
+    neighborhood + related failures), write to context_pack.md instead of the
+    shared context_brief.md, and emit a `kind:context` pipeline event.
     """
     root = Path(wiki_root)
+    if not purpose:
+        purpose = STAGE_PURPOSE.get(stage) if stage else None
+    purpose = purpose or "general"
     budgets = CONTEXT_BUDGETS.get(purpose, CONTEXT_BUDGETS["general"])
     b_methods, b_gaps, b_failed, b_papers, b_experiments, b_edges, b_stale = budgets
 
     edge_counts = _entity_edge_counts(wiki_root)
     sections: list[str] = []
+
+    _ctx_neighbor_count = 0
+    if entity:
+        focus, _ctx_neighbor_count = _entity_context_section(
+            wiki_root, entity, neighbors_depth, min(3000, max_chars // 2))
+        sections.append(focus)
 
     # 1. Methods summary — most-connected reusable methods first.
     if b_methods > 0:
@@ -1417,10 +1486,21 @@ def compile_context(wiki_root: str, purpose: str,
                 pack += s[:remaining] + "\n...(truncated)\n"
             break
 
-    pack_path = root / DERIVED_DIR / "context_brief.md"
+    out_name = "context_pack.md" if entity else "context_brief.md"
+    pack_path = root / DERIVED_DIR / out_name
     pack_path.parent.mkdir(parents=True, exist_ok=True)
     pack_path.write_text(pack, encoding="utf-8")
-    print(json.dumps({"status": "ok", "purpose": purpose, "chars": len(pack)}))
+
+    status = {"status": "ok", "purpose": purpose, "chars": len(pack)}
+    if entity:
+        status["entity"] = entity
+        if stage:
+            status["stage"] = stage
+        append_event(wiki_root, "pipeline_events", {
+            "kind": "context", "entity": entity, "stage": stage,
+            "purpose": purpose, "chars": len(pack), "neighbors": _ctx_neighbor_count,
+        })
+    print(json.dumps(status))
 
 
 # ---------------------------------------------------------------------------
@@ -2710,8 +2790,11 @@ def main():
     p = sub.add_parser("compile-context",
                        help="Generate purpose-specific context")
     p.add_argument("wiki_root")
-    p.add_argument("--for", dest="purpose", required=True,
+    p.add_argument("--for", dest="purpose", required=False, default=None,
                    choices=list(CONTEXT_BUDGETS.keys()))
+    p.add_argument("--stage", default=None, choices=list(STAGE_PURPOSE.keys()))
+    p.add_argument("--entity", default=None)
+    p.add_argument("--include-neighbors-depth", dest="neighbors_depth", type=int, default=1)
     p.add_argument("--max-chars", type=int, default=8000)
 
     # append-event
@@ -2849,7 +2932,11 @@ def main():
         neighbors(args.wiki_root, args.node_id, args.depth,
                   edge_type_list, direction)
     elif args.command == "compile-context":
-        compile_context(args.wiki_root, args.purpose, args.max_chars)
+        if args.entity and "/" not in args.entity:
+            print("--entity must be '<kind>/<slug>'", file=sys.stderr)
+            sys.exit(2)
+        compile_context(args.wiki_root, args.purpose, args.max_chars,
+                        entity=args.entity, stage=args.stage, neighbors_depth=args.neighbors_depth)
     elif args.command == "transition":
         transition(args.path, args.new_status, args.reason)
     elif args.command == "batch-edges":
