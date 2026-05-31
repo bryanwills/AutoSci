@@ -202,6 +202,9 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     if args.command == "verify-claims":
+        man_path = Path(args.wiki_dir) / "manuscripts" / f"{args.manuscript_slug}.md"
+        if not man_path.exists():
+            print(f"warning: manuscript not found: {man_path}", file=sys.stderr)
         results = verify_claims(Path(args.wiki_dir), args.manuscript_slug)
         if args.json:
             print(json.dumps({

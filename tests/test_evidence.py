@@ -151,5 +151,14 @@ class TestEndToEnd(unittest.TestCase):
         self.assertIn("no idea/experiment/method claims", r.stdout)
 
 
+    def test_missing_manuscript_warns_on_stderr(self):
+        d = _wiki(with_edge=False)
+        r = subprocess.run(
+            [sys.executable, str(TOOLS / "evidence.py"), "verify-claims", "does-not-exist",
+             "--wiki-dir", str(d)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0)          # advisory: missing slug does not change exit code
+        self.assertIn("not found", r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
