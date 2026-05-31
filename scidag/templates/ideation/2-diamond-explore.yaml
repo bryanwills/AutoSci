@@ -1,0 +1,20 @@
+name: diamond-explore
+stage: ideation
+complexity: 2
+paper_figure: false
+description: "One reasoned draft, then two divergent transforms (refine vs. explore) that vote at the end. The canonical diamond: fan-out into improve/explore, fan-in at the final vote."
+# Mirrors /ideate's tension between sharpening a promising direction (Refine)
+# and exploring a genuinely different bet (Variation), then choosing.
+#
+#        root
+#         |
+#     GenerateCoT
+#        /  \
+#   Refine  Variation        -> final vote across the two leaves
+nodes:
+  - op: GenerateCoT
+    parents: [root]
+  - op: Refine
+    parents: [0]
+  - op: Variation
+    parents: [0]

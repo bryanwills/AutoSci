@@ -1,0 +1,32 @@
+name: iterative-test-refine
+stage: experiment
+complexity: 4
+paper_figure: false
+description: "Core operators only (generate + test + refine). A test→refine→test chain (the iterative-ablation spirit) runs alongside an independently tested second draft, then both reliability results are consolidated by Refine. Test appears three times — maximal reliability emphasis without leaving the core operator set."
+#
+#        root ─────────────┐
+#         |                 |
+#     GenerateCoT        Generate
+#         |                 |
+#        Test              Test
+#         |                 |
+#       Refine              |
+#         |                 |
+#        Test               |
+#          \               /
+#            Refine                 (single leaf = consolidated reliable design)
+nodes:
+  - op: GenerateCoT
+    parents: [root]
+  - op: Test
+    parents: [0]
+  - op: Refine
+    parents: [1]
+  - op: Test
+    parents: [2]
+  - op: Generate
+    parents: [root]
+  - op: Test
+    parents: [4]
+  - op: Refine
+    parents: [3, 5]

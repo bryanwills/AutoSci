@@ -1,0 +1,30 @@
+name: review-polish-review
+stage: writing
+complexity: 3
+paper_figure: false
+description: "Core operators only (review + polish), a two-pass review→polish→review cycle plus a parallel review of the raw draft. One draft is reviewed and polished, the polished result is reviewed again, and that re-review is merged with an independent review of the original draft by a final Polish. Review/polish-centric."
+#
+#        root
+#         |
+#     GenerateCoT
+#        /  \
+#   Review   Review        (left = re-review path, right = raw-draft review)
+#     |        |
+#   Polish     |
+#     |        |
+#   Review     |
+#        \    /
+#        Polish               (single leaf = polished outline)
+nodes:
+  - op: GenerateCoT
+    parents: [root]
+  - op: Review
+    parents: [0]
+  - op: Review
+    parents: [0]
+  - op: Polish
+    parents: [1]
+  - op: Review
+    parents: [3]
+  - op: Polish
+    parents: [4, 2]
