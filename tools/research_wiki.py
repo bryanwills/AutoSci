@@ -87,6 +87,7 @@ from runtime.loader import (  # noqa: E402
     validate_lifecycle_transition,
 )
 import pipeline_progress  # noqa: E402  (tools/ sibling module)
+from wiki_events import ALLOWED_EVENT_STREAMS, append_event  # noqa: E402,F401  (re-export; research_wiki.append_event kept for back-compat)
 
 DERIVED_DIR = "graph"
 
@@ -2096,27 +2097,6 @@ def append_log(wiki_root: str, message: str) -> None:
             f.write(entry)
     else:
         log_path.write_text(f"# OmegaWiki Log\n\n{entry}", encoding="utf-8")
-
-
-ALLOWED_EVENT_STREAMS = {"trust_events", "pipeline_events", "jobs", "consolidation_events"}
-
-
-def append_event(wiki_root: str, stream: str, record: dict[str, object]) -> None:
-    """Append one JSON record to wiki/graph/<stream>.jsonl (the only sanctioned
-    writer for wiki/graph/ event logs, per hard-rule 2). A UTC `ts` is stamped
-    if the caller did not provide one."""
-    if stream not in ALLOWED_EVENT_STREAMS:
-        raise ValueError(
-            f"unknown event stream {stream!r}; allowed: {sorted(ALLOWED_EVENT_STREAMS)}"
-        )
-    root = Path(wiki_root)
-    graph_dir = root / DERIVED_DIR
-    graph_dir.mkdir(parents=True, exist_ok=True)
-    row = dict(record)
-    row.setdefault("ts", datetime.now(timezone.utc).isoformat(timespec="seconds"))
-    path = graph_dir / f"{stream}.jsonl"
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------------------------
