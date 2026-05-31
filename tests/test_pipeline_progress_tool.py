@@ -18,6 +18,12 @@ pp = importlib.util.module_from_spec(spec)
 sys.modules["pipeline_progress"] = pp
 spec.loader.exec_module(pp)
 
+lint_spec = importlib.util.spec_from_file_location("lint", TOOLS / "lint.py")
+assert lint_spec and lint_spec.loader
+lint = importlib.util.module_from_spec(lint_spec)
+sys.modules["lint"] = lint
+lint_spec.loader.exec_module(lint)
+
 _GOOD = """---
 slug: p1
 direction: kernel opt
@@ -100,6 +106,28 @@ class PipelineProgressToolTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, d, ignore_errors=True)
         issues = pp.validate(d)
         self.assertTrue(any(s == "BLOCK" and "e1" in m for s, m in issues))
+
+
+class LintHookTests(unittest.TestCase):
+    def test_lint_surfaces_pipeline_block(self) -> None:
+        text = _GOOD.replace('idea_slug: ""', "idea_slug: ghost")
+        d = _wiki(text)
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        issues = lint.check_pipeline_progress(d)
+        self.assertTrue(any(i.category == "pipeline" and i.level == "🔴" for i in issues))
+        self.assertTrue(any("ghost" in i.message for i in issues))
+
+    def test_lint_clean_snapshot_no_pipeline_issue(self) -> None:
+        d = _wiki(_GOOD)
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        self.assertEqual(lint.check_pipeline_progress(d), [])
+
+    def test_lint_aggregate_includes_pipeline(self) -> None:
+        text = _GOOD.replace("current_stage: stage1", "current_stage: stage9")
+        d = _wiki(text)
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        cats = {i.category for i in lint.lint(d)}
+        self.assertIn("pipeline", cats)
 
 
 if __name__ == "__main__":

@@ -54,6 +54,7 @@ from runtime.loader import (  # noqa: E402
     edge_requires_confidence,
     validate_edge_attributes,
 )
+import pipeline_progress  # noqa: E402  (tools/ sibling module; shares the runtime bridge)
 
 WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
@@ -735,6 +736,20 @@ def check_content_quality(wiki_dir: Path, pages: dict[str, Path]) -> list[LintIs
     return issues
 
 
+_PIPELINE_SEVERITY_LEVEL = {"BLOCK": "🔴", "WARN": "🟡"}
+
+
+def check_pipeline_progress(wiki_dir: Path) -> list[LintIssue]:
+    """Validate wiki/outputs/pipeline-progress.md (no-op if the file is absent)."""
+    issues = []
+    for severity, message in pipeline_progress.validate(wiki_dir):
+        issues.append(LintIssue(
+            _PIPELINE_SEVERITY_LEVEL.get(severity, "🟡"),
+            "pipeline", "outputs/pipeline-progress.md", message,
+        ))
+    return issues
+
+
 def lint(wiki_dir: Path) -> list[LintIssue]:
     """Run all lint checks and return sorted issues."""
     pages = find_all_pages(wiki_dir)
@@ -751,6 +766,7 @@ def lint(wiki_dir: Path) -> list[LintIssue]:
     issues.extend(check_graph_edges(wiki_dir, pages))
     issues.extend(check_graph_citations(wiki_dir, pages))
     issues.extend(check_content_quality(wiki_dir, pages))
+    issues.extend(check_pipeline_progress(wiki_dir))
 
     return issues
 
