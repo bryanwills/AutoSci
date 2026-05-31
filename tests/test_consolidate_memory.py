@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
@@ -110,6 +111,85 @@ class ProposeCliTests(unittest.TestCase):
         events = d / "graph" / "consolidation_events.jsonl"
         rows = [json.loads(line) for line in events.read_text(encoding="utf-8").splitlines() if line.strip()]
         self.assertTrue(any(row.get("kind") == "consolidation_proposed" for row in rows))
+
+
+class ApplyTests(unittest.TestCase):
+    def _patch(self, d):
+        return {"kind": "topic_open_problem", "target": "topics/t1", "section": "## Open problems",
+                "line": "- Failed Idea: did not work (failed idea i-fail)",
+                "source": "ideas/i-fail", "rationale": "x"}
+
+    def test_apply_appends_line(self) -> None:
+        d = _wiki()
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        with mock.patch.object(cm.trust_guard, "check", return_value=mock.Mock(status="PASS")):
+            res = cm.apply_patch(d, self._patch(d), repo_root=d)
+        self.assertTrue(res["appended"])
+        self.assertEqual(res["trust"], "PASS")
+        self.assertIn("did not work", (d / "topics" / "t1.md").read_text(encoding="utf-8"))
+
+    def test_apply_idempotent(self) -> None:
+        d = _wiki()
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        with mock.patch.object(cm.trust_guard, "check", return_value=mock.Mock(status="PASS")):
+            cm.apply_patch(d, self._patch(d), repo_root=d)
+            res2 = cm.apply_patch(d, self._patch(d), repo_root=d)
+        self.assertFalse(res2["appended"])
+        body = (d / "topics" / "t1.md").read_text(encoding="utf-8")
+        self.assertEqual(body.count("did not work"), 1)
+
+    def test_apply_missing_target(self) -> None:
+        d = _wiki()
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        p = {"kind": "x", "target": "topics/ghost", "section": "## Open problems",
+             "line": "- z", "source": "ideas/i", "rationale": "x"}
+        res = cm.apply_patch(d, p, repo_root=d)
+        self.assertFalse(res["appended"])
+        self.assertEqual(res["trust"], "missing")
+
+    def test_cmd_apply_bad_json_exit_2(self) -> None:
+        d = _wiki()
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        pf = d / "bad.json"
+        pf.write_text("not json at all", encoding="utf-8")
+        rc = cm.cmd_apply(str(d), str(pf), str(d), False)
+        self.assertEqual(rc, 2)
+        self.assertFalse((d / "graph" / "consolidation_events.jsonl").exists())  # no writes
+
+    def test_cmd_apply_missing_key_exit_2(self) -> None:
+        d = _wiki()
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        pf = d / "p.json"
+        pf.write_text(json.dumps([{"section": "## Open problems", "line": "x"}]), encoding="utf-8")  # no "target"
+        rc = cm.cmd_apply(str(d), str(pf), str(d), False)
+        self.assertEqual(rc, 2)
+
+    def test_cmd_apply_block_returns_1(self) -> None:
+        d = _wiki()
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        pf = d / "p.json"
+        pf.write_text(json.dumps([self._patch(d)]), encoding="utf-8")
+        with mock.patch.object(cm.trust_guard, "check", return_value=mock.Mock(status="BLOCK")):
+            rc = cm.cmd_apply(str(d), str(pf), str(d), False)
+        self.assertEqual(rc, 1)
+
+
+class ApplyCliTests(unittest.TestCase):
+    def test_cli_apply_runs_and_emits(self) -> None:
+        d = _wiki()
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        patch_file = d / "patch.json"
+        patch_file.write_text(json.dumps([{
+            "kind": "topic_open_problem", "target": "topics/t1", "section": "## Open problems",
+            "line": "- Failed Idea: did not work (failed idea i-fail)",
+            "source": "ideas/i-fail", "rationale": "x"}]), encoding="utf-8")
+        r = subprocess.run([sys.executable, str(TOOLS / "consolidate_memory.py"), "apply",
+                            str(d), str(patch_file), "--repo-root", str(d)], capture_output=True, text=True)
+        self.assertIn(r.returncode, (0, 1))  # 1 only if real lint BLOCKs the minimal page
+        self.assertIn("did not work", (d / "topics" / "t1.md").read_text(encoding="utf-8"))
+        events = d / "graph" / "consolidation_events.jsonl"
+        rows = [json.loads(line) for line in events.read_text(encoding="utf-8").splitlines() if line.strip()]
+        self.assertTrue(any(row.get("kind") == "consolidation_applied" for row in rows))
 
 
 if __name__ == "__main__":

@@ -134,6 +134,51 @@ def cmd_propose(wiki_root: str, out: str | None, repo_root: str, as_json: bool) 
     return 0
 
 
+def apply_patch(wiki_dir, patch: dict, *, repo_root) -> dict:
+    """Apply one approved patch: append the line to the target page section
+    (idempotent / creates the section if missing), then Trust-Guard the page
+    (form-only). Returns {target, appended, trust}."""
+    target_path = Path(wiki_dir) / f"{patch['target']}.md"
+    if not target_path.exists():
+        return {"target": patch["target"], "appended": False, "trust": "missing"}
+    appended = lint._append_to_section(target_path, patch["section"], patch["line"])
+    verdict = trust_guard.check(Path(wiki_dir), target_path,
+                                content_reviewer=lambda text, context: None,
+                                repo_root=Path(repo_root), emit_event=False)
+    return {"target": patch["target"], "appended": appended, "trust": verdict.status}
+
+
+def cmd_apply(wiki_root: str, patch_file: str, repo_root: str, as_json: bool) -> int:
+    try:
+        patches = json.loads(Path(patch_file).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"cannot read patch file: {exc}", file=sys.stderr)
+        return 2
+    if not isinstance(patches, list):
+        print("patch file must be a JSON array of patches", file=sys.stderr)
+        return 2
+    required = ("target", "section", "line")
+    for i, patch in enumerate(patches):
+        if not isinstance(patch, dict) or not all(k in patch for k in required):
+            print(f"patch[{i}] missing required keys {required}", file=sys.stderr)
+            return 2
+
+    results = []
+    for patch in patches:
+        res = apply_patch(wiki_root, patch, repo_root=repo_root)
+        wiki_events.append_event(wiki_root, "consolidation_events", {
+            "kind": "consolidation_applied", "patch": patch,
+            "appended": res["appended"], "trust": res["trust"],
+        })
+        results.append(res)
+    blocked = any(r["trust"] == "BLOCK" for r in results)
+    if as_json:
+        print(json.dumps(results, ensure_ascii=False, indent=2))
+    else:
+        print(json.dumps({"status": "ok", "applied": len(results), "blocked": blocked}))
+    return 1 if blocked else 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="consolidate_memory")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -142,10 +187,17 @@ def main(argv=None) -> int:
     pp.add_argument("--out", default=None)
     pp.add_argument("--repo-root", default=".")
     pp.add_argument("--json", action="store_true")
+    pa = sub.add_parser("apply")
+    pa.add_argument("wiki_root")
+    pa.add_argument("patch_file")
+    pa.add_argument("--repo-root", default=".")
+    pa.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
     if args.command == "propose":
         return cmd_propose(args.wiki_root, args.out, args.repo_root, args.json)
+    if args.command == "apply":
+        return cmd_apply(args.wiki_root, args.patch_file, args.repo_root, args.json)
     return 1
 
 
