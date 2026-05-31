@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import shutil
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -143,6 +147,131 @@ class PlanNextTests(unittest.TestCase):
     def test_stage4_no_exps_manual_gate(self) -> None:
         d = rp.plan_next(_fm(current_stage="stage4"), _log(stage4="completed"), [], "tested")
         self.assertEqual((d.action, d.reason), ("manual_gate", "no_experiment_results"))
+
+
+_PROGRESS = """---
+slug: p1
+direction: kernel opt
+status: running
+current_stage: stage3-await
+started: 2026-05-31
+mode: auto
+skip_paper: false
+idea_slug: i1
+experiment_slugs: [e-baseline, e-val]
+stage3a_deployed: [e-baseline, e-val]
+linked_idea_slugs: []
+iteration_count: 0
+---
+## Stage Log
+- Stage 0 (Bootstrap): skipped
+- Stage 1: completed
+- Gate 1: completed
+- Stage 2: completed
+- Stage 3a (Deploy): completed
+- Stage 3b (Await): running
+- Stage 3c (Collect): pending
+- Stage 4: pending
+- Gate 2: pending
+- Stage 5: pending
+"""
+
+
+def _wiki(progress=_PROGRESS, exps=None, idea_status="in_progress") -> Path:
+    d = Path(tempfile.mkdtemp())
+    (d / "outputs").mkdir(parents=True, exist_ok=True)
+    (d / "experiments").mkdir(parents=True, exist_ok=True)
+    (d / "ideas").mkdir(parents=True, exist_ok=True)
+    if progress is not None:
+        (d / "outputs" / "pipeline-progress.md").write_text(progress, encoding="utf-8")
+    for slug, fields in (exps or {}).items():
+        fm = "\n".join(f"{k}: {v}" for k, v in fields.items())
+        (d / "experiments" / f"{slug}.md").write_text(f"---\nslug: {slug}\n{fm}\n---\n# {slug}\n", encoding="utf-8")
+    if idea_status is not None:
+        (d / "ideas" / "i1.md").write_text(f"---\nslug: i1\nstatus: {idea_status}\n---\n# i1\n", encoding="utf-8")
+    return d
+
+
+class ToolTests(unittest.TestCase):
+    def test_derive_exp_states_reads_pages(self) -> None:
+        d = _wiki(exps={"e-baseline": {"status": "completed", "outcome": "succeeded", "tags": "[baseline]"},
+                        "e-val": {"status": "running"}})
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        states = rp.derive_exp_states(d, ["e-baseline", "e-val"])
+        by = {e.slug: e for e in states}
+        self.assertEqual(by["e-baseline"].status, "completed")
+        self.assertEqual(by["e-baseline"].outcome, "succeeded")
+        self.assertTrue(rp.is_baseline(by["e-baseline"]))
+        self.assertEqual(by["e-val"].status, "running")
+
+    def test_resume_plan_awaits_when_running(self) -> None:
+        d = _wiki(exps={"e-baseline": {"status": "completed", "outcome": "succeeded"},
+                        "e-val": {"status": "running"}})
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        decision = rp.resume_plan(d)
+        self.assertEqual(decision.action, "await")
+
+    def test_resume_plan_collect_when_all_done(self) -> None:
+        d = _wiki(exps={"e-baseline": {"status": "completed", "outcome": "succeeded"},
+                        "e-val": {"status": "completed", "outcome": "succeeded"}})
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        decision = rp.resume_plan(d)
+        self.assertEqual((decision.action, decision.reason), ("resume", "stage3-collect"))
+
+    def test_resume_plan_baseline_failed_terminates(self) -> None:
+        d = _wiki(exps={"e-baseline": {"status": "completed", "outcome": "failed"},
+                        "e-val": {"status": "completed", "outcome": "succeeded"}})
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        decision = rp.resume_plan(d)
+        self.assertEqual((decision.action, decision.reason), ("terminate", "baseline_collect_failed"))
+
+    def test_status_no_pipeline(self) -> None:
+        d = _wiki(progress=None)
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        text = rp.status(d)
+        self.assertIn("no active pipeline", text.lower())
+
+
+class CliTests(unittest.TestCase):
+    def _run(self, *args):
+        return subprocess.run([sys.executable, str(TOOLS / "research_pipeline.py"), *args],
+                              capture_output=True, text=True)
+
+    def test_cli_resume_plan_runs(self) -> None:
+        d = _wiki(exps={"e-baseline": {"status": "completed", "outcome": "succeeded"},
+                        "e-val": {"status": "completed", "outcome": "succeeded"}})
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        r = self._run("resume-plan", str(d))
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("stage3-collect", r.stdout)
+
+    def test_cli_status_json(self) -> None:
+        d = _wiki(exps={"e-baseline": {"status": "completed", "outcome": "succeeded"},
+                        "e-val": {"status": "running"}})
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        r = self._run("status", str(d), "--json")
+        self.assertEqual(r.returncode, 0)
+        payload = json.loads(r.stdout)
+        self.assertEqual(payload["current_stage"], "stage3-await")
+        self.assertEqual(payload["decision"]["action"], "await")
+
+    def test_cli_status_json_handles_date_started(self) -> None:
+        # /exp-run writes `started: YYYY-MM-DD`; yaml loads it as datetime.date.
+        d = _wiki(exps={"e-baseline": {"status": "completed", "outcome": "succeeded", "started": "2026-05-31"},
+                        "e-val": {"status": "running", "started": "2026-05-31"}})
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        r = self._run("status", str(d), "--json")
+        self.assertEqual(r.returncode, 0)
+        payload = json.loads(r.stdout)
+        self.assertEqual(payload["experiments"][0]["started"], "2026-05-31")
+
+    def test_cli_validate_block_exits_1(self) -> None:
+        prog = _PROGRESS.replace("idea_slug: i1", "idea_slug: ghost")
+        d = _wiki(progress=prog, idea_status=None,
+                  exps={"e-baseline": {"status": "completed"}, "e-val": {"status": "completed"}})
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        r = self._run("validate", str(d))
+        self.assertEqual(r.returncode, 1)
 
 
 if __name__ == "__main__":

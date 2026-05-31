@@ -7,7 +7,16 @@ Stage-3 job state is derived live from experiment pages — there is no jobs.jso
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import argparse
+import json
+import sys
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+
+import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pipeline_progress  # noqa: E402  (tools/ sibling; reuses parse_progress + validate)
 
 
 @dataclass
@@ -118,3 +127,141 @@ def plan_next(frontmatter: dict, stage_log: dict, exp_states: list, idea_status)
         return Decision("resume", "stage5", "/research --start-from stage5")
 
     return Decision("resume", stage or "stage1", f"/research --start-from {stage or 'stage1'}")
+
+
+def _read_frontmatter(path: Path) -> dict:
+    """YAML-load a page's frontmatter. Intentionally a small standalone reader
+    (generalizes pipeline_progress._read_status) to avoid importing research_wiki."""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return {}
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return {}
+    fm = yaml.safe_load(parts[1])
+    return fm if isinstance(fm, dict) else {}
+
+
+def derive_exp_states(wiki_dir, slugs) -> list:
+    """Build ExpState list from experiment pages (no jobs registry)."""
+    states = []
+    for slug in slugs or []:
+        slug = _clean_slug(slug)
+        fm = _read_frontmatter(Path(wiki_dir) / "experiments" / f"{slug}.md")
+        started = fm.get("started")
+        states.append(ExpState(
+            slug=slug,
+            status=fm.get("status"),
+            outcome=fm.get("outcome"),
+            started=str(started) if started is not None else None,
+            estimated_hours=fm.get("estimated_hours"),
+            tags=fm.get("tags") or [],
+        ))
+    return states
+
+
+def _read_idea_status(wiki_dir, idea_slug):
+    idea_slug = _clean_slug(idea_slug)
+    if not idea_slug:
+        return None
+    return _read_frontmatter(Path(wiki_dir) / "ideas" / f"{idea_slug}.md").get("status")
+
+
+def gather(wiki_dir):
+    """Return (frontmatter, stage_log, exp_states, idea_status) or None if no pipeline file."""
+    progress = Path(wiki_dir) / pipeline_progress.PROGRESS_REL
+    if not progress.exists():
+        return None
+    fm, stage_log = pipeline_progress.parse_progress(progress)
+    deployed = fm.get("stage3a_deployed") or fm.get("experiment_slugs") or []
+    exp_states = derive_exp_states(wiki_dir, deployed)
+    idea_status = _read_idea_status(wiki_dir, fm.get("idea_slug"))
+    return fm, stage_log, exp_states, idea_status
+
+
+def resume_plan(wiki_dir) -> Decision:
+    g = gather(wiki_dir)
+    if g is None:
+        return Decision("done", "no_pipeline", "No active pipeline (outputs/pipeline-progress.md not found).")
+    fm, stage_log, exp_states, idea_status = g
+    return plan_next(fm, stage_log, exp_states, idea_status)
+
+
+def _status_payload(wiki_dir):
+    """Return the status dict, or None when there is no active pipeline."""
+    g = gather(wiki_dir)
+    if g is None:
+        return None
+    fm, stage_log, exp_states, idea_status = g
+    decision = plan_next(fm, stage_log, exp_states, idea_status)
+    return {
+        "slug": fm.get("slug"),
+        "status": fm.get("status"),
+        "current_stage": fm.get("current_stage"),
+        "idea_slug": _clean_slug(fm.get("idea_slug")),
+        "idea_status": idea_status,
+        "stage_log": stage_log,
+        "experiments": [asdict(e) for e in exp_states],
+        "counts": {
+            "running": sum(1 for e in exp_states if e.status == "running"),
+            "completed": sum(1 for e in exp_states if e.status == "completed"),
+            "failed": sum(1 for e in exp_states if e.outcome == "failed"),
+            "inconclusive": sum(1 for e in exp_states if e.outcome == "inconclusive"),
+        },
+        "decision": asdict(decision),
+    }
+
+
+def status(wiki_dir, as_json: bool = False) -> str:
+    payload = _status_payload(wiki_dir)
+    if payload is None:
+        if as_json:
+            return json.dumps({"pipeline": None}, ensure_ascii=False, indent=2)
+        return "No active pipeline (outputs/pipeline-progress.md not found)."
+    if as_json:
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+    lines = [
+        f"pipeline: {payload['slug']}  status={payload['status']}  current_stage={payload['current_stage']}",
+        f"idea: {payload['idea_slug'] or '(none)'} ({payload['idea_status']})",
+        "experiments:",
+    ]
+    for e in payload["experiments"]:
+        lines.append(f"  - {e['slug']}: status={e['status']} outcome={e['outcome']}")
+    c = payload["counts"]
+    lines.append(f"counts: running={c['running']} completed={c['completed']} failed={c['failed']} inconclusive={c['inconclusive']}")
+    d = payload["decision"]
+    lines.append(f"next: [{d['action']}] {d['reason']} — {d['detail']}")
+    return "\n".join(lines)
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(prog="research_pipeline")
+    sub = parser.add_subparsers(dest="command", required=True)
+    for name in ("status", "resume-plan", "validate"):
+        p = sub.add_parser(name)
+        p.add_argument("wiki_root")
+        if name in ("status", "resume-plan"):
+            p.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+
+    if args.command == "status":
+        print(status(args.wiki_root, as_json=args.json))
+        return 0
+    if args.command == "resume-plan":
+        d = resume_plan(args.wiki_root)
+        if args.json:
+            print(json.dumps(asdict(d), ensure_ascii=False, indent=2))
+        else:
+            print(f"[{d.action}] {d.reason} — {d.detail}")
+        return 0
+    if args.command == "validate":
+        issues = pipeline_progress.validate(args.wiki_root)
+        for severity, message in issues:
+            print(f"{severity}: {message}")
+        return 1 if any(sev == "BLOCK" for sev, _ in issues) else 0
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
