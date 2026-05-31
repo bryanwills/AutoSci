@@ -325,27 +325,36 @@ def add_edge(wiki_root: str, from_id: str, to_id: str,
     for msg in warnings:
         print(msg, file=sys.stderr)
 
-    # Dedup: check existing edges
+    # Dedup / update: scan existing edges for a canonical match
     target_key = _edge_key({
         "from": from_id, "to": to_id, "type": edge_type,
         "symmetric": is_symmetric,
     })
-    if edges_path.exists():
-        for line in edges_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                e = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if _edge_key(e) == target_key:
-                result: dict = {"status": "exists",
-                                "message": f"{from_id} --{edge_type}--> {to_id}"}
-                if warnings:
-                    result["warnings"] = warnings
-                print(json.dumps(result))
-                return
+    existing = (edges_path.read_text(encoding="utf-8").splitlines()
+                if edges_path.exists() else [])
+    for i, line in enumerate(existing):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            e = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if _edge_key(e) != target_key:
+            continue
+        if attrs:
+            e.update(attrs)
+            existing[i] = json.dumps(e, ensure_ascii=False)
+            edges_path.write_text("\n".join(existing) + "\n", encoding="utf-8")
+            result: dict = {"status": "updated",
+                            "edge": f"{from_id} --{edge_type}--> {to_id}"}
+        else:
+            result = {"status": "exists",
+                      "message": f"{from_id} --{edge_type}--> {to_id}"}
+        if warnings:
+            result["warnings"] = warnings
+        print(json.dumps(result, ensure_ascii=False))
+        return
 
     edge = {
         "from": from_id,

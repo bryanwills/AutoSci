@@ -69,6 +69,29 @@ class TestAddEdgeAttr(unittest.TestCase):
             rw.add_edge(str(d), "ideas/i-val", "experiments/e1", "tested_by",
                         attrs={"bogus": "x"})
 
+    def test_existing_edge_attr_merge_updates(self):
+        d = _wiki()
+        rw.add_edge(str(d), "ideas/i-val", "experiments/e1", "tested_by", evidence="e")
+        rw.add_edge(str(d), "ideas/i-val", "experiments/e1", "tested_by",
+                    attrs={"metric_value": "0.87"})
+        edges = rw.load_edges(str(d))
+        self.assertEqual(len(edges), 1)            # merged, not duplicated
+        self.assertEqual(edges[0]["metric_value"], "0.87")
+        self.assertEqual(edges[0]["evidence"], "e")  # original field preserved
+
+    def test_update_preserves_other_edges(self):
+        d = _wiki()
+        rw.add_edge(str(d), "ideas/i-val", "experiments/e1", "supports", evidence="s")
+        rw.add_edge(str(d), "ideas/i-val", "experiments/e1", "tested_by", evidence="t")
+        rw.add_edge(str(d), "ideas/i-val", "experiments/e1", "tested_by",
+                    attrs={"metric_value": "0.91"})
+        edges = rw.load_edges(str(d))
+        self.assertEqual(len(edges), 2)  # supports untouched + tested_by merged in place
+        by_type = {e["type"]: e for e in edges}
+        self.assertEqual(by_type["tested_by"]["metric_value"], "0.91")
+        self.assertEqual(by_type["supports"]["evidence"], "s")
+        self.assertNotIn("metric_value", by_type["supports"])
+
 
 if __name__ == "__main__":
     unittest.main()
