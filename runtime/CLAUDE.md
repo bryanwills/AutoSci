@@ -66,6 +66,9 @@ Every change below is **YAML-only, zero Python change**.  Edit, save, done.
 
 - **Evolution signal/proposal contract** — update this when changing the
   proposal-first `scievolve-*` command storage or field shape.
+- Three evolution dimensions: `/dream` (memory), `/forge` (workflow), `/morph`
+  (orchestration). `scievolve-cycle` coordinates sense-report-propose across
+  all dimensions.
 
 ## When Python changes ARE needed
 

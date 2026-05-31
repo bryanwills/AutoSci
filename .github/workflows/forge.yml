@@ -1,0 +1,528 @@
+name: Scheduled Forge workflow evolution
+
+on:
+  schedule:
+    - cron: '23 19 * * 0'  # 19:23 UTC Sunday = 03:23 Monday Beijing time
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "auto-apply or dry-run"
+        required: false
+        default: "auto-apply"
+        type: choice
+        options:
+          - auto-apply
+          - dry-run
+      target_skill:
+        description: "Optional skill name to focus"
+        required: false
+        default: ""
+      max_signals:
+        description: "Maximum recent workflow signals in the forge context"
+        required: false
+        default: "40"
+      yolo:
+        description: "Allow high-confidence skill archive/merge mutations"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: forge-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  forge:
+    runs-on: ubuntu-latest
+    env:
+      HAS_CLAUDE_CODE_AUTH: ${{ secrets.ANTHROPIC_API_KEY != '' || secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      HAS_REVIEW_LLM: ${{ secrets.LLM_API_KEY != '' && secrets.LLM_BASE_URL != '' && secrets.LLM_MODEL != '' }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+      LLM_MODEL: ${{ secrets.LLM_MODEL }}
+      LLM_FALLBACK_MODEL: ${{ secrets.LLM_FALLBACK_MODEL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Resolve forge run configuration
+        env:
+          INPUT_MODE: ${{ github.event.inputs.mode }}
+          INPUT_TARGET_SKILL: ${{ github.event.inputs.target_skill }}
+          INPUT_MAX_SIGNALS: ${{ github.event.inputs.max_signals }}
+          INPUT_YOLO: ${{ github.event.inputs.yolo }}
+        run: |
+          set -euo pipefail
+
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          import os
+          import re
+          import sys
+          from copy import deepcopy
+          from pathlib import Path
+
+          import yaml
+
+          DEFAULT_CONFIG = {
+              "mode": "auto-apply",
+              "wiki_root": "wiki",
+              "target_skill": "",
+              "max_signals": 40,
+              "yolo": False,
+          }
+
+          def fail(message: str) -> None:
+              print(f"::error::{message}", file=sys.stderr)
+              raise SystemExit(1)
+
+          def deep_merge(base: dict, override: dict) -> dict:
+              merged = deepcopy(base)
+              for key, value in override.items():
+                  if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                      merged[key] = deep_merge(merged[key], value)
+                  elif value is not None:
+                      merged[key] = value
+              return merged
+
+          def nonempty_env(name: str) -> str:
+              value = os.environ.get(name, "")
+              return "" if value is None else str(value).strip()
+
+          def as_int(value: object, name: str) -> int:
+              try:
+                  parsed = int(str(value).strip())
+              except (TypeError, ValueError):
+                  fail(f"{name} must be an integer")
+              if parsed < 0:
+                  fail(f"{name} must be a non-negative integer")
+              return parsed
+
+          def as_bool(value: object, name: str) -> bool:
+              if isinstance(value, bool):
+                  return value
+              text = str(value).strip().lower()
+              if text in {"1", "true", "yes", "on"}:
+                  return True
+              if text in {"0", "false", "no", "off"}:
+                  return False
+              fail(f"{name} must be true or false")
+
+          run_dir = Path(".forge/run")
+          run_dir.mkdir(parents=True, exist_ok=True)
+
+          config_path = Path("config/forge.yml")
+          config_found = config_path.exists()
+          cfg = deepcopy(DEFAULT_CONFIG)
+          if config_found:
+              loaded = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+              if not isinstance(loaded, dict):
+                  fail("config/forge.yml must contain a YAML mapping")
+              cfg = deep_merge(cfg, loaded)
+
+          if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+              overrides = {}
+              for env_name, key in (
+                  ("INPUT_MODE", "mode"),
+                  ("INPUT_TARGET_SKILL", "target_skill"),
+                  ("INPUT_MAX_SIGNALS", "max_signals"),
+                  ("INPUT_YOLO", "yolo"),
+              ):
+                  value = nonempty_env(env_name)
+                  if value:
+                      overrides[key] = value
+              cfg = deep_merge(cfg, overrides)
+
+          mode = str(cfg.get("mode") or "auto-apply").strip()
+          if mode not in {"auto-apply", "dry-run"}:
+              fail("mode must be auto-apply or dry-run")
+          wiki_root = str(cfg.get("wiki_root") or "wiki").strip().rstrip("/") or "wiki"
+          if wiki_root != "wiki":
+              fail("scheduled /forge currently supports wiki_root=wiki only")
+          target_skill = str(cfg.get("target_skill") or "").strip()
+          if target_skill and not re.fullmatch(r"[a-z][a-z0-9-]*", target_skill):
+              fail("target_skill must be empty or a skill slug")
+          max_signals = as_int(cfg.get("max_signals"), "max_signals")
+          yolo = as_bool(cfg.get("yolo", False), "yolo")
+          event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+          config_source = str(config_path) if config_found else "defaults"
+
+          run_config = {
+              "mode": mode,
+              "wiki_root": wiki_root,
+              "target_skill": target_skill,
+              "max_signals": max_signals,
+              "yolo": yolo,
+              "event_name": event_name,
+              "config_source": config_source,
+          }
+          (run_dir / "config.json").write_text(
+              json.dumps(run_config, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          (run_dir / "instructions.md").write_text(
+              "\n".join(
+                  [
+                      "# Scheduled /forge Instructions",
+                      "",
+                      "Run AutoSci's agent-first /forge loop against `wiki/`.",
+                      "",
+                      f"- Mode: `{mode}`",
+                      f"- Target skill: `{target_skill or '(all workflow-signaled skills)'}`",
+                      f"- Max signals: `{max_signals}`",
+                      f"- Yolo: `{str(yolo).lower()}`",
+                      f"- Config source: `{config_source}`",
+                      "",
+                      "The run must produce strict `forge_agent_response.json`, finalize",
+                      "through `tools/research_wiki.py forge`, and leave durable artifacts",
+                      "under `wiki/outputs/evolution/forge/`. If evidence is thin, write",
+                      '{"proposals": []}.',
+                      "",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+
+          for key, value in {
+              "FORGE_RUN_DIR": run_dir.as_posix(),
+              "FORGE_CONFIG": (run_dir / "config.json").as_posix(),
+              "FORGE_INSTRUCTIONS": (run_dir / "instructions.md").as_posix(),
+              "FORGE_RESPONSE": (run_dir / "forge_agent_response.json").as_posix(),
+              "FORGE_SENSE": (run_dir / "sense.json").as_posix(),
+              "FORGE_PREPARE": (run_dir / "prepare.json").as_posix(),
+              "FORGE_FINALIZE": (run_dir / "finalize.json").as_posix(),
+              "FORGE_STAGE_PATHS": (run_dir / "stage-paths.txt").as_posix(),
+              "FORGE_CONFIG_SOURCE": config_source,
+              "FORGE_MODE": mode,
+              "FORGE_TARGET_SKILL": target_skill,
+              "FORGE_MAX_SIGNALS": str(max_signals),
+              "FORGE_YOLO": str(yolo).lower(),
+          }.items():
+              print(f"{key}={value}")
+          PY
+
+      - name: Validate policy runtime
+        run: |
+          set -euo pipefail
+          if [ "${HAS_CLAUDE_CODE_AUTH:-false}" != "true" ] && [ "${HAS_REVIEW_LLM:-false}" != "true" ]; then
+            echo "::error::Scheduled /forge needs either Claude Code Action auth (ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN) or fallback LLM secrets (LLM_API_KEY, LLM_BASE_URL, LLM_MODEL)."
+            exit 1
+          fi
+
+      - name: Sense durable SciEvolve signals
+        run: |
+          set -euo pipefail
+          python tools/research_wiki.py scievolve-sense wiki --json > "$FORGE_SENSE"
+
+      - name: Prepare Claude forge context
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        run: |
+          set -euo pipefail
+          args=(
+            forge
+            wiki
+            --max-signals "$FORGE_MAX_SIGNALS"
+            --dry-run
+            --json
+          )
+          if [ -n "$FORGE_TARGET_SKILL" ]; then
+            args+=(--target-skill "$FORGE_TARGET_SKILL")
+          fi
+          python tools/research_wiki.py "${args[@]}" > "$FORGE_PREPARE"
+
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path(".forge/run/prepare.json").read_text(encoding="utf-8"))
+          print(f"FORGE_PREPARED_RUN_DIR={data['run_dir']}")
+          PY
+
+          python - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          run_dir = Path(os.environ["FORGE_PREPARED_RUN_DIR"])
+          rows = []
+          for name in ("forge_context.json", "forge_context.md", "forge_agent_prompt.md"):
+              path = run_dir / name
+              rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          Path(".forge/run/prepared-files.sha256").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          roots = [Path("i18n/en/skills"), Path(".claude/skills")]
+          rows = []
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in sorted(p for p in root.rglob("*") if p.is_file()):
+                  rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          Path(".forge/run/skills-before.sha256").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+          git status --porcelain --untracked-files=all | awk '$2 !~ /^\.forge\// {print}' > .forge/run/git-status-before.txt
+
+      - name: Run Claude /forge agent
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Run AutoSci /forge for this scheduled job.
+
+            Read .forge/run/config.json, .forge/run/instructions.md, .forge/run/sense.json, and .forge/run/prepare.json. The prepare JSON points to the forge_context.json, forge_context.md, and forge_agent_prompt.md files for this run.
+
+            Act as the /forge workflow-evolution agent. Write strict JSON to .forge/run/forge_agent_response.json using the requested schema. Use only cited workflow signals or recurring pattern evidence. If evidence is thin, write {"proposals": []}.
+
+            Do not finalize the run yourself. Do not edit source code, docs, runtime schemas, workflow files, or skill files. The next GitHub Actions step will validate and finalize your response through tools/research_wiki.py.
+          claude_args: |
+            --max-turns 80
+            --allowedTools "Read,Write"
+
+      - name: Validate Claude write boundary
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          roots = [Path("i18n/en/skills"), Path(".claude/skills")]
+          rows = []
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in sorted(p for p in root.rglob("*") if p.is_file()):
+                  rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          before = Path(".forge/run/skills-before.sha256").read_text(encoding="utf-8")
+          after = "\n".join(rows) + "\n"
+          if before != after:
+              raise SystemExit("Claude modified skill files before deterministic finalization.")
+          PY
+
+          python - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          run_dir = Path(os.environ["FORGE_PREPARED_RUN_DIR"])
+          rows = []
+          for name in ("forge_context.json", "forge_context.md", "forge_agent_prompt.md"):
+              path = run_dir / name
+              rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          before = Path(".forge/run/prepared-files.sha256").read_text(encoding="utf-8")
+          after = "\n".join(rows) + "\n"
+          if before != after:
+              raise SystemExit("Claude modified prepared forge context before deterministic finalization.")
+          PY
+
+          git status --porcelain --untracked-files=all | awk '$2 !~ /^\.forge\// {print}' > .forge/run/git-status-after.txt
+          if ! diff -u .forge/run/git-status-before.txt .forge/run/git-status-after.txt; then
+            echo "::error::Claude modified files outside .forge/run before finalization."
+            exit 1
+          fi
+
+      - name: Finalize Claude /forge response
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -s "$FORGE_RESPONSE" ]; then
+            echo "::error::Claude did not write $FORGE_RESPONSE."
+            exit 1
+          fi
+
+          args=(
+            forge
+            wiki
+            --agent-response "$FORGE_RESPONSE"
+            --run-dir "$FORGE_PREPARED_RUN_DIR"
+            --max-signals "$FORGE_MAX_SIGNALS"
+            --json
+          )
+          if [ -n "$FORGE_TARGET_SKILL" ]; then
+            args+=(--target-skill "$FORGE_TARGET_SKILL")
+          fi
+          if [ "$FORGE_MODE" = "dry-run" ]; then
+            args+=(--dry-run)
+          fi
+          if [ "$FORGE_YOLO" = "true" ]; then
+            args+=(--yolo)
+          fi
+
+          python tools/research_wiki.py "${args[@]}" > "$FORGE_FINALIZE"
+
+      - name: Run OpenAI-compatible /forge agent
+        if: env.HAS_CLAUDE_CODE_AUTH != 'true' && env.HAS_REVIEW_LLM == 'true'
+        run: |
+          set -euo pipefail
+
+          args=(
+            forge
+            wiki
+            --use-llm
+            --max-signals "$FORGE_MAX_SIGNALS"
+            --json
+          )
+          if [ -n "$FORGE_TARGET_SKILL" ]; then
+            args+=(--target-skill "$FORGE_TARGET_SKILL")
+          fi
+          if [ "$FORGE_MODE" = "dry-run" ]; then
+            args+=(--dry-run)
+          fi
+          if [ "$FORGE_YOLO" = "true" ]; then
+            args+=(--yolo)
+          fi
+
+          python tools/research_wiki.py "${args[@]}" > "$FORGE_FINALIZE"
+
+      - name: Add forge report to job summary
+        run: |
+          set -euo pipefail
+          if [ ! -f "$FORGE_FINALIZE" ]; then
+            echo "::error::Forge finalization did not produce $FORGE_FINALIZE."
+            exit 1
+          fi
+
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path(os.environ["FORGE_FINALIZE"]).read_text())
+          print("# Scheduled /forge")
+          print()
+          print(f"- Run directory: `{data.get('run_dir', '')}`")
+          print(f"- Workflow signals: {data.get('signal_count', 0)}")
+          print(f"- Accepted agent proposals: {data.get('accepted_agent_proposals', 0)}")
+          print(f"- Rejected agent items: {data.get('rejected_agent_items', 0)}")
+          print(f"- Proposal artifacts: {data.get('proposal_count', 0)}")
+          print(f"- Safe applications: {data.get('safe_application_count', 0)}")
+          if data.get("apply_report_markdown_path"):
+              print(f"- Apply report: `{data['apply_report_markdown_path']}`")
+          if data.get("report_path"):
+              print(f"- Forge report: `{data['report_path']}`")
+          PY
+
+      - name: Upload forge artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-${{ github.run_id }}
+          path: |
+            .forge/run/config.json
+            .forge/run/instructions.md
+            .forge/run/sense.json
+            .forge/run/prepare.json
+            .forge/run/forge_agent_response.json
+            .forge/run/finalize.json
+            .forge/run/stage-paths.txt
+            .forge/run/prepared-files.sha256
+            .forge/run/skills-before.sha256
+            .forge/run/git-status-before.txt
+            .forge/run/git-status-after.txt
+            wiki/outputs/evolution/forge/**
+            wiki/outputs/evolution/proposals/**
+            wiki/outputs/evolution/signals.jsonl
+            wiki/outputs/evolution/proposals.jsonl
+            wiki/outputs/evolution/applications.jsonl
+          if-no-files-found: ignore
+
+      - name: Commit forge evolution changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path(os.environ["FORGE_FINALIZE"]).read_text(encoding="utf-8"))
+          paths = [
+              data.get("run_dir", ""),
+              data.get("context_path", ""),
+              data.get("context_markdown_path", ""),
+              data.get("prompt_path", ""),
+              data.get("response_path", ""),
+              data.get("report_path", ""),
+              data.get("apply_report_path", ""),
+              data.get("apply_report_markdown_path", ""),
+              "wiki/outputs/evolution/signals.jsonl",
+              "wiki/outputs/evolution/proposals.jsonl",
+              "wiki/outputs/evolution/applications.jsonl",
+          ]
+          for proposal in data.get("proposals", []):
+              if isinstance(proposal, dict):
+                  paths.extend([proposal.get("output_path", ""), proposal.get("json_path", "")])
+          for application in data.get("safe_applications", []):
+              for change in application.get("application", {}).get("changed_paths", []):
+                  if isinstance(change, dict):
+                      paths.append(change.get("path", ""))
+              for change in application.get("changed_paths", []):
+                  if isinstance(change, dict):
+                      paths.append(change.get("path", ""))
+
+          normalized = []
+          for raw in paths:
+              if not raw:
+                  continue
+              path = Path(str(raw))
+              if path.is_absolute():
+                  try:
+                      path = path.relative_to(Path.cwd())
+                  except ValueError:
+                      continue
+              text = path.as_posix()
+              if text.startswith("outputs/evolution/"):
+                  text = f"wiki/{text}"
+              if text and text not in normalized:
+                  normalized.append(text)
+
+          Path(os.environ["FORGE_STAGE_PATHS"]).write_text(
+              "\n".join(normalized) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          while IFS= read -r path; do
+            if [ -z "$path" ]; then
+              continue
+            fi
+            if [ -e "$path" ] || git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+              git add --force --all -- "$path"
+            fi
+          done < "$FORGE_STAGE_PATHS"
+          if git diff --cached --quiet; then
+            echo "Scheduled /forge ran, but no changes were staged." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git commit -m "forge workflow evolution"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push

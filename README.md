@@ -90,6 +90,20 @@ Run `/poster` after `/paper-draft` + `/paper-compile` to turn your finished draf
 
 Run `/discover --venue iclr --year 2024` (or any conference/year) and get a personalized shortlist of papers from that venue, ranked by relevance to what's already in your wiki. Instead of scrolling a 7000-paper proceedings, you see the dozen that actually matter for your research direction, each with a rationale tied to topics and methods you already track. No new API keys, no ingest side-effects on your wiki — just a ranked reading list. Supports NeurIPS, ICLR, ICML, and other venues covered by [Paper Copilot](https://github.com/papercopilot/paperlists).
 
+### 🧠 2026-05-31 · Scheduled SciEvolve — unattended memory, workflow, and orchestration evolution
+
+`/dream`, `/forge`, and `/morph` now have GitHub Actions schedules like `/daily-arxiv`.
+Scheduled runs first call `scievolve-sense` to turn durable failed states and
+apply-skip reports into deduped signals, then run the agent-first finalizers.
+`/dream` safe-applies reversible memory metadata and rebuilds
+`wiki/graph/context_brief.md`; `/forge` can apply validated skill patches with
+bounded line/section matching; `/morph` can apply validated DAG template and
+operator-prompt patches when `--apply` is enabled. Scheduled defaults live in
+optional `config/dream.yml`, `config/forge.yml`, and `config/morph.yml`,
+including explicit `yolo` opt-ins.
+Conservative defaults are a safety posture for unattended agents, not a limit
+on self-evolution capability.
+
 ### 📰 2026-05-09 · Daily arXiv — fresh-paper recommendations, on demand or scheduled
 
 Run `/daily-arxiv` for a one-off pass, or `/daily-arxiv setup` to schedule the same pipeline in GitHub Actions. The skill builds an evidence packet from arXiv + Semantic Scholar + DeepXiv, lets the LLM rank candidates against your wiki interests, and delivers a digest by e-mail. Explicit `--mode auto-ingest` calls `/ingest` for high-confidence picks; `inform` mode just notifies.
@@ -212,6 +226,21 @@ AutoSci is built by [DAIR Lab](https://cuibinpku.github.io/) at Peking Universit
 
 Scientific research has traditionally been **human-intensive**: researchers coordinate literature, ideas, experiments, manuscripts, and review responses across long project cycles. **AutoSci** is a memory-centric agentic system that automates the full research lifecycle — from paper ingestion to rebuttal — while maintaining structured persistent memory across projects and improving its own procedures over time.
 
+AutoSci's self-evolution boundary is the full research-agent system. Claude Code
+or another configured policy runtime supplies semantic judgment; deterministic
+Python tools provide the sensors, validators, ledgers, and guarded effectors.
+This is the most auditable implementation of agent evolution, not a dependency
+on an outside reviewer: the reasoning layer is replaceable, while the evidence
+contract and apply semantics stay stable. SciEvolve mutates durable behavioral
+surfaces that downstream workflows consume: memory metadata affects
+`compile-context`, skill patches affect later slash-command execution, and DAG
+template/prompt patches affect future SciDAG runs. Arbitrary core runtime
+rewrites stay outside the safe auto-apply path because they add risk without
+proving better scientific behavior. These choices are the safety and
+verifiability mechanism, not defects or capability gaps.
+
+See [`docs/scievolve.md`](docs/scievolve.md) for the exact closed-loop contract.
+
 <div align="center">
 <img src="assets/fig-overview.png" width="820" alt="AutoSci system overview">
 </div>
@@ -295,7 +324,7 @@ and are best run from WSL2 or Linux/macOS.
 | `CLAUDE_CODE_OAUTH_TOKEN` | Optional | `claude setup-token` | GitHub Actions Claude Code auth for Pro/Max users |
 | `SEMANTIC_SCHOLAR_API_KEY` | Optional | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) (free) | Citation graph, paper search |
 | `DEEPXIV_TOKEN` | Optional | `setup.sh` auto-registers | Semantic search, TLDR, trending |
-| `LLM_API_KEY` + `LLM_BASE_URL` + `LLM_MODEL` | Optional | Any OpenAI-compatible API | Cross-model review; `/daily-arxiv` inform recommendations |
+| `LLM_API_KEY` + `LLM_BASE_URL` + `LLM_MODEL` | Optional | Any OpenAI-compatible API | Cross-model review; `/daily-arxiv` inform recommendations; scheduled `/dream`, `/forge`, and `/morph` fallback |
 
 > **Don't have an Anthropic API key?** AutoSci runs on Claude Code, which supports any Anthropic-protocol-compatible provider — DeepSeek, Kimi, MiMo, GLM, and more. See the [LLM API Configuration](#llm-api-configuration--大模型-api-配置) section below for setup snippets.
 
@@ -414,6 +443,9 @@ AutoSci ships with 30+ slash commands spanning the full research lifecycle.
 | `/init` | Bootstrap the wiki from your source files, with optional discovery, then ingest the final paper set in parallel |
 | `/ingest` | Ingest a paper (local path or arXiv URL) — creates pages and builds all cross-references and graph edges |
 | `/discover` | Build a ranked shortlist of candidate papers (anchor-driven, topic-driven, venue-filtered, or from wiki state) without ingesting |
+| `/dream` | Run or schedule SciMem memory evolution; writes proposal/application artifacts, safe-applies reversible memory metadata, and rebuilds downstream context |
+| `/forge` | Run or schedule SciFlow workflow evolution; writes proposal/application artifacts and applies validated skill patches |
+| `/morph` | Run or schedule SciDAG orchestration evolution; writes proposal/application artifacts and can apply validated template/prompt patches |
 | `/edit` | Add or remove raw sources, or update wiki content, per user request |
 | `/ask` | Ask the wiki a question — retrieve and synthesize relevant pages, optionally crystallize the answer back into the wiki |
 | `/check` | Scan the full wiki to detect health issues and produce a tiered fix-recommendation report |

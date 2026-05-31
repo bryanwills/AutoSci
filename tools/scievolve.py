@@ -105,6 +105,8 @@ This directory is managed by `tools/research_wiki.py scievolve-*` commands.
 - `proposals/` stores proposal Markdown/JSON pairs.
 - `reports/` stores dry-run evolution reports.
 - `applications.jsonl` records guarded proposal applications.
+- `scievolve-sense` may append deduped signals from durable failed states,
+  workflow log failures, and stage apply skips.
 
 Stage-specific skills extend this same substrate:
 
@@ -191,7 +193,9 @@ def scievolve_record_signal(
     evidence_text: str = "",
     confidence: str = "medium",
     severity: str = "info",
-) -> None:
+    dedupe_key: str = "",
+    emit: bool = True,
+) -> dict:
     _validate_choice("source", source, SCIEVOLVE_SOURCE_VALUES)
     _validate_choice("dimension", dimension, SCIEVOLVE_DIMENSION_VALUES)
     _validate_choice("confidence", confidence, SCIEVOLVE_CONFIDENCE_VALUES)
@@ -207,6 +211,23 @@ def scievolve_record_signal(
         sys.exit(1)
 
     store = ensure_scievolve_store(wiki_root)
+    signals_path = store / SCIEVOLVE_SIGNALS
+    dedupe_key = dedupe_key.strip()
+    if dedupe_key:
+        existing, _ = _load_jsonl(signals_path)
+        for signal in existing:
+            if str(signal.get("dedupe_key", "")) == dedupe_key:
+                result = {
+                    "status": "skipped",
+                    "reason": "duplicate-dedupe-key",
+                    "signal_id": signal.get("id", ""),
+                    "path": str(signals_path),
+                    "signal": signal,
+                }
+                if emit:
+                    print(json.dumps(result, ensure_ascii=False))
+                return result
+
     timestamp = _now_iso()
     base_record = {
         "timestamp": timestamp,
@@ -222,20 +243,25 @@ def scievolve_record_signal(
         "severity": severity,
         "status": "recorded",
     }
+    if dedupe_key:
+        base_record["dedupe_key"] = dedupe_key
     record = {
         "id": f"sig-{_compact_timestamp()}-{_json_digest(base_record)}",
         **base_record,
     }
 
-    with open(store / SCIEVOLVE_SIGNALS, "a", encoding="utf-8") as f:
+    with open(signals_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-    print(json.dumps({
+    result = {
         "status": "ok",
         "signal_id": record["id"],
-        "path": str(store / SCIEVOLVE_SIGNALS),
+        "path": str(signals_path),
         "signal": record,
-    }, ensure_ascii=False))
+    }
+    if emit:
+        print(json.dumps(result, ensure_ascii=False))
+    return result
 
 
 def _filter_signals(

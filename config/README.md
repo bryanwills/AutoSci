@@ -16,6 +16,43 @@ This file stores non-secret settings such as mode, categories, recommendation
 caps, schedule, and profile hints. Keep API keys and SMTP credentials in `.env`
 or GitHub Actions secrets.
 
+### `dream.yml.example`
+
+Scheduled `/dream` memory-evolution preferences. Copy to `config/dream.yml`:
+
+```bash
+cp config/dream.yml.example config/dream.yml
+```
+
+This file stores non-secret settings such as mode, context limits, and the
+explicit `yolo` opt-in used by scheduled GitHub Actions runs. Keep policy
+runtime API keys in `.env` or GitHub Actions secrets.
+
+### `forge.yml.example`
+
+Scheduled `/forge` workflow-evolution preferences. Copy to `config/forge.yml`:
+
+```bash
+cp config/forge.yml.example config/forge.yml
+```
+
+This file stores non-secret settings such as mode, target skill, signal limit,
+and the explicit `yolo` opt-in used by scheduled GitHub Actions runs. Keep
+policy runtime API keys in `.env` or GitHub Actions secrets.
+
+### `morph.yml.example`
+
+Scheduled `/morph` orchestration-evolution preferences. Copy to
+`config/morph.yml`:
+
+```bash
+cp config/morph.yml.example config/morph.yml
+```
+
+This file stores non-secret settings such as mode, target template, signal
+limit, and the explicit `yolo` opt-in used by scheduled GitHub Actions runs.
+Keep policy runtime API keys in `.env` or GitHub Actions secrets.
+
 ### `.env.example`
 
 Environment variables for API keys. Copy to project root:
@@ -79,5 +116,6 @@ Then edit `config/server.yaml` with your server's SSH details, GPU info, conda e
 ## All Done by `setup.sh`
 
 If you ran `setup.sh`, `.env` and `.claude/settings.local.json` are already
-copied to the right locations. `daily-arxiv.yml` and `server.yaml` are optional
-and can be created later when you use those features.
+copied to the right locations. `daily-arxiv.yml`, `dream.yml`, `forge.yml`, and
+`morph.yml`, and `server.yaml` are optional and can be created later when you
+use those features.

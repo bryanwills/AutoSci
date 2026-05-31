@@ -27,6 +27,14 @@ When safe auto-apply runs, only medium/high-confidence proposals may become
 actual memory changes, and only as reversible frontmatter metadata plus an
 append-only audit note. This gives `/dream` a closed loop without letting it
 rewrite scientific content.
+Applied metadata is consumed by downstream context compilation: downweighted
+pages rank lower, consolidation sources fold into their canonical target, and
+associations appear in the SciEvolve guidance section.
+
+This conservative apply boundary is an industry safety convention for
+unattended memory-editing agents, not a capability boundary. The same
+evidence-grounded loop can act automatically through safe apply, and explicit
+`--yolo` or scheduled `yolo=true` enables high-confidence archive/merge paths.
 
 ## Forgetting
 
@@ -135,5 +143,5 @@ confidence is medium or high. Low-confidence associations remain proposals.
 ## Choosing Proposal Count
 
 Prefer 0-5 meaningful proposals. A no-op dream is valid when the memory is too
-sparse or no association is defensible. Reviewers should see judgment, not a
+sparse or no association is defensible. The run should show judgment, not a
 long deterministic checklist.

@@ -1,0 +1,531 @@
+name: Scheduled Morph orchestration evolution
+
+on:
+  schedule:
+    - cron: '13 17 * * 3'  # 17:13 UTC Wednesday = 01:13 Thursday Beijing time
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run or apply"
+        required: false
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - apply
+      target_template:
+        description: "Optional template name to focus"
+        required: false
+        default: ""
+      max_signals:
+        description: "Maximum recent orchestration signals in the morph context"
+        required: false
+        default: "20"
+      yolo:
+        description: "Allow high-confidence template archive/merge mutations"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: morph-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  morph:
+    runs-on: ubuntu-latest
+    env:
+      HAS_CLAUDE_CODE_AUTH: ${{ secrets.ANTHROPIC_API_KEY != '' || secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      HAS_REVIEW_LLM: ${{ secrets.LLM_API_KEY != '' && secrets.LLM_BASE_URL != '' && secrets.LLM_MODEL != '' }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+      LLM_MODEL: ${{ secrets.LLM_MODEL }}
+      LLM_FALLBACK_MODEL: ${{ secrets.LLM_FALLBACK_MODEL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Resolve morph run configuration
+        env:
+          INPUT_MODE: ${{ github.event.inputs.mode }}
+          INPUT_TARGET_TEMPLATE: ${{ github.event.inputs.target_template }}
+          INPUT_MAX_SIGNALS: ${{ github.event.inputs.max_signals }}
+          INPUT_YOLO: ${{ github.event.inputs.yolo }}
+        run: |
+          set -euo pipefail
+
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          import os
+          import re
+          import sys
+          from copy import deepcopy
+          from pathlib import Path
+
+          import yaml
+
+          DEFAULT_CONFIG = {
+              "mode": "dry-run",
+              "wiki_root": "wiki",
+              "target_template": "",
+              "max_signals": 20,
+              "yolo": False,
+          }
+
+          def fail(message: str) -> None:
+              print(f"::error::{message}", file=sys.stderr)
+              raise SystemExit(1)
+
+          def deep_merge(base: dict, override: dict) -> dict:
+              merged = deepcopy(base)
+              for key, value in override.items():
+                  if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                      merged[key] = deep_merge(merged[key], value)
+                  elif value is not None:
+                      merged[key] = value
+              return merged
+
+          def nonempty_env(name: str) -> str:
+              value = os.environ.get(name, "")
+              return "" if value is None else str(value).strip()
+
+          def as_int(value: object, name: str) -> int:
+              try:
+                  parsed = int(str(value).strip())
+              except (TypeError, ValueError):
+                  fail(f"{name} must be an integer")
+              if parsed < 0:
+                  fail(f"{name} must be a non-negative integer")
+              return parsed
+
+          def as_bool(value: object, name: str) -> bool:
+              if isinstance(value, bool):
+                  return value
+              text = str(value).strip().lower()
+              if text in {"1", "true", "yes", "on"}:
+                  return True
+              if text in {"0", "false", "no", "off"}:
+                  return False
+              fail(f"{name} must be true or false")
+
+          run_dir = Path(".morph/run")
+          run_dir.mkdir(parents=True, exist_ok=True)
+
+          config_path = Path("config/morph.yml")
+          config_found = config_path.exists()
+          cfg = deepcopy(DEFAULT_CONFIG)
+          if config_found:
+              loaded = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+              if not isinstance(loaded, dict):
+                  fail("config/morph.yml must contain a YAML mapping")
+              cfg = deep_merge(cfg, loaded)
+
+          if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+              overrides = {}
+              for env_name, key in (
+                  ("INPUT_MODE", "mode"),
+                  ("INPUT_TARGET_TEMPLATE", "target_template"),
+                  ("INPUT_MAX_SIGNALS", "max_signals"),
+                  ("INPUT_YOLO", "yolo"),
+              ):
+                  value = nonempty_env(env_name)
+                  if value:
+                      overrides[key] = value
+              cfg = deep_merge(cfg, overrides)
+
+          mode = str(cfg.get("mode") or "dry-run").strip()
+          if mode not in {"dry-run", "apply"}:
+              fail("mode must be dry-run or apply")
+          wiki_root = str(cfg.get("wiki_root") or "wiki").strip().rstrip("/") or "wiki"
+          if wiki_root != "wiki":
+              fail("scheduled /morph currently supports wiki_root=wiki only")
+          target_template = str(cfg.get("target_template") or "").strip()
+          if target_template and not re.fullmatch(r"[a-z][a-z0-9-]*", target_template):
+              fail("target_template must be empty or a template slug")
+          max_signals = as_int(cfg.get("max_signals"), "max_signals")
+          yolo = as_bool(cfg.get("yolo", False), "yolo")
+          event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+          config_source = str(config_path) if config_found else "defaults"
+
+          run_config = {
+              "mode": mode,
+              "wiki_root": wiki_root,
+              "target_template": target_template,
+              "max_signals": max_signals,
+              "yolo": yolo,
+              "event_name": event_name,
+              "config_source": config_source,
+          }
+          (run_dir / "config.json").write_text(
+              json.dumps(run_config, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          (run_dir / "instructions.md").write_text(
+              "\n".join(
+                  [
+                      "# Scheduled /morph Instructions",
+                      "",
+                      "Run AutoSci's agent-first /morph loop against `wiki/`.",
+                      "",
+                      f"- Mode: `{mode}`",
+                      f"- Target template: `{target_template or '(all orchestration-signaled templates)'}`",
+                      f"- Max signals: `{max_signals}`",
+                      f"- Yolo: `{str(yolo).lower()}`",
+                      f"- Config source: `{config_source}`",
+                      "",
+                      "The run must produce strict `morph_agent_response.json`, finalize",
+                      "through `tools/research_wiki.py morph`, and leave durable artifacts",
+                      "under `wiki/outputs/evolution/morph/`. If evidence is thin, write",
+                      '{"proposals": []}.',
+                      "",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+
+          for key, value in {
+              "MORPH_RUN_DIR": run_dir.as_posix(),
+              "MORPH_CONFIG": (run_dir / "config.json").as_posix(),
+              "MORPH_INSTRUCTIONS": (run_dir / "instructions.md").as_posix(),
+              "MORPH_RESPONSE": (run_dir / "morph_agent_response.json").as_posix(),
+              "MORPH_SENSE": (run_dir / "sense.json").as_posix(),
+              "MORPH_PREPARE": (run_dir / "prepare.json").as_posix(),
+              "MORPH_FINALIZE": (run_dir / "finalize.json").as_posix(),
+              "MORPH_STAGE_PATHS": (run_dir / "stage-paths.txt").as_posix(),
+              "MORPH_CONFIG_SOURCE": config_source,
+              "MORPH_MODE": mode,
+              "MORPH_TARGET_TEMPLATE": target_template,
+              "MORPH_MAX_SIGNALS": str(max_signals),
+              "MORPH_YOLO": str(yolo).lower(),
+          }.items():
+              print(f"{key}={value}")
+          PY
+
+      - name: Validate policy runtime
+        run: |
+          set -euo pipefail
+          if [ "${HAS_CLAUDE_CODE_AUTH:-false}" != "true" ] && [ "${HAS_REVIEW_LLM:-false}" != "true" ]; then
+            echo "::error::Scheduled /morph needs either Claude Code Action auth (ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN) or fallback LLM secrets (LLM_API_KEY, LLM_BASE_URL, LLM_MODEL)."
+            exit 1
+          fi
+
+      - name: Sense durable SciEvolve signals
+        run: |
+          set -euo pipefail
+          python tools/research_wiki.py scievolve-sense wiki --json > "$MORPH_SENSE"
+
+      - name: Prepare Claude morph context
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        run: |
+          set -euo pipefail
+          args=(
+            morph
+            wiki
+            --max-signals "$MORPH_MAX_SIGNALS"
+            --json
+          )
+          if [ -n "$MORPH_TARGET_TEMPLATE" ]; then
+            args+=(--target-template "$MORPH_TARGET_TEMPLATE")
+          fi
+          python tools/research_wiki.py "${args[@]}" > "$MORPH_PREPARE"
+
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path(".morph/run/prepare.json").read_text(encoding="utf-8"))
+          print(f"MORPH_PREPARED_RUN_DIR={data['run_dir']}")
+          PY
+
+          python - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          run_dir = Path(os.environ["MORPH_PREPARED_RUN_DIR"])
+          rows = []
+          for name in ("morph_context.json", "morph_context.md", "morph_agent_prompt.md"):
+              path = run_dir / name
+              rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          Path(".morph/run/prepared-files.sha256").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          roots = [Path("scidag/templates"), Path("scidag/operators/prompts.py")]
+          rows = []
+          for root in roots:
+              if root.is_file():
+                  rows.append(f"{hashlib.sha256(root.read_bytes()).hexdigest()}  {root.as_posix()}")
+              elif root.is_dir():
+                  for path in sorted(p for p in root.rglob("*") if p.is_file()):
+                      rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          Path(".morph/run/scidag-before.sha256").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+          git status --porcelain --untracked-files=all | awk '$2 !~ /^\.morph\// {print}' > .morph/run/git-status-before.txt
+
+      - name: Run Claude /morph agent
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Run AutoSci /morph for this scheduled job.
+
+            Read .morph/run/config.json, .morph/run/instructions.md, .morph/run/sense.json, and .morph/run/prepare.json. The prepare JSON points to the morph_context.json, morph_context.md, and morph_agent_prompt.md files for this run.
+
+            Act as the /morph orchestration-evolution agent. Write strict JSON to .morph/run/morph_agent_response.json using the requested schema. Use only cited orchestration signals or recurring pattern evidence. If evidence is thin, write {"proposals": []}.
+
+            Do not finalize the run yourself. Do not edit source code, docs, runtime schemas, workflow files, or skill files. The next GitHub Actions step will validate and finalize your response through tools/research_wiki.py.
+          claude_args: |
+            --max-turns 80
+            --allowedTools "Read,Write"
+
+      - name: Validate Claude write boundary
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          roots = [Path("scidag/templates"), Path("scidag/operators/prompts.py")]
+          rows = []
+          for root in roots:
+              if root.is_file():
+                  rows.append(f"{hashlib.sha256(root.read_bytes()).hexdigest()}  {root.as_posix()}")
+              elif root.is_dir():
+                  for path in sorted(p for p in root.rglob("*") if p.is_file()):
+                      rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          before = Path(".morph/run/scidag-before.sha256").read_text(encoding="utf-8")
+          after = "\n".join(rows) + "\n"
+          if before != after:
+              raise SystemExit("Claude modified scidag files before deterministic finalization.")
+          PY
+
+          python - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          run_dir = Path(os.environ["MORPH_PREPARED_RUN_DIR"])
+          rows = []
+          for name in ("morph_context.json", "morph_context.md", "morph_agent_prompt.md"):
+              path = run_dir / name
+              rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          before = Path(".morph/run/prepared-files.sha256").read_text(encoding="utf-8")
+          after = "\n".join(rows) + "\n"
+          if before != after:
+              raise SystemExit("Claude modified prepared morph context before deterministic finalization.")
+          PY
+
+          git status --porcelain --untracked-files=all | awk '$2 !~ /^\.morph\// {print}' > .morph/run/git-status-after.txt
+          if ! diff -u .morph/run/git-status-before.txt .morph/run/git-status-after.txt; then
+            echo "::error::Claude modified files outside .morph/run before finalization."
+            exit 1
+          fi
+
+      - name: Finalize Claude /morph response
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -s "$MORPH_RESPONSE" ]; then
+            echo "::error::Claude did not write $MORPH_RESPONSE."
+            exit 1
+          fi
+
+          args=(
+            morph
+            wiki
+            --agent-response "$MORPH_RESPONSE"
+            --run-dir "$MORPH_PREPARED_RUN_DIR"
+            --max-signals "$MORPH_MAX_SIGNALS"
+            --json
+          )
+          if [ -n "$MORPH_TARGET_TEMPLATE" ]; then
+            args+=(--target-template "$MORPH_TARGET_TEMPLATE")
+          fi
+          if [ "$MORPH_MODE" = "apply" ]; then
+            args+=(--apply)
+          fi
+          if [ "$MORPH_YOLO" = "true" ]; then
+            args+=(--yolo)
+          fi
+
+          python tools/research_wiki.py "${args[@]}" > "$MORPH_FINALIZE"
+
+      - name: Run OpenAI-compatible /morph agent
+        if: env.HAS_CLAUDE_CODE_AUTH != 'true' && env.HAS_REVIEW_LLM == 'true'
+        run: |
+          set -euo pipefail
+
+          args=(
+            morph
+            wiki
+            --use-llm
+            --max-signals "$MORPH_MAX_SIGNALS"
+            --json
+          )
+          if [ -n "$MORPH_TARGET_TEMPLATE" ]; then
+            args+=(--target-template "$MORPH_TARGET_TEMPLATE")
+          fi
+          if [ "$MORPH_MODE" = "apply" ]; then
+            args+=(--apply)
+          fi
+          if [ "$MORPH_YOLO" = "true" ]; then
+            args+=(--yolo)
+          fi
+
+          python tools/research_wiki.py "${args[@]}" > "$MORPH_FINALIZE"
+
+      - name: Add morph report to job summary
+        run: |
+          set -euo pipefail
+          if [ ! -f "$MORPH_FINALIZE" ]; then
+            echo "::error::Morph finalization did not produce $MORPH_FINALIZE."
+            exit 1
+          fi
+
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path(os.environ["MORPH_FINALIZE"]).read_text())
+          print("# Scheduled /morph")
+          print()
+          print(f"- Run directory: `{data.get('run_dir', '')}`")
+          print(f"- Orchestration signals: {data.get('signal_count', 0)}")
+          print(f"- Accepted agent proposals: {data.get('accepted_agent_proposals', 0)}")
+          print(f"- Rejected agent items: {data.get('rejected_agent_items', 0)}")
+          print(f"- Proposal artifacts: {data.get('proposal_count', 0)}")
+          print(f"- Safe applications: {data.get('safe_application_count', 0)}")
+          if data.get("apply_report_markdown_path"):
+              print(f"- Apply report: `{data['apply_report_markdown_path']}`")
+          if data.get("report_path"):
+              print(f"- Morph report: `{data['report_path']}`")
+          PY
+
+      - name: Upload morph artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: morph-${{ github.run_id }}
+          path: |
+            .morph/run/config.json
+            .morph/run/instructions.md
+            .morph/run/sense.json
+            .morph/run/prepare.json
+            .morph/run/morph_agent_response.json
+            .morph/run/finalize.json
+            .morph/run/stage-paths.txt
+            .morph/run/prepared-files.sha256
+            .morph/run/scidag-before.sha256
+            .morph/run/git-status-before.txt
+            .morph/run/git-status-after.txt
+            wiki/outputs/evolution/morph/**
+            wiki/outputs/evolution/proposals/**
+            wiki/outputs/evolution/signals.jsonl
+            wiki/outputs/evolution/proposals.jsonl
+            wiki/outputs/evolution/applications.jsonl
+            scidag/templates/**
+            scidag/operators/prompts.py
+          if-no-files-found: ignore
+
+      - name: Commit morph evolution changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path(os.environ["MORPH_FINALIZE"]).read_text(encoding="utf-8"))
+          paths = [
+              data.get("run_dir", ""),
+              data.get("context_path", ""),
+              data.get("context_markdown_path", ""),
+              data.get("prompt_path", ""),
+              data.get("response_path", ""),
+              data.get("report_path", ""),
+              data.get("apply_report_path", ""),
+              data.get("apply_report_markdown_path", ""),
+              "wiki/outputs/evolution/signals.jsonl",
+              "wiki/outputs/evolution/proposals.jsonl",
+              "wiki/outputs/evolution/applications.jsonl",
+          ]
+          for proposal in data.get("proposals", []):
+              if isinstance(proposal, dict):
+                  paths.extend([proposal.get("output_path", ""), proposal.get("json_path", "")])
+          for application in data.get("safe_applications", []):
+              for change in application.get("application", {}).get("changed_paths", []):
+                  if isinstance(change, dict):
+                      paths.append(change.get("path", ""))
+              for change in application.get("changed_paths", []):
+                  if isinstance(change, dict):
+                      paths.append(change.get("path", ""))
+
+          normalized = []
+          for raw in paths:
+              if not raw:
+                  continue
+              path = Path(str(raw))
+              if path.is_absolute():
+                  try:
+                      path = path.relative_to(Path.cwd())
+                  except ValueError:
+                      continue
+              text = path.as_posix()
+              if text.startswith("outputs/evolution/"):
+                  text = f"wiki/{text}"
+              if text and text not in normalized:
+                  normalized.append(text)
+
+          Path(os.environ["MORPH_STAGE_PATHS"]).write_text(
+              "\n".join(normalized) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          while IFS= read -r path; do
+            if [ -z "$path" ]; then
+              continue
+            fi
+            if [ -e "$path" ] || git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+              git add --force --all -- "$path"
+            fi
+          done < "$MORPH_STAGE_PATHS"
+          if git diff --cached --quiet; then
+            echo "Scheduled /morph ran, but no changes were staged." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git commit -m "morph orchestration evolution"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push

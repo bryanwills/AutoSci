@@ -4,15 +4,20 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[2]
 TOOL = REPO / "tools" / "research_wiki.py"
+sys.path.insert(0, str(REPO))
+
+from tools import research_wiki
 
 
 class SciEvolveDreamTests(unittest.TestCase):
@@ -223,6 +228,134 @@ Adjusts retrieval memory cache parameters.
             self.assertEqual(data["proposal_count"], 0)
             self.assertEqual(data["rejected_agent_items"], 1)
 
+    def test_dream_rejects_target_only_without_explicit_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wiki = Path(tmp) / "wiki"
+            self.seed_wiki(wiki)
+            response_path = Path(tmp) / "target_only_response.json"
+            response_path.write_text(
+                json.dumps({
+                    "proposals": [
+                        {
+                            "operation": "association",
+                            "target": "concepts/neural-cache",
+                            "title": "Target-only proposal",
+                            "proposed_action": "Associate neural cache with cache tuning.",
+                            "rationale": "This names real pages but cites no context evidence.",
+                            "confidence": "medium",
+                            "related_entities": ["methods/cache-tuning"],
+                            "evidence": [],
+                        }
+                    ]
+                }),
+                encoding="utf-8",
+            )
+
+            result = self.run_tool(
+                "dream",
+                str(wiki),
+                "--agent-response",
+                str(response_path),
+                "--propose-only",
+                "--json",
+            )
+            data = json.loads(result.stdout)
+
+            self.assertEqual(data["accepted_agent_proposals"], 0)
+            self.assertEqual(data["proposal_count"], 0)
+            self.assertEqual(data["rejected_agent_items"], 1)
+
+    def test_dream_finalize_reuses_prepared_run_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wiki = Path(tmp) / "wiki"
+            self.seed_wiki(wiki)
+
+            prepare = json.loads(self.run_tool("dream", str(wiki), "--json").stdout)
+            context = json.loads(Path(prepare["context_path"]).read_text(encoding="utf-8"))
+            consolidation = next(
+                candidate
+                for candidate in context["candidate_memory_cues"]
+                if candidate["operation"] == "consolidation"
+            )
+            response_path = Path(tmp) / "dream_agent_response.json"
+            response_path.write_text(
+                json.dumps({
+                    "proposals": [
+                        {
+                            "operation": "consolidation",
+                            "target": "concepts/neural-cache",
+                            "title": "Reuse prepared context",
+                            "proposed_action": "Record the prepared consolidation cue.",
+                            "rationale": "The same prepared context should be finalized.",
+                            "confidence": "medium",
+                            "related_entities": ["concepts/neural-cache-memory"],
+                            "candidate_ids": [consolidation["id"]],
+                            "evidence": [{"source": consolidation["id"], "summary": "Prepared cue."}],
+                        }
+                    ]
+                }),
+                encoding="utf-8",
+            )
+
+            finalized = self.run_tool(
+                "dream",
+                str(wiki),
+                "--agent-response",
+                str(response_path),
+                "--run-dir",
+                prepare["run_dir"],
+                "--propose-only",
+                "--json",
+            )
+            data = json.loads(finalized.stdout)
+
+            self.assertEqual(data["run_dir"], prepare["run_dir"])
+            self.assertEqual(data["context_path"], prepare["context_path"])
+            self.assertEqual(data["accepted_agent_proposals"], 1)
+
+    def test_dream_openai_compatible_uses_fallback_model(self) -> None:
+        class FakeResponse:
+            def __init__(self, status_code: int, payload: dict | None = None) -> None:
+                self.status_code = status_code
+                self._payload = payload or {}
+
+            def raise_for_status(self) -> None:
+                if self.status_code >= 400:
+                    raise RuntimeError(f"status {self.status_code}")
+
+            def json(self) -> dict:
+                return self._payload
+
+        calls: list[str] = []
+
+        def fake_post(url: str, *, headers: dict, json: dict, timeout: int) -> FakeResponse:
+            calls.append(json["model"])
+            if json["model"] == "primary-model":
+                return FakeResponse(500)
+            return FakeResponse(
+                200,
+                {"choices": [{"message": {"content": '{"proposals": []}'}}]},
+            )
+
+        env = {
+            "LLM_API_KEY": "key",
+            "LLM_BASE_URL": "https://example.test/v1",
+            "LLM_MODEL": "primary-model",
+            "LLM_FALLBACK_MODEL": "fallback-model",
+        }
+        with patch.dict(os.environ, env, clear=False), patch.object(research_wiki.requests, "post", fake_post):
+            payload, trace = research_wiki._dream_call_openai_compatible(
+                "prompt",
+                timeout=1,
+                temperature=0.0,
+            )
+
+        self.assertEqual(payload, {"proposals": []})
+        self.assertEqual(trace["model"], "fallback-model")
+        self.assertEqual(trace["fallback_from"], "primary-model")
+        self.assertIn("primary-model", calls)
+        self.assertIn("fallback-model", calls)
+
     def test_dream_apply_safe_updates_memory_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             wiki = Path(tmp) / "wiki"
@@ -300,6 +433,69 @@ Adjusts retrieval memory cache parameters.
             )
             self.assertIn(proposal["id"], applications)
 
+    def test_compile_context_consumes_scievolve_memory_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wiki = Path(tmp) / "wiki"
+            self.run_tool("init", str(wiki))
+            self.write_page(
+                wiki,
+                "papers/downweighted.md",
+                """---
+title: Downweighted Paper
+importance: high
+tldr: Old noisy trace.
+scievolve_memory_weight: downweighted
+---
+
+Body.
+""",
+            )
+            self.write_page(
+                wiki,
+                "papers/normal.md",
+                """---
+title: Normal Paper
+importance: low
+tldr: Current useful trace.
+---
+
+Body.
+""",
+            )
+            self.write_page(
+                wiki,
+                "papers/canonical.md",
+                """---
+title: Canonical Paper
+importance: high
+tldr: Canonical trace.
+scievolve_consolidates_with:
+  - papers/source
+---
+
+Body.
+""",
+            )
+            self.write_page(
+                wiki,
+                "papers/source.md",
+                """---
+title: Source Paper
+importance: high
+tldr: Folded source trace.
+---
+
+Body.
+""",
+            )
+
+            self.run_tool("compile-context", str(wiki), "--for", "general")
+            context = (wiki / "graph" / "context_brief.md").read_text(encoding="utf-8")
+
+            paper_section = context.split("## Papers", 1)[1]
+            self.assertLess(paper_section.index("Normal Paper"), paper_section.index("Downweighted Paper"))
+            self.assertIn("fold papers/source into canonical context for papers/canonical", context)
+            self.assertNotIn("Source Paper", paper_section)
 
     def test_dream_yolo_consolidation_merges_and_archives(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -322,7 +518,12 @@ Adjusts retrieval memory cache parameters.
                             "confidence": "high",
                             "related_entities": ["concepts/neural-cache-memory"],
                             "candidate_ids": [],
-                            "evidence": [],
+                            "evidence": [
+                                {
+                                    "source": "concepts/neural-cache",
+                                    "summary": "Target page is the merge destination.",
+                                }
+                            ],
                         }
                     ]
                 }),
@@ -369,7 +570,12 @@ Adjusts retrieval memory cache parameters.
                             "confidence": "high",
                             "related_entities": [],
                             "candidate_ids": [],
-                            "evidence": [],
+                            "evidence": [
+                                {
+                                    "source": "concepts/neural-cache-memory",
+                                    "summary": "Target page is covered by neural-cache.",
+                                }
+                            ],
                         }
                     ]
                 }),

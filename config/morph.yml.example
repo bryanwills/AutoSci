@@ -1,0 +1,16 @@
+# config/morph.yml - scheduled /morph orchestration-evolution preferences
+# Copy to config/morph.yml and edit. Do not put secrets in this file.
+
+# dry-run: write proposals and reports without modifying template or prompt files.
+# apply: write proposals and apply validated template/prompt patches.
+mode: dry-run
+
+# Empty means all templates with recent orchestration signals.
+target_template: ""
+
+max_signals: 20
+
+# Explicit opt-in for high-confidence archive-template / merge-templates operations
+# during scheduled runs. The finalizer still requires evidence-grounded proposals and
+# high confidence before applying yolo operations.
+yolo: false

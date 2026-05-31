@@ -1,0 +1,16 @@
+# config/forge.yml - scheduled /forge workflow-evolution preferences
+# Copy to config/forge.yml and edit. Do not put secrets in this file.
+
+# auto-apply: write proposals and apply validated skill mutations.
+# dry-run: write proposals and reports without modifying skill files.
+mode: auto-apply
+
+# Empty means all skills with recent workflow signals.
+target_skill: ""
+
+max_signals: 40
+
+# Explicit opt-in for high-confidence archive-skill / merge-skills operations
+# during scheduled runs. The finalizer still requires evidence-grounded
+# proposals and high confidence before applying yolo operations.
+yolo: false

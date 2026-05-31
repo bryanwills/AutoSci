@@ -12,7 +12,8 @@ Usage:
         [--evidence-path <path>] \
         [--evidence-text "<quote>"] \
         [--severity {info|low|medium|high|critical}] \
-        [--confidence {low|medium|high}]
+        [--confidence {low|medium|high}] \
+        [--dedupe-key <stable-key>]
 """
 
 from __future__ import annotations
@@ -45,6 +46,8 @@ def main() -> None:
                         choices=("info", "low", "medium", "high", "critical"))
     parser.add_argument("--confidence", default="medium",
                         choices=("low", "medium", "high"))
+    parser.add_argument("--dedupe-key", default="",
+                        help="Stable key for idempotent automatic signal recording")
 
     args = parser.parse_args()
 
@@ -59,6 +62,7 @@ def main() -> None:
         evidence_text=args.evidence_text,
         confidence=args.confidence,
         severity=args.severity,
+        dedupe_key=args.dedupe_key,
     )
 
 

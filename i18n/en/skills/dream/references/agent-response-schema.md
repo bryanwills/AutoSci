@@ -41,7 +41,7 @@ wiki/outputs/evolution/dream/<run>/dream_agent_response.json
 - `operation`: one of `forgetting`, `consolidation`, `association`
 - `target`: an entity id from the context, or blank only when the proposal is a
   cluster-level memory operation
-- `title`: short reviewer-facing title
+- `title`: short proposal title
 - `proposed_action`: reversible proposal-first action
 - `rationale`: agent's memory-organization reasoning, including how the
   proposal would improve a future retrieval, ideation, or planning cycle
@@ -51,11 +51,14 @@ wiki/outputs/evolution/dream/<run>/dream_agent_response.json
 - `evidence`: list of cited context evidence records
 
 Every proposal must cite at least one known context reference through
-`target`, `related_entities`, `candidate_ids`, or `evidence[*].source`.
+`candidate_ids`, `triggering_signals`, or `evidence[*].source`. The target page
+alone does not count as evidence.
 
 In safe auto-apply mode, medium/high-confidence validated proposals may be
 applied as reversible frontmatter metadata plus an append-only audit note.
 Low-confidence proposals are kept for review and are not auto-applied.
+Review-only modes are deployment safety choices; they do not reduce the actual
+closed-loop capability.
 
 ## Evidence Records
 
@@ -73,6 +76,7 @@ Use this shape:
 - entity id, such as `papers/foo`
 - signal id, such as `sig-...`
 - candidate id, such as `dream-candidate-003`
+- recurring pattern id, such as `pattern-memory-concepts-cache-failure-...`
 - edge id, such as `graph-edge-4` or `projected-edge-2`
 
 Do not cite raw file paths as `source` unless that path appears in the prepared

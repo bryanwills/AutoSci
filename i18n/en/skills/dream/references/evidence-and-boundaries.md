@@ -4,12 +4,19 @@
 operations, and safe auto-apply may apply narrow reversible metadata changes
 plus an append-only audit note. It must not silently rewrite the wiki.
 
+Conservative modes are safety posture, not reduced autonomy. `--propose-only`
+keeps artifacts review-only for demos, and `yolo=false` avoids page archive/merge
+by default, but the implemented loop can still apply validated memory updates
+and rebuild downstream context.
+
 ## Evidence Sources
 
 Acceptable evidence:
 
 - entity ids from `dream_context.json`, such as `concepts/foo` or `methods/bar`
 - candidate ids from `candidate_memory_cues`, such as `dream-candidate-003`
+- recurring pattern ids from `recurring_patterns`, such as
+  `pattern-memory-concepts-cache-failure-*`
 - signal ids from `wiki/outputs/evolution/signals.jsonl`
 - graph, projected-edge, or citation ids from the dream context
 - page excerpts, summaries, tags, status, dates, and existing links in the
@@ -17,7 +24,7 @@ Acceptable evidence:
 - existing `/check` or lint reports as secondary evidence only
 
 Evidence should answer: "Why did the agent believe this memory operation is
-worth reviewing?"
+worth changing?"
 
 ## Boundary With `/check`
 
@@ -59,9 +66,9 @@ Allowed:
 - cite a `/check` issue as supporting evidence
 - leave the dream with zero proposals when evidence is thin
 
-## Reviewer-Facing Standard
+## Closed-Loop Standard
 
-The reviewer should see a trace like this:
+The run should leave a trace like this:
 
 1. The system prepared a memory scene.
 2. A pluggable policy runtime interpreted the scene as scientific memory, not
@@ -88,9 +95,10 @@ Avoid traces that look like this:
 ## Confidence Guidance
 
 - `high`: explicit evidence from multiple pages/signals, low ambiguity
-- `medium`: evidence is clear but still needs human review before applying
+- `medium`: evidence is clear enough for guarded safe auto-apply, or for
+  review-only handling when `--propose-only` is selected
 - `low`: plausible association or cleanup candidate; useful mainly as a prompt
-  for user review
+  for later review
 
 Use `low` freely for speculative associations. The proposal artifact is still
 valuable when it honestly marks uncertainty.

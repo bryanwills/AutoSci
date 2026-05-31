@@ -1,12 +1,12 @@
 ---
-description: Run AutoSci's agent-first SciEvolve dream pass: reflect over SciMem and write proposal-first self-evolution artifacts for forgetting, consolidation, and association
-argument-hint: "[wiki-root] [--propose-only] [--yolo]"
+description: Run or manage AutoSci's agent-first SciEvolve dream pass: reflect over SciMem, write proposal-first self-evolution artifacts, and check scheduled automation health
+argument-hint: "[setup|status] [wiki-root] [--propose-only] [--yolo]"
 ---
 
 # /dream
 
 Reflect over SciMem with a pluggable memory-evolution policy runtime. `/dream`
-is the visible self-evolution loop for reviewers: the system inspects its own
+is the auditable self-evolution loop for memory: the system inspects its own
 scientific memory, decides what should fade, what should be reorganized, and
 what latent associations should be proposed for future work. The autonomy claim
 lives in the closed memory loop: SciMem state -> policy judgment -> validated
@@ -17,14 +17,35 @@ a local model, or a supplied JSON response. The Python helper prepares context,
 validates evidence, records artifacts, and applies guarded memory updates; it
 does not replace the policy judgment.
 
+The self-evolving unit is the full AutoSci agent boundary, not the Python CLI
+alone. The policy runtime supplies semantic judgment inside that boundary; the
+deterministic tools make the judgment evidence-grounded, auditable, and safely
+applicable to downstream memory behavior. This split is the intended
+implementation: replaceable reasoning plus stable validation is easier to audit
+than a hard-coded in-process judge.
+
 Use these local references on demand:
 
 - `references/memory-operations.md` — the rubric for forgetting, consolidation, and association proposals
-- `references/evidence-and-boundaries.md` — evidence rules, `/check` boundary, and reviewer-facing safety constraints
+- `references/evidence-and-boundaries.md` — evidence rules, `/check` boundary, and safety constraints
 - `references/agent-response-schema.md` — exact JSON shape expected by the finalizer, plus examples
+- `references/automation-scaffold.md` — GitHub Actions schedule, secrets, artifacts, and failure behavior
 
 Open `runtime/schema/scievolve.yaml` for the on-disk signal/proposal contract.
-Open `docs/scievolve.md` only when you need reviewer-facing command examples.
+Open `docs/scievolve.md` only when you need CLI examples or automation details.
+
+## Commands
+
+- `/dream`: run a one-off memory-evolution pass now.
+- `/dream setup`: verify `.github/workflows/dream.yml` exists, exposes `LLM_*`
+  secrets in job `env:`, reads optional `config/dream.yml`, uses the
+  write-boundary guard, and explain required Claude Code Action or
+  OpenAI-compatible secrets.
+- `/dream status`: inspect workflow presence, schedule, policy-runtime secret
+  availability when visible, and recent local `wiki/outputs/evolution/dream/`
+  artifacts.
+- `scievolve-sense`: the scheduled workflow runs this before context
+  preparation so durable failed states and apply skips become deduped signals.
 
 ## Inputs
 
@@ -36,9 +57,22 @@ Open `docs/scievolve.md` only when you need reviewer-facing command examples.
   page-level mutations. `consolidation` merges the body of related pages into
   the target and archives the sources. `forgetting` archives the target page
   directly. Only `high` confidence proposals are eligible for yolo. This flag
-  is explicit opt-in and produces reviewer-visible diffs.
+  is explicit opt-in and produces durable diffs.
 - Existing wiki pages, graph edges, projected frontmatter edges, citations, and
   SciEvolve memory signals.
+- Scheduled runs use `.github/workflows/dream.yml` and the same finalizer. They
+  read optional `config/dream.yml` for mode, context limits, and `yolo`;
+  manual dispatch inputs override that config. They require Claude Code Action
+  auth or the OpenAI-compatible `LLM_*` secrets, run `scievolve-sense`, and
+  reject Claude-side edits outside the generated response file before
+  deterministic finalization.
+
+Safety posture: conservative modes such as `--propose-only` or default
+`yolo=false` are standard deployment safeguards for unattended agents. They do
+not reduce `/dream`'s actual self-evolution capability: the default finalizer
+can auto-apply validated medium/high-confidence memory proposals, and explicit
+`--yolo` or scheduled `yolo=true` can enable high-confidence archive/merge
+mutations.
 
 ## Outputs
 
@@ -73,7 +107,8 @@ Open `docs/scievolve.md` only when you need reviewer-facing command examples.
 - entity page frontmatter and an append-only `SciEvolve Memory Evolution Note`
   when safe applications are applied; no body sections are rewritten
 - `wiki/graph/context_brief.md` rebuilt after successful safe application so
-  downstream skills consume the evolved memory state
+  downstream skills consume the evolved memory state. Applied metadata also
+  affects future `compile-context` ranking and folding.
 
 Do not rewrite entity page bodies, skills, templates, schemas, graph files,
 `index.md`, or `log.md` from `/dream`. The only body change allowed by the safe
@@ -116,8 +151,9 @@ Run:
 ```
 
 Read the returned `dream_context.md`, `dream_context.json`, and
-`dream_agent_prompt.md`. The context may contain deterministic candidate cues.
-**Treat them as observations only; do not copy them mechanically into proposals.**
+`dream_agent_prompt.md`. The context may contain deterministic candidate cues
+and recurring signal patterns. **Treat them as observations only; do not copy
+them mechanically into proposals.**
 
 ### Step 2: Perform Agentic Memory Reflection
 
@@ -126,8 +162,7 @@ the slash-command path, Claude Code is the policy runtime; in headless demos,
 `tools/research_wiki.py dream --use-llm` can call an OpenAI-compatible model;
 in tests or local-model runs, `--agent-response` can supply the same strict JSON
 contract. These runtimes are interchangeable at the `/dream` boundary: the
-reviewer-visible mechanism is the validated memory-evolution loop, not a claim
-that AutoSci ships a bespoke agent framework. Read
+validated memory-evolution loop is independent of the policy runtime. Read
 `references/memory-operations.md` before deciding proposal types. Read
 `references/evidence-and-boundaries.md` before accepting any proposal that looks
 like lint repair, deletion, or unsupported science.
@@ -153,8 +188,8 @@ wiki/outputs/evolution/dream/<run>/dream_agent_response.json
 ```
 
 Use the same run directory returned by Step 1. Every proposal must cite known
-context evidence: entity ids, candidate ids, signal ids, or edge ids from the
-prepared context.
+context evidence: entity ids, candidate ids, recurring pattern ids, signal ids,
+or edge ids from the prepared context.
 
 ### Step 4: Finalize Through The Shared SciEvolve Store
 
@@ -173,6 +208,9 @@ notes**. This is the self-evolution path: it mutates both frontmatter
 (`scievolve_*`, `tags`, `related_concepts`, `maturity`, etc.) and page body
 (appending a `SciEvolve Memory Evolution Note` section), logs the application
 event, rebuilds downstream context, and marks applied proposals as `applied`.
+`compile-context` consumes applied metadata by deprioritizing downweighted
+pages, folding consolidation sources into canonical targets, and surfacing
+associations in SciEvolve guidance.
 
 If the user passed `--propose-only` (`DREAM_PROPOSE_ONLY=true`), stop after
 writing proposal artifacts and summarize what would be applied:
@@ -210,6 +248,12 @@ Report:
 - Show self-evolution, not maintenance. A good proposal changes the future shape
   of memory by fading noise, consolidating fragments, or opening a useful new
   research association.
+- Treat conservative defaults as safety posture, not a capability boundary.
+  The development contract is the closed loop: validated proposal, guarded
+  mutation, application ledger, and downstream context rebuild.
+- Treat the safe apply surface as a typed memory behavior surface, not a claim
+  that `/dream` should rewrite arbitrary runtime code. Core code changes belong
+  to a higher-risk development path.
 - Proposal-first by default. No deletion, archival, or edge write.
 - Closed-loop auto-apply is the default when an agent response is provided.
   It mutates both `scievolve_*` metadata and standard frontmatter fields
@@ -223,8 +267,8 @@ Report:
   missing required fields, and xref asymmetry remain `/check` concerns.
 - Do not fabricate scientific associations. Low confidence is acceptable only
   when evidence is cited and the proposal is clearly marked for review.
-- Preserve provenance. Every proposal should make it easy for a reviewer to see
-  why the agent made the memory-organization judgment.
+- Preserve provenance. Every proposal should make the agent's
+  memory-organization judgment inspectable from artifacts and ledgers.
 
 ## Reflection & Signal Recording
 
@@ -249,4 +293,3 @@ Record a signal when:
 - Run completed smoothly with meaningful mutations applied → `kind=success` (use sparingly)
 
 If nothing notable happened, skip signal recording.
-

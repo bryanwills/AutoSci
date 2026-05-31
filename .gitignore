@@ -32,6 +32,12 @@ Thumbs.db
 # Local and CI scratch files for /daily-arxiv runs
 .daily-arxiv/
 
+# Local and CI scratch files for /dream runs
+.dream/
+
+# Local and CI scratch files for /forge runs
+.forge/
+
 # ---------------------------------------------------------------------------
 # Per-user data — NEVER commit, NEVER push to upstream.
 #
