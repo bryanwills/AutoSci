@@ -125,6 +125,11 @@ argument-hint: <review-file-or-path> [--paper-slug <slug>] [--venue <venue>] [--
 | Rv1-C2 | R1 | missing | major | [[idea-slug]] | insufficient | B |
 | Rv2-C1 | R2 | novelty | major | unmapped | — | D |
 
+**证据覆盖自检(advisory)**:对被质疑、声称已验证的 claim,运行
+`python3 tools/evidence.py verify-claims <manuscript-slug> --wiki-dir wiki`
+确认其有结构化 `supports`/`tested_by` 证据支撑。遇 🔴 BLOCK → 在 rebuttal 中
+避免对该 claim 做强断言,或先补证据边;提示而非强制阻断。
+
 ### Step 4: 起草 Rebuttal 回应
 
 对每个 concern 按 strategy 起草回应：

@@ -62,6 +62,12 @@ argument-hint: <paper-plan-path> [--review] [--sections <section-numbers>]
 
 **前置**：确认工作目录为 wiki 项目根（包含 `wiki/`、`raw/`、`tools/` 的目录）。
 
+**写作前证据覆盖自检(advisory)**:运行
+`python3 tools/evidence.py verify-claims <manuscript-slug> --wiki-dir wiki`。
+遇 🔴 BLOCK → 报告未覆盖的高风险 claim,建议先补结构化 `supports`/`tested_by`
+证据边(`add-edge ... --attr metric_value=... --attr source_path=...`);
+提示而非强制阻断(硬门控由 S1.2 负责)。
+
 ### Step 1: 初始化 Paper 目录
 
 1. 读取 PAPER_PLAN.md，提取 venue、title、section 列表

@@ -304,6 +304,11 @@ mcp__llm-review__chat:
    - 把延后字段(`linked_ideas` / `target_venue` / `draft_dir`)留在正文,不进 frontmatter。
      此处 manuscript 保持 `drafting`,由 `/refine` 推进到 `revised`。
    - wiki 写入后运行 `python3 tools/lint.py --wiki-dir wiki --fix`(或 `/check --fix`)。
+   - **证据覆盖自检(advisory)**:manuscript 创建后运行
+     `python3 tools/evidence.py verify-claims {slug} --wiki-dir wiki`。
+     遇 🔴 BLOCK(高风险 idea/experiment 无 `supports`/`tested_by` 结构化证据边)→
+     向用户报告未覆盖项,建议补 `add-edge ... --attr metric_value=... --attr source_path=...`
+     后再继续;**提示而非强制阻断**(stage 级硬门控由 S1.2 负责)。
 
 3. **添加 graph edges**：
    ```bash
