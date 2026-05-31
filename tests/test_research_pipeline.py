@@ -420,5 +420,58 @@ class GateCliTests(unittest.TestCase):
         self.assertEqual(payload["to"], "stage5")
 
 
+class FeedbackTests(unittest.TestCase):
+    def test_route_known(self) -> None:
+        self.assertEqual(rp.route_feedback("schema_error"), "refine")
+        self.assertEqual(rp.route_feedback("evidence_gap"), "manual_gate")
+        self.assertEqual(rp.route_feedback("experiment_failed"), "rerun")
+        self.assertEqual(rp.route_feedback("review_concern"), "refine")
+        self.assertEqual(rp.route_feedback("compile_failed"), "refine")
+
+    def test_route_unknown_manual_gate(self) -> None:
+        self.assertEqual(rp.route_feedback("???"), "manual_gate")
+        self.assertEqual(rp.route_feedback(None), "manual_gate")
+
+    def test_classify_known(self) -> None:
+        self.assertEqual(rp.classify_signal("baseline_collect_failed"), "experiment_failed")
+        self.assertEqual(rp.classify_signal("evidence:experiment"), "evidence_gap")
+        self.assertEqual(rp.classify_signal("form:lint"), "schema_error")
+        self.assertEqual(rp.classify_signal("manuscript:status"), "compile_failed")
+
+    def test_classify_unknown_none(self) -> None:
+        self.assertIsNone(rp.classify_signal("totally_unknown"))
+        self.assertIsNone(rp.classify_signal(None))
+
+    def test_feedback_from_reason(self) -> None:
+        v = rp.feedback(reason="baseline_collect_failed")
+        self.assertEqual((v.category, v.action), ("experiment_failed", "rerun"))
+
+    def test_feedback_from_category(self) -> None:
+        v = rp.feedback(category="schema_error")
+        self.assertEqual(v.action, "refine")
+
+    def test_feedback_unknown_reason(self) -> None:
+        v = rp.feedback(reason="unknown_xyz")
+        self.assertEqual((v.category, v.action), ("unknown", "manual_gate"))
+
+    def test_feedback_to_event(self) -> None:
+        ev = rp.feedback(reason="evidence:experiment", source="gate", detail="d").to_event()
+        self.assertEqual(ev["kind"], "feedback")
+        self.assertEqual(ev["category"], "evidence_gap")
+        self.assertEqual(ev["action"], "manual_gate")
+        self.assertEqual(ev["source"], "gate")
+
+    def test_feedback_category_wins_over_reason(self) -> None:
+        v = rp.feedback(category="schema_error", reason="baseline_collect_failed")
+        self.assertEqual((v.category, v.action), ("schema_error", "refine"))
+
+    def test_feedback_empty_category_not_classified_from_reason(self) -> None:
+        v = rp.feedback(category="", reason="baseline_collect_failed")
+        self.assertEqual(v.category, "unknown")  # explicit "" != reason-derived category
+
+    def test_classify_all_ideas_failed(self) -> None:
+        self.assertEqual(rp.classify_signal("all_ideas_failed"), "experiment_failed")
+
+
 if __name__ == "__main__":
     unittest.main()

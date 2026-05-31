@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 GRAPH_DIRNAME = "graph"  # intentionally duplicates research_wiki.DERIVED_DIR (kept local to avoid an import cycle)
-ALLOWED_EVENT_STREAMS = {"trust_events", "pipeline_events", "jobs", "consolidation_events"}
+ALLOWED_EVENT_STREAMS = {"trust_events", "pipeline_events", "jobs", "consolidation_events", "pipeline_feedback"}
 
 
 def append_event(wiki_root: str, stream: str, record: dict[str, object]) -> None:

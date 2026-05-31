@@ -334,6 +334,77 @@ def gate_handoff(wiki_dir, from_stage: str, to_stage: str, *, manuscript=None, o
                        to_stage=to_stage, overridden=overridden, checks=checks)
 
 
+# ── Feedback routing (S1.4) ─────────────────────────────────────────────────
+
+FEEDBACK_ROUTES = {
+    "schema_error": "refine",
+    "evidence_gap": "manual_gate",
+    "experiment_failed": "rerun",
+    "review_concern": "refine",
+    "compile_failed": "refine",
+}
+
+# Map S1.1 plan_next reasons + S1.2 gate check names (+ free-form codes) -> category.
+SIGNAL_CATEGORY = {
+    "form:lint": "schema_error",
+    "pipeline:validate": "schema_error",
+    "schema_error": "schema_error",
+    "evidence:experiment": "evidence_gap",
+    "verdict_insufficient": "evidence_gap",
+    "no_experiment_results": "evidence_gap",
+    "baseline_collect_failed": "experiment_failed",
+    "all_deploys_failed": "experiment_failed",
+    "all_ideas_failed": "experiment_failed",
+    "max_iterations_reached": "experiment_failed",
+    "experiment_failed": "experiment_failed",
+    "manuscript:status": "compile_failed",
+    "compile_failed": "compile_failed",
+    "review_concern": "review_concern",
+    # Terminal/gate reasons (already_failed, gate1, gate2) are intentionally
+    # unmapped: classify_signal -> None -> manual_gate (a human handles the state).
+}
+
+
+@dataclass
+class FeedbackVerdict:
+    category: str
+    action: str
+    source: str | None = None
+    reason: str | None = None
+    detail: str | None = None
+
+    def to_event(self) -> dict:
+        return {
+            "kind": "feedback",
+            "category": self.category,
+            "action": self.action,
+            "source": self.source,
+            "reason": self.reason,
+            "detail": self.detail,
+        }
+
+
+def classify_signal(reason: str | None) -> str | None:
+    """Map a known gate/terminate reason code to a feedback category (or None)."""
+    if not reason:
+        return None
+    return SIGNAL_CATEGORY.get(reason)
+
+
+def route_feedback(category: str | None) -> str:
+    """Route a category to an action; unknown/None -> manual_gate."""
+    return FEEDBACK_ROUTES.get(category, "manual_gate")
+
+
+def feedback(*, category: str | None = None, reason: str | None = None,
+             source: str | None = None, detail: str | None = None) -> FeedbackVerdict:
+    """Classify a failure/critique signal and route it to an action. `category`
+    (explicit) wins; else `reason` is classified via classify_signal."""
+    cat = category if category is not None else classify_signal(reason)
+    return FeedbackVerdict(category=cat or "unknown", action=route_feedback(cat),
+                           source=source, reason=reason, detail=detail)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="research_pipeline")
     sub = parser.add_subparsers(dest="command", required=True)

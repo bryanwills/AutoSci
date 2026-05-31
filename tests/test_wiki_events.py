@@ -51,6 +51,13 @@ class WikiEventsTests(unittest.TestCase):
         rows = [json.loads(line) for line in (wiki / "graph" / "trust_events.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
         self.assertEqual(rows[0]["ts"], "2020-01-01T00:00:00+00:00")
 
+    def test_accepts_pipeline_feedback_stream(self) -> None:
+        wiki = self._wiki()
+        we.append_event(str(wiki), "pipeline_feedback",
+                        {"kind": "feedback", "category": "evidence_gap", "action": "manual_gate"})
+        rows = [json.loads(line) for line in (wiki / "graph" / "pipeline_feedback.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+        self.assertEqual(rows[0]["category"], "evidence_gap")
+
 
 if __name__ == "__main__":
     unittest.main()
