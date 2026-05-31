@@ -265,3 +265,117 @@ def pipeline_stage_log_states() -> set[str]:
 
 def pipeline_current_stage_map() -> dict[str, list[str]]:
     return {k: list(v) for k, v in PIPELINE['current_stage_map'].items()}
+
+
+# ── Pipeline-progress validator (pure logic; entity_status injected by tools) ─
+
+
+def _pipeline_norm_slug(value) -> str:
+    s = str(value).strip().strip('"').strip("'")
+    while s.startswith('[') and s.endswith(']'):
+        s = s[1:-1].strip()
+    return s
+
+
+def _pipeline_slug_list(value) -> list[str]:
+    if not value:
+        return []
+    items = value if isinstance(value, list) else [value]
+    return [_pipeline_norm_slug(x) for x in items if str(x).strip()]
+
+
+def validate_pipeline(frontmatter: dict, stage_log: dict, *, entity_status=None) -> list[tuple[str, str]]:
+    """Validate a parsed pipeline-progress snapshot. Pure logic, no I/O.
+    `entity_status` is an optional callable (kind, slug) -> status|None used for
+    cross-entity rules (R4); when None those rules are skipped. Returns a list of
+    (severity, message) tuples; severity in {"BLOCK","WARN"}; empty == valid."""
+    fm = frontmatter or {}
+    log = stage_log or {}
+    issues: list[tuple[str, str]] = []
+    B, W = "BLOCK", "WARN"
+
+    # R1: required fields
+    for f in pipeline_required_fields():
+        if f not in fm or fm.get(f) in (None, ""):
+            issues.append((B, f"missing required frontmatter field {f!r}"))
+
+    # R1: frontmatter enums
+    for fname, allowed in pipeline_field_enums().items():
+        if fname in fm and fm[fname] is not None and str(fm[fname]) not in allowed:
+            issues.append((B, f"{fname}={fm[fname]!r} not in {sorted(allowed)}"))
+
+    # stage-log key set + state validity
+    lines = pipeline_stage_log_lines()
+    keys = [l["key"] for l in lines]
+    order = {k: i for i, k in enumerate(keys)}
+    valid_states = pipeline_stage_log_states()
+    for k, st in log.items():
+        if k not in order:
+            issues.append((B, f"unknown stage-log line {k!r}"))
+        elif st not in valid_states:
+            issues.append((B, f"stage-log {k} state {st!r} not in {sorted(valid_states)}"))
+
+    def state_of(k):
+        return log.get(k)
+
+    # R2: a still-pending stage must not be followed by any already-completed stage
+    completed_orders = [order[k] for k in keys if state_of(k) == "completed"]
+    last_completed = max(completed_orders) if completed_orders else -1
+    for k in keys:
+        if state_of(k) == "pending" and order[k] < last_completed:
+            issues.append((B, f"stage-log {k} is still pending but a later stage is already completed"))
+
+    # R3: current_stage <-> stage-log coherence
+    cmap = pipeline_current_stage_map()
+    cur = str(fm.get("current_stage")) if fm.get("current_stage") is not None else ""
+    if cur in cmap:
+        cur_keys = set(cmap[cur])
+        cur_idx = min(order[k] for k in cur_keys)
+        for k in keys:
+            if k in cur_keys:
+                continue
+            st = state_of(k)
+            if order[k] < cur_idx:
+                if st not in ("completed", "skipped"):
+                    issues.append((B, f"current_stage={cur} but earlier stage-log {k} is {st!r} (expected completed/skipped)"))
+            else:
+                if st not in ("pending", None):
+                    issues.append((B, f"current_stage={cur} but later stage-log {k} is {st!r} (expected pending)"))
+
+    # R4a (no entity lookup needed): stage5 completed => status completed
+    if state_of("stage5") == "completed" and str(fm.get("status")) != "completed":
+        issues.append((B, f"stage5 is completed but status is {fm.get('status')!r} (expected completed)"))
+
+    # R4b: cross-entity existence + lifecycle (needs entity_status)
+    if entity_status is not None:
+        idea = _pipeline_norm_slug(fm.get("idea_slug") or "")
+        exps = _pipeline_slug_list(fm.get("experiment_slugs"))
+        linked = _pipeline_slug_list(fm.get("linked_idea_slugs"))
+
+        if idea and entity_status("ideas", idea) is None:
+            issues.append((B, f"idea_slug {idea!r} does not resolve to an existing idea page"))
+        for e in exps:
+            if entity_status("experiments", e) is None:
+                issues.append((B, f"experiment_slug {e!r} does not resolve to an existing experiment page"))
+        for lnk in linked:
+            if entity_status("ideas", lnk) is None:
+                issues.append((B, f"linked_idea_slug {lnk!r} does not resolve to an existing idea page"))
+
+        at_verdict = cur in ("stage4", "stage5") or state_of("stage4") == "completed"
+        at_label = cur if cur in ("stage4", "stage5") else "stage4-or-later"
+        if at_verdict:
+            for e in exps:
+                st = entity_status("experiments", e)
+                if st is not None and st not in ("completed", "abandoned"):
+                    issues.append((B, f"at {at_label}, experiment {e!r} status is {st!r} (expected completed/abandoned)"))
+            if idea:
+                ist = entity_status("ideas", idea)
+                if ist is not None and ist not in ("tested", "validated", "failed"):
+                    issues.append((B, f"at {at_label}, idea {idea!r} status is {ist!r} (expected tested/validated/failed)"))
+
+    # R5 (soft): running but every non-skippable stage already completed
+    non_skippable = [l["key"] for l in lines if not l.get("skippable")]
+    if str(fm.get("status")) == "running" and non_skippable and all(state_of(k) == "completed" for k in non_skippable):
+        issues.append((W, "status is running but all non-skippable stages are completed (stale snapshot?)"))
+
+    return issues
