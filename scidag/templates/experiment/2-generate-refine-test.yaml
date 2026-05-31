@@ -1,0 +1,22 @@
+name: generate-refine-test
+stage: experiment
+complexity: 2
+paper_figure: false
+description: "Core operators only (generate + refine + test). A reasoned design fans out into a refined branch and a directly-tested branch, which merge at a final reliability check. The generate/refine/test loop the experiment stage favors."
+#
+#        root
+#         |
+#     GenerateCoT
+#        /  \
+#    Refine  Test
+#        \  /
+#        Test                 (single leaf = reliability-checked design)
+nodes:
+  - op: GenerateCoT
+    parents: [root]
+  - op: Refine
+    parents: [0]
+  - op: Test
+    parents: [0]
+  - op: Test
+    parents: [1, 2]

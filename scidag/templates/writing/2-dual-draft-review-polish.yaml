@@ -1,0 +1,27 @@
+name: dual-draft-review-polish
+stage: writing
+complexity: 2
+paper_figure: true
+description: "The paper's writing template (Fig. 9): emphasize review→polish, core operators only. Two outline drafts are each independently reviewed, then merged and polished against both critiques. A genuine DAG built purely from the writing stage's preferred operators (review, polish)."
+# This is the writing architecture shown in the paper figure, expressed with the
+# stage's preferred operators only: two producers draft, each is Reviewed, and
+# Polish consolidates. No variation/debate/refine — review and polish are central.
+#
+#        root
+#        /  \
+#  Generate  GenerateCoT
+#     |          |
+#   Review     Review
+#        \    /
+#        Polish               (single leaf = polished outline)
+nodes:
+  - op: Generate
+    parents: [root]
+  - op: GenerateCoT
+    parents: [root]
+  - op: Review
+    parents: [0]
+  - op: Review
+    parents: [1]
+  - op: Polish
+    parents: [2, 3]

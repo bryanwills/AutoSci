@@ -1,0 +1,25 @@
+name: draft-dual-review-polish
+stage: writing
+complexity: 1
+paper_figure: false
+description: "Simplest writing DAG, core operators only (review + polish, on a single draft). One outline draft is reviewed twice in parallel (two independent reviewers), then polished against both. Non-linear via fan-out to two reviews + fan-in at Polish."
+# Writing stage emphasizes review→polish. Core operators only: a single producer
+# to draft, then {Review×2, Polish}. The two parallel reviews make it a DAG, not
+# a linear draft→review→polish chain.
+#
+#        root
+#         |
+#      Generate
+#        /  \
+#   Review  Review
+#        \  /
+#       Polish                (single leaf = polished outline)
+nodes:
+  - op: Generate
+    parents: [root]
+  - op: Review
+    parents: [0]
+  - op: Review
+    parents: [0]
+  - op: Polish
+    parents: [1, 2]

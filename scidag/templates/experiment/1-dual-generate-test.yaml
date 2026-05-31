@@ -1,0 +1,20 @@
+name: dual-generate-test
+stage: experiment
+complexity: 1
+paper_figure: false
+description: "Simplest experiment-design DAG, core operators only (generate + test). Two parallel design drafts (direct + reasoned) are merged and reliability-checked. Non-linear via root fan-out + fan-in at Test."
+# Experiment stage emphasizes reliability (test), so even the minimal DAG ends
+# in a Test gate. Core operators only: {Generate, GenerateCoT} = generate family, Test.
+#
+#        root
+#        /  \
+#  Generate  GenerateCoT
+#        \  /
+#        Test                 (single leaf = reliability-checked design)
+nodes:
+  - op: Generate
+    parents: [root]
+  - op: GenerateCoT
+    parents: [root]
+  - op: Test
+    parents: [0, 1]

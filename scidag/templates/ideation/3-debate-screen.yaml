@@ -1,0 +1,24 @@
+name: debate-screen
+stage: ideation
+complexity: 2
+paper_figure: false
+description: "Generate one idea, then in parallel debate it (two experts) and explore an alternative; merge both and screen feasibility. Fan-out to debate/explore, fan-in at the feasibility screen."
+# /ideate Phase 2 (debate-style refinement) + Phase 3 (feasibility screening) in
+# a compact graph.
+#
+#        root
+#         |
+#      Generate
+#        /  \
+#   Debate   Variation
+#        \  /
+#        Test                 (single leaf = screened idea)
+nodes:
+  - op: Generate
+    parents: [root]
+  - op: Debate
+    parents: [0]
+  - op: Variation
+    parents: [0]
+  - op: Test
+    parents: [1, 2]

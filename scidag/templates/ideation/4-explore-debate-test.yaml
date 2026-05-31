@@ -1,0 +1,24 @@
+name: explore-debate-test
+stage: ideation
+complexity: 3
+paper_figure: true
+description: "The paper's ideation template (Fig. 9): emphasize diverse generation and debate. MultiGenerate fans out parallel idea lanes, which are explored (Variation) and debated (Debate) in parallel, then merged and feasibility-screened (Test)."
+# This is the ideation architecture shown in the paper figure: exploration-heavy
+# (MultiGenerate + Variation) plus debate, converging through a feasibility test.
+#
+#          root
+#           |
+#     MultiGenerate (3 lanes)
+#         /     \
+#   Variation   Debate
+#         \     /
+#          Test                (single leaf = screened idea)
+nodes:
+  - op: MultiGenerate
+    parents: [root]
+  - op: Variation
+    parents: [0]
+  - op: Debate
+    parents: [0]
+  - op: Test
+    parents: [1, 2]
