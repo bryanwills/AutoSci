@@ -1183,17 +1183,16 @@ def query_orphans(wiki_root: str) -> None:
 # Graph traversal: neighbors
 # ---------------------------------------------------------------------------
 
-def neighbors(wiki_root: str, node_id: str, depth: int = 1,
-              edge_types: list[str] | None = None,
-              direction: str = "both") -> None:
-    """BFS traversal from a node in the edge graph.
-
-    Args:
-        direction: "both", "incoming", or "outgoing"
-    """
+def graph_neighbors(wiki_root: str, node_id: str, depth: int = 1,
+                    edge_types: list[str] | None = None, direction: str = "both",
+                    include_projected: bool = False) -> list[dict]:
+    """BFS traversal from a node in the edge graph; returns visited neighbor nodes
+    (excluding the center) as [{id, edge, direction, evidence}]. With
+    include_projected=True, frontmatter-projected edges are walked too."""
     edges = load_edges(wiki_root)
+    if include_projected:
+        edges = edges + project_frontmatter_edges(wiki_root)
 
-    # Build adjacency lists
     adj_out: dict[str, list[dict]] = defaultdict(list)
     adj_in: dict[str, list[dict]] = defaultdict(list)
     for e in edges:
@@ -1211,31 +1210,36 @@ def neighbors(wiki_root: str, node_id: str, depth: int = 1,
             adj_in[src].append({"id": dst, "edge": etype, "direction": "symmetric",
                                 "evidence": e.get("evidence", "")})
 
-    # BFS
     visited: set[str] = {node_id}
     current_level: set[str] = {node_id}
     all_nodes: list[dict] = []
-
     for _ in range(depth):
         next_level: set[str] = set()
         for nid in current_level:
             if direction in ("both", "outgoing"):
-                for neighbor in adj_out.get(nid, []):
-                    if neighbor["id"] not in visited:
-                        visited.add(neighbor["id"])
-                        next_level.add(neighbor["id"])
-                        all_nodes.append(neighbor)
+                for nb in adj_out.get(nid, []):
+                    if nb["id"] not in visited:
+                        visited.add(nb["id"])
+                        next_level.add(nb["id"])
+                        all_nodes.append(nb)
             if direction in ("both", "incoming"):
-                for neighbor in adj_in.get(nid, []):
-                    if neighbor["id"] not in visited:
-                        visited.add(neighbor["id"])
-                        next_level.add(neighbor["id"])
-                        all_nodes.append(neighbor)
+                for nb in adj_in.get(nid, []):
+                    if nb["id"] not in visited:
+                        visited.add(nb["id"])
+                        next_level.add(nb["id"])
+                        all_nodes.append(nb)
         current_level = next_level
         if not current_level:
             break
+    return all_nodes
 
-    print(json.dumps({"center": node_id, "depth": depth, "nodes": all_nodes},
+
+def neighbors(wiki_root: str, node_id: str, depth: int = 1,
+              edge_types: list[str] | None = None, direction: str = "both") -> None:
+    """CLI: BFS traversal from a node; prints {center, depth, nodes} as JSON."""
+    nodes = graph_neighbors(wiki_root, node_id, depth, edge_types, direction,
+                            include_projected=False)
+    print(json.dumps({"center": node_id, "depth": depth, "nodes": nodes},
                       ensure_ascii=False, indent=2))
 
 
