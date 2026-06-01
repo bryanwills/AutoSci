@@ -1,0 +1,22 @@
+name: refine-review-polish
+stage: writing
+complexity: 3
+paper_figure: false
+description: "Mixed-operator writing DAG (minority beyond the core set): adds refine for evidence fidelity. A reasoned draft is refined and (in parallel) reviewed; Polish consolidates the refined version with the review feedback. Keeps review→polish central while bringing in refine."
+#
+#        root
+#         |
+#     GenerateCoT
+#        /  \
+#    Refine  Review
+#        \  /
+#       Polish                (single leaf = polished outline)
+nodes:
+  - op: GenerateCoT
+    parents: [root]
+  - op: Refine
+    parents: [0]
+  - op: Review
+    parents: [0]
+  - op: Polish
+    parents: [1, 2]

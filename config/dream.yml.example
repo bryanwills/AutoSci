@@ -1,0 +1,17 @@
+# config/dream.yml - scheduled /dream memory-evolution preferences
+# Copy to config/dream.yml and edit. Do not put secrets in this file.
+
+# auto-apply: write proposals and apply validated medium/high-confidence
+# reversible memory mutations.
+# propose-only: write proposals and reports without applying mutations.
+mode: auto-apply
+
+# Context size controls for the unattended run.
+max_entities: 120
+max_signals: 30
+max_candidates: 30
+
+# Explicit opt-in for high-confidence page archive/merge mutations during
+# scheduled runs. The finalizer still requires evidence-grounded proposals and
+# high confidence before applying yolo operations.
+yolo: false

@@ -1,0 +1,29 @@
+name: multigen-test-refine
+stage: experiment
+complexity: 3
+paper_figure: true
+description: "The paper's experimentation template (Fig. 9): emphasize reliability checks, core operators only (generate + test + refine). MultiGenerate seeds candidate designs; one branch is tested directly while another is refined then tested; both reliability results are consolidated by Refine into a final design."
+# This is the experimentation architecture shown in the paper figure, expressed
+# with the stage's preferred operators only: generate (MultiGenerate), test (×2,
+# the reliability emphasis), and refine. No variation/debate.
+#
+#              root
+#               |
+#        MultiGenerate (3 lanes)
+#         /          \
+#       Test        Refine
+#        |            |
+#        |           Test
+#         \          /
+#           Refine             (single leaf = consolidated reliable design)
+nodes:
+  - op: MultiGenerate
+    parents: [root]
+  - op: Test
+    parents: [0]
+  - op: Refine
+    parents: [0]
+  - op: Test
+    parents: [2]
+  - op: Refine
+    parents: [1, 3]

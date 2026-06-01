@@ -111,6 +111,9 @@ without seeing Claude's prior analysis, improving review quality.
 - `/rebuttal` — stress-test rebuttal responses
 - `/refine` — review in multi-round improve cycle
 - `/daily-arxiv` — inform-mode recommendation in CI when Claude Code is unavailable
+- `/dream` — scheduled memory-evolution fallback in CI when Claude Code is unavailable
+- `/forge` — scheduled workflow-evolution fallback in CI when Claude Code is unavailable
+- `/morph` — scheduled orchestration-evolution fallback in CI when Claude Code is unavailable
 
 **Without these keys**: Skills skip the cross-model review step and proceed with
 Claude-only analysis or deterministic fallback. Everything still works, but you

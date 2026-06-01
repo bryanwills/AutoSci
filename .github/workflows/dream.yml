@@ -1,0 +1,542 @@
+name: Scheduled Dream memory evolution
+
+on:
+  schedule:
+    - cron: '43 18 * * *'  # 18:43 UTC = 02:43 Beijing time
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "auto-apply or propose-only"
+        required: false
+        default: "auto-apply"
+        type: choice
+        options:
+          - auto-apply
+          - propose-only
+      max_entities:
+        description: "Maximum wiki entities in the dream context"
+        required: false
+        default: "120"
+      max_signals:
+        description: "Maximum recent memory signals in the dream context"
+        required: false
+        default: "30"
+      max_candidates:
+        description: "Maximum deterministic memory cues"
+        required: false
+        default: "30"
+      yolo:
+        description: "Allow high-confidence page archive/merge mutations"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  # contents: write - commits reviewer-visible dream artifacts and safe wiki mutations.
+  # id-token: write - claude-code-action can exchange OIDC for an app token.
+  contents: write
+  id-token: write
+
+concurrency:
+  group: dream-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dream:
+    runs-on: ubuntu-latest
+    env:
+      HAS_CLAUDE_CODE_AUTH: ${{ secrets.ANTHROPIC_API_KEY != '' || secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      HAS_REVIEW_LLM: ${{ secrets.LLM_API_KEY != '' && secrets.LLM_BASE_URL != '' && secrets.LLM_MODEL != '' }}
+      # The fallback Python path reads these from process env. Defining secrets
+      # in the repository is not enough unless the workflow exposes them here.
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+      LLM_MODEL: ${{ secrets.LLM_MODEL }}
+      LLM_FALLBACK_MODEL: ${{ secrets.LLM_FALLBACK_MODEL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Resolve dream run configuration
+        env:
+          INPUT_MODE: ${{ github.event.inputs.mode }}
+          INPUT_MAX_ENTITIES: ${{ github.event.inputs.max_entities }}
+          INPUT_MAX_SIGNALS: ${{ github.event.inputs.max_signals }}
+          INPUT_MAX_CANDIDATES: ${{ github.event.inputs.max_candidates }}
+          INPUT_YOLO: ${{ github.event.inputs.yolo }}
+        run: |
+          set -euo pipefail
+
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          import os
+          import sys
+          from copy import deepcopy
+          from pathlib import Path
+
+          import yaml
+
+          DEFAULT_CONFIG = {
+              "mode": "auto-apply",
+              "wiki_root": "wiki",
+              "max_entities": 120,
+              "max_signals": 30,
+              "max_candidates": 30,
+              "yolo": False,
+          }
+
+          def fail(message: str) -> None:
+              print(f"::error::{message}", file=sys.stderr)
+              raise SystemExit(1)
+
+          def deep_merge(base: dict, override: dict) -> dict:
+              merged = deepcopy(base)
+              for key, value in override.items():
+                  if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                      merged[key] = deep_merge(merged[key], value)
+                  elif value is not None:
+                      merged[key] = value
+              return merged
+
+          def nonempty_env(name: str) -> str:
+              value = os.environ.get(name, "")
+              return "" if value is None else str(value).strip()
+
+          def as_int(value: object, name: str) -> int:
+              try:
+                  parsed = int(str(value).strip())
+              except (TypeError, ValueError):
+                  fail(f"{name} must be an integer")
+              if parsed < 0:
+                  fail(f"{name} must be a non-negative integer")
+              return parsed
+
+          def as_bool(value: object, name: str) -> bool:
+              if isinstance(value, bool):
+                  return value
+              text = str(value).strip().lower()
+              if text in {"1", "true", "yes", "on"}:
+                  return True
+              if text in {"0", "false", "no", "off"}:
+                  return False
+              fail(f"{name} must be true or false")
+
+          run_dir = Path(".dream/run")
+          run_dir.mkdir(parents=True, exist_ok=True)
+
+          config_path = Path("config/dream.yml")
+          config_found = config_path.exists()
+          cfg = deepcopy(DEFAULT_CONFIG)
+          if config_found:
+              loaded = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+              if not isinstance(loaded, dict):
+                  fail("config/dream.yml must contain a YAML mapping")
+              cfg = deep_merge(cfg, loaded)
+
+          if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+              overrides = {}
+              for env_name, key in (
+                  ("INPUT_MODE", "mode"),
+                  ("INPUT_MAX_ENTITIES", "max_entities"),
+                  ("INPUT_MAX_SIGNALS", "max_signals"),
+                  ("INPUT_MAX_CANDIDATES", "max_candidates"),
+                  ("INPUT_YOLO", "yolo"),
+              ):
+                  value = nonempty_env(env_name)
+                  if value:
+                      overrides[key] = value
+              cfg = deep_merge(cfg, overrides)
+
+          mode = str(cfg.get("mode") or "auto-apply").strip()
+          if mode not in {"auto-apply", "propose-only"}:
+              fail("mode must be auto-apply or propose-only")
+          wiki_root = str(cfg.get("wiki_root") or "wiki").strip().rstrip("/") or "wiki"
+          if wiki_root != "wiki":
+              fail("scheduled /dream currently supports wiki_root=wiki only")
+          max_entities = as_int(cfg.get("max_entities"), "max_entities")
+          max_signals = as_int(cfg.get("max_signals"), "max_signals")
+          max_candidates = as_int(cfg.get("max_candidates"), "max_candidates")
+          yolo = as_bool(cfg.get("yolo", False), "yolo")
+          event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+          config_source = str(config_path) if config_found else "defaults"
+
+          run_config = {
+              "mode": mode,
+              "wiki_root": wiki_root,
+              "max_entities": max_entities,
+              "max_signals": max_signals,
+              "max_candidates": max_candidates,
+              "yolo": yolo,
+              "event_name": event_name,
+              "config_source": config_source,
+          }
+          (run_dir / "config.json").write_text(
+              json.dumps(run_config, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+
+          (run_dir / "instructions.md").write_text(
+              "\n".join(
+                  [
+                      "# Scheduled /dream Instructions",
+                      "",
+                      "Run AutoSci's agent-first /dream loop against `wiki/`.",
+                      "",
+                      f"- Mode: `{mode}`",
+                      f"- Max entities: `{max_entities}`",
+                      f"- Max signals: `{max_signals}`",
+                      f"- Max candidates: `{max_candidates}`",
+                      f"- Yolo: `{str(yolo).lower()}`",
+                      f"- Config source: `{config_source}`",
+                      "",
+                      "The run must produce strict `dream_agent_response.json`, finalize",
+                      "through `tools/research_wiki.py dream`, and leave reviewer-visible",
+                      "artifacts under `wiki/outputs/evolution/dream/`. If evidence is thin,",
+                      'write `{"proposals": []}` and still finalize so the unattended pass is',
+                      "inspectable.",
+                      "",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+
+          for key, value in {
+              "DREAM_RUN_DIR": run_dir.as_posix(),
+              "DREAM_CONFIG": (run_dir / "config.json").as_posix(),
+              "DREAM_INSTRUCTIONS": (run_dir / "instructions.md").as_posix(),
+              "DREAM_RESPONSE": (run_dir / "dream_agent_response.json").as_posix(),
+              "DREAM_SENSE": (run_dir / "sense.json").as_posix(),
+              "DREAM_PREPARE": (run_dir / "prepare.json").as_posix(),
+              "DREAM_FINALIZE": (run_dir / "finalize.json").as_posix(),
+              "DREAM_STAGE_PATHS": (run_dir / "stage-paths.txt").as_posix(),
+              "DREAM_CONFIG_SOURCE": config_source,
+              "DREAM_MODE": mode,
+              "DREAM_MAX_ENTITIES": str(max_entities),
+              "DREAM_MAX_SIGNALS": str(max_signals),
+              "DREAM_MAX_CANDIDATES": str(max_candidates),
+              "DREAM_YOLO": str(yolo).lower(),
+          }.items():
+              print(f"{key}={value}")
+          PY
+
+      - name: Validate policy runtime
+        run: |
+          set -euo pipefail
+          if [ "${HAS_CLAUDE_CODE_AUTH:-false}" != "true" ] && [ "${HAS_REVIEW_LLM:-false}" != "true" ]; then
+            echo "::error::Scheduled /dream needs either Claude Code Action auth (ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN) or fallback LLM secrets (LLM_API_KEY, LLM_BASE_URL, LLM_MODEL)."
+            exit 1
+          fi
+
+      - name: Sense durable SciEvolve signals
+        run: |
+          set -euo pipefail
+          python tools/research_wiki.py scievolve-sense wiki --json > "$DREAM_SENSE"
+
+      - name: Prepare Claude dream context
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        run: |
+          set -euo pipefail
+          python tools/research_wiki.py dream wiki \
+            --max-entities "$DREAM_MAX_ENTITIES" \
+            --max-signals "$DREAM_MAX_SIGNALS" \
+            --max-candidates "$DREAM_MAX_CANDIDATES" \
+            --json > "$DREAM_PREPARE"
+
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path(".dream/run/prepare.json").read_text(encoding="utf-8"))
+          print(f"DREAM_PREPARED_RUN_DIR={data['run_dir']}")
+          PY
+
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          root = Path("wiki")
+          exclude = root / "outputs" / "evolution" / "dream"
+          rows = []
+          for path in sorted(p for p in root.rglob("*") if p.is_file()):
+              try:
+                  path.relative_to(exclude)
+                  continue
+              except ValueError:
+                  pass
+              rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          Path(".dream/run/wiki-before.sha256").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+          python - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          run_dir = Path(os.environ["DREAM_PREPARED_RUN_DIR"])
+          rows = []
+          for name in ("dream_context.json", "dream_context.md", "dream_agent_prompt.md"):
+              path = run_dir / name
+              rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          Path(".dream/run/prepared-files.sha256").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+          git status --porcelain --untracked-files=all | awk '$2 !~ /^\.dream\// {print}' > .dream/run/git-status-before.txt
+
+      - name: Run Claude /dream agent
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Run AutoSci /dream for this scheduled job.
+
+            Read .dream/run/config.json, .dream/run/instructions.md, and .dream/run/prepare.json. The prepare JSON points to the dream_context.json, dream_context.md, and dream_agent_prompt.md files for this run.
+
+            Act as the /dream memory-evolution agent. Write strict JSON to .dream/run/dream_agent_response.json using the requested schema. Use only cited context evidence. If evidence is thin, write {"proposals": []}.
+
+            Do not finalize the run yourself. Do not edit source code, docs, runtime schemas, workflow files, or skill files. The next GitHub Actions step will validate and finalize your response through tools/research_wiki.py.
+          claude_args: |
+            --max-turns 80
+            --allowedTools "Read,Write"
+
+      - name: Validate Claude write boundary
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          root = Path("wiki")
+          exclude = root / "outputs" / "evolution" / "dream"
+          before_path = Path(".dream/run/wiki-before.sha256")
+          before = before_path.read_text(encoding="utf-8")
+          rows = []
+          for path in sorted(p for p in root.rglob("*") if p.is_file()):
+              try:
+                  path.relative_to(exclude)
+                  continue
+              except ValueError:
+                  pass
+              rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          after = "\n".join(rows) + "\n"
+          if before != after:
+              raise SystemExit("Claude modified wiki files before deterministic finalization.")
+          PY
+
+          python - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          run_dir = Path(os.environ["DREAM_PREPARED_RUN_DIR"])
+          rows = []
+          for name in ("dream_context.json", "dream_context.md", "dream_agent_prompt.md"):
+              path = run_dir / name
+              rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}")
+          before = Path(".dream/run/prepared-files.sha256").read_text(encoding="utf-8")
+          after = "\n".join(rows) + "\n"
+          if before != after:
+              raise SystemExit("Claude modified prepared dream context before deterministic finalization.")
+          PY
+
+          git status --porcelain --untracked-files=all | awk '$2 !~ /^\.dream\// {print}' > .dream/run/git-status-after.txt
+          if ! diff -u .dream/run/git-status-before.txt .dream/run/git-status-after.txt; then
+            echo "::error::Claude modified files outside .dream/run before finalization."
+            exit 1
+          fi
+
+      - name: Finalize Claude /dream response
+        if: env.HAS_CLAUDE_CODE_AUTH == 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -s "$DREAM_RESPONSE" ]; then
+            echo "::error::Claude did not write $DREAM_RESPONSE."
+            exit 1
+          fi
+
+          args=(
+            dream
+            wiki
+            --agent-response "$DREAM_RESPONSE"
+            --run-dir "$DREAM_PREPARED_RUN_DIR"
+            --max-entities "$DREAM_MAX_ENTITIES"
+            --max-signals "$DREAM_MAX_SIGNALS"
+            --max-candidates "$DREAM_MAX_CANDIDATES"
+            --json
+          )
+          if [ "$DREAM_MODE" = "propose-only" ]; then
+            args+=(--propose-only)
+          fi
+          if [ "$DREAM_YOLO" = "true" ]; then
+            args+=(--yolo)
+          fi
+
+          python tools/research_wiki.py "${args[@]}" > "$DREAM_FINALIZE"
+
+      - name: Run OpenAI-compatible /dream agent
+        if: env.HAS_CLAUDE_CODE_AUTH != 'true' && env.HAS_REVIEW_LLM == 'true'
+        run: |
+          set -euo pipefail
+
+          args=(
+            dream
+            wiki
+            --use-llm
+            --max-entities "$DREAM_MAX_ENTITIES"
+            --max-signals "$DREAM_MAX_SIGNALS"
+            --max-candidates "$DREAM_MAX_CANDIDATES"
+            --json
+          )
+          if [ "$DREAM_MODE" = "propose-only" ]; then
+            args+=(--propose-only)
+          fi
+          if [ "$DREAM_YOLO" = "true" ]; then
+            args+=(--yolo)
+          fi
+
+          python tools/research_wiki.py "${args[@]}" > "$DREAM_FINALIZE"
+
+      - name: Add dream report to job summary
+        run: |
+          set -euo pipefail
+          if [ ! -f "$DREAM_FINALIZE" ]; then
+            echo "::error::Dream finalization did not produce $DREAM_FINALIZE."
+            exit 1
+          fi
+
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path(os.environ["DREAM_FINALIZE"]).read_text())
+          print("# Scheduled /dream")
+          print()
+          print(f"- Run directory: `{data.get('run_dir', '')}`")
+          print(f"- Candidate cues: {data.get('candidate_count', 0)}")
+          print(f"- Accepted agent proposals: {data.get('accepted_agent_proposals', 0)}")
+          print(f"- Rejected agent items: {data.get('rejected_agent_items', 0)}")
+          print(f"- Proposal artifacts: {data.get('proposal_count', 0)}")
+          print(f"- Safe applications: {data.get('safe_application_count', 0)}")
+          if data.get("apply_report_markdown_path"):
+              print(f"- Apply report: `{data['apply_report_markdown_path']}`")
+          if data.get("report_path"):
+              print(f"- Dream report: `{data['report_path']}`")
+          PY
+
+      - name: Upload dream artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dream-${{ github.run_id }}
+          path: |
+            .dream/run/config.json
+            .dream/run/instructions.md
+            .dream/run/sense.json
+            .dream/run/prepare.json
+            .dream/run/dream_agent_response.json
+            .dream/run/finalize.json
+            .dream/run/stage-paths.txt
+            .dream/run/prepared-files.sha256
+            .dream/run/wiki-before.sha256
+            .dream/run/git-status-before.txt
+            .dream/run/git-status-after.txt
+            wiki/outputs/evolution/dream/**
+            wiki/outputs/evolution/proposals/**
+            wiki/outputs/evolution/signals.jsonl
+            wiki/outputs/evolution/proposals.jsonl
+            wiki/outputs/evolution/applications.jsonl
+            wiki/graph/context_brief.md
+          if-no-files-found: ignore
+
+      - name: Commit dream evolution changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path(os.environ["DREAM_FINALIZE"]).read_text(encoding="utf-8"))
+          paths = [
+              data.get("run_dir", ""),
+              data.get("context_path", ""),
+              data.get("context_markdown_path", ""),
+              data.get("prompt_path", ""),
+              data.get("response_path", ""),
+              data.get("report_path", ""),
+              data.get("apply_report_path", ""),
+              data.get("apply_report_markdown_path", ""),
+              "wiki/outputs/evolution/signals.jsonl",
+              "wiki/outputs/evolution/proposals.jsonl",
+              "wiki/outputs/evolution/applications.jsonl",
+              "wiki/graph/context_brief.md",
+          ]
+          for proposal in data.get("proposals", []):
+              if isinstance(proposal, dict):
+                  paths.extend([proposal.get("output_path", ""), proposal.get("json_path", "")])
+          for application in data.get("safe_applications", []):
+              for change in application.get("changed_paths", []):
+                  if isinstance(change, dict):
+                      paths.extend([change.get("path", ""), change.get("archive_path", "")])
+
+          normalized = []
+          for raw in paths:
+              if not raw:
+                  continue
+              path = Path(str(raw))
+              if path.is_absolute():
+                  try:
+                      path = path.relative_to(Path.cwd())
+                  except ValueError:
+                      continue
+              text = path.as_posix()
+              if text.startswith("outputs/evolution/"):
+                  text = f"wiki/{text}"
+              if text and text not in normalized:
+                  normalized.append(text)
+
+          Path(os.environ["DREAM_STAGE_PATHS"]).write_text(
+              "\n".join(normalized) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          while IFS= read -r path; do
+            if [ -z "$path" ]; then
+              continue
+            fi
+            if [ -e "$path" ] || git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+              git add --force --all -- "$path"
+            fi
+          done < "$DREAM_STAGE_PATHS"
+          if git diff --cached --quiet; then
+            echo "Scheduled /dream ran, but no wiki changes were staged." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git commit -m "dream memory evolution"
+          # claude-code-action can clear the auth header that actions/checkout
+          # installed; re-embed GITHUB_TOKEN before pushing.
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push

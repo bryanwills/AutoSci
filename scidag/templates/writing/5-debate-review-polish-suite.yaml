@@ -1,0 +1,24 @@
+name: debate-review-polish-suite
+stage: writing
+complexity: 4
+paper_figure: false
+description: "Mixed-operator writing DAG (minority beyond the core set): MultiGenerate seeds outline drafts, then debate and review probe them in parallel (narrative-structure debate + correctness/evidence review), and Polish consolidates both into the final write-up. Adds variation/debate on top of the review→polish core for harder outlines."
+#
+#              root
+#               |
+#        MultiGenerate (3 lanes)
+#         /     |     \
+#  Variation  Debate  Review
+#         \     |     /
+#            Polish               (single leaf = polished outline)
+nodes:
+  - op: MultiGenerate
+    parents: [root]
+  - op: Variation
+    parents: [0]
+  - op: Debate
+    parents: [0]
+  - op: Review
+    parents: [0]
+  - op: Polish
+    parents: [1, 2, 3]

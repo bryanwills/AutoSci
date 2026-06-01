@@ -1,0 +1,17 @@
+name: dual-draft-vote
+stage: ideation
+complexity: 1
+paper_figure: false
+description: "Simplest ideation DAG: two parallel producers (direct + reasoned) draft ideas independently, then the executor votes one out. Non-linear via root fan-out + leaf fan-in vote."
+# Replaces the lightest form of /ideate Phase 2 brainstorm: generate a couple of
+# independent candidate directions and keep the strongest. Even this minimal
+# template is a DAG (root branches to two producers), not a single chain.
+#
+#        root
+#        /  \
+#  Generate  GenerateCoT      -> final Ensemble vote across the two leaves
+nodes:
+  - op: Generate
+    parents: [root]
+  - op: GenerateCoT
+    parents: [root]

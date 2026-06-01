@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **Scheduled SciEvolve loops** via `.github/workflows/dream.yml` and `.github/workflows/forge.yml`: daily `/dream` and weekly `/forge` runs use Claude Code Action auth or OpenAI-compatible `LLM_*` secrets, read optional scheduled defaults from `config/dream.yml` / `config/forge.yml`, run `scievolve-sense` before policy judgment, finalize through `tools/research_wiki.py`, and commit finalizer-declared evolution artifacts, ledgers, context rebuilds, and skill mutations.
+- **Automatic SciEvolve sensing and recurring patterns**: `tools/research_wiki.py scievolve-sense` records deduped signals from failed idea/experiment states, workflow failures in `wiki/log.md`, and `/dream`/`/forge` apply skips. `/dream` and `/forge` contexts now include 30-day recurring signal patterns for repeated medium+ or high/critical issues.
+- **Stronger guarded apply semantics**: `/dream` metadata now affects downstream `compile-context` ranking and consolidation folding; `/forge` prompt/step patches require a unique line hint or bounded section match and are skipped if markdown structure would break.
+
 ## [1.4.0] - 2026-05-18
 
 ### Added

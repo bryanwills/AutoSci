@@ -48,18 +48,33 @@ Commands:
     checkpoint-clear <wiki_root> <task_id>
     checkpoint-set-meta <wiki_root> <task_id> <key> <value>
     checkpoint-get-meta <wiki_root> <task_id> [<key>]
+
+    # SciEvolve shared spine
+    scievolve-init <wiki_root>
+    scievolve-record-signal <wiki_root> --source user|task|open --dimension memory|workflow|orchestration --target ... --kind ... --summary ...
+    scievolve-sense <wiki_root> [--json]
+    scievolve-report <wiki_root> [--dimension memory|workflow|orchestration] [--target ...] [--propose] [--json]
+    dream <wiki_root> [--agent-response path] [--run-dir path] [--use-llm] [--propose-only] [--json]
+    forge <wiki_root> [--agent-response path] [--run-dir path] [--use-llm] [--dry-run] [--json]
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
-from collections import defaultdict
-from datetime import datetime, timezone
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+try:
+    import requests
+except Exception:  # pragma: no cover - optional LLM path
+    requests = None  # type: ignore
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -88,6 +103,34 @@ from runtime.loader import (  # noqa: E402
 )
 import pipeline_progress  # noqa: E402  (tools/ sibling module)
 from wiki_events import ALLOWED_EVENT_STREAMS, append_event  # noqa: E402,F401  (re-export; research_wiki.append_event kept for back-compat)
+try:
+    from scievolve import (  # noqa: E402
+        SCIEVOLVE_CONFIDENCE_VALUES,
+        SCIEVOLVE_DIMENSION_VALUES,
+        SCIEVOLVE_SEVERITY_VALUES,
+        SCIEVOLVE_SOURCE_VALUES,
+        load_scievolve_signals,
+        scievolve_record_application,
+        scievolve_init,
+        scievolve_record_signal,
+        scievolve_report,
+        scievolve_update_proposal_status,
+        scievolve_write_proposal,
+    )
+except ImportError:  # pragma: no cover - supports `python -m tools.research_wiki`
+    from tools.scievolve import (  # noqa: E402
+        SCIEVOLVE_CONFIDENCE_VALUES,
+        SCIEVOLVE_DIMENSION_VALUES,
+        SCIEVOLVE_SEVERITY_VALUES,
+        SCIEVOLVE_SOURCE_VALUES,
+        load_scievolve_signals,
+        scievolve_record_application,
+        scievolve_init,
+        scievolve_record_signal,
+        scievolve_report,
+        scievolve_update_proposal_status,
+        scievolve_write_proposal,
+    )
 
 DERIVED_DIR = "graph"
 
@@ -1322,12 +1365,12 @@ def neighbors(wiki_root: str, node_id: str, depth: int = 1,
 # ---------------------------------------------------------------------------
 
 CONTEXT_BUDGETS = {
-    #                Methods Gaps  Failed  Papers  Experiments  Edges  Stale
-    "ideation":     (1500,  2000, 2000,   1000,   500,         500,   500),
-    "experiment":   (2500,  500,  500,    1000,   2500,        500,   0),
-    "writing":      (2000,  500,  200,    2500,   500,         800,   0),
-    "review":       (2500,  1000, 500,    1000,   1500,        500,   500),
-    "general":      (2000,  1500, 1500,   2000,   0,           1000,  0),
+    #                Methods Evolve Gaps  Failed  Papers  Experiments  Edges  Stale
+    "ideation":     (1500,  1200,  1800, 2000,   1000,   500,         500,   400),
+    "experiment":   (2500,  800,   500,  500,    1000,   2500,        500,   0),
+    "writing":      (2000,  600,   500,  200,    2500,   500,         800,   0),
+    "review":       (2500,  1200,  1000, 500,    1000,   1500,        500,   500),
+    "general":      (2000,  1200,  1500, 1500,   2000,   0,           1000,  0),
 }
 
 STAGE_PURPOSE = {
@@ -1399,9 +1442,86 @@ def _entity_context_section(wiki_root: str, entity: str, depth: int, budget: int
     return section[:budget], len(nodes)
 
 
+def _scievolve_memory_state(root: Path) -> dict:
+    """Return applied /dream metadata in a downstream-friendly shape."""
+    states: dict[str, dict] = {}
+    canonical_for: dict[str, str] = {}
+    for etype in ENTITY_DIRS:
+        edir = root / etype
+        if not edir.exists():
+            continue
+        for path in sorted(edir.glob("*.md")):
+            fm = _parse_frontmatter(path)
+            entity_id = f"{etype}/{path.stem}"
+            title = fm.get("title") or fm.get("name") or path.stem
+            weight = str(fm.get("scievolve_memory_weight") or "").strip().lower()
+            consolidates = _dream_as_list(fm.get("scievolve_consolidates_with"))
+            associations = _dream_as_list(fm.get("scievolve_associations"))
+            notes = _dream_as_list(fm.get("scievolve_dream_notes"))
+            states[entity_id] = {
+                "title": title,
+                "weight": weight,
+                "consolidates": consolidates,
+                "associations": associations,
+                "notes": notes,
+            }
+            for related in consolidates:
+                if related and related != entity_id:
+                    canonical_for.setdefault(related, entity_id)
+    return {"states": states, "canonical_for": canonical_for}
+
+
+def _scievolve_memory_guidance(root: Path) -> list[str]:
+    """Return applied /dream memory guidance for downstream context packs."""
+    memory = _scievolve_memory_state(root)
+    states = memory["states"]
+    canonical_for = memory["canonical_for"]
+    lines: list[str] = []
+    for entity_id, state in sorted(states.items()):
+        title = state.get("title") or entity_id
+        weight = state.get("weight") or ""
+        consolidates = state.get("consolidates") or []
+        associations = state.get("associations") or []
+        notes = state.get("notes") or []
+        note = f" — {notes[-1]}" if notes else ""
+        if weight:
+            lines.append(f"- downweight {entity_id} ({title}): {weight}{note}")
+        if consolidates:
+            lines.append(
+                f"- consolidate {entity_id} ({title}) with "
+                f"{', '.join(consolidates)}{note}"
+            )
+        if associations:
+            lines.append(
+                f"- associate {entity_id} ({title}) with "
+                f"{', '.join(associations)}{note}"
+            )
+    for related, canonical in sorted(canonical_for.items()):
+        lines.append(f"- fold {related} into canonical context for {canonical}")
+    return lines
+
+
+def _scievolve_context_score(entity_id: str, base_score: int, memory_state: dict) -> int:
+    """Adjust downstream context ranking using applied /dream metadata."""
+    states = memory_state.get("states") or {}
+    canonical_for = memory_state.get("canonical_for") or {}
+    if entity_id in canonical_for:
+        return -20000 + base_score
+    state = states.get(entity_id) or {}
+    weight = str(state.get("weight") or "").lower()
+    if weight in {"downweighted", "downweight", "low", "stale"}:
+        return -10000 + base_score
+    if state.get("consolidates"):
+        return base_score + 100
+    if state.get("associations"):
+        return base_score + 20
+    return base_score
+
+
 def compile_context(wiki_root: str, purpose: str | None = None,
                     max_chars: int = 8000, *, entity: str | None = None,
-                    stage: str | None = None, neighbors_depth: int = 1) -> None:
+                    stage: str | None = None, neighbors_depth: int = 1,
+                    emit: bool = True) -> dict:
     """Generate purpose-specific compressed context for downstream skills.
 
     When `entity` is given, prepend an entity-centered Focus section (graph
@@ -1413,9 +1533,20 @@ def compile_context(wiki_root: str, purpose: str | None = None,
         purpose = STAGE_PURPOSE.get(stage) if stage else None
     purpose = purpose or "general"
     budgets = CONTEXT_BUDGETS.get(purpose, CONTEXT_BUDGETS["general"])
-    b_methods, b_gaps, b_failed, b_papers, b_experiments, b_edges, b_stale = budgets
+    (
+        b_methods,
+        b_evolution,
+        b_gaps,
+        b_failed,
+        b_papers,
+        b_experiments,
+        b_edges,
+        b_stale,
+    ) = budgets
 
     edge_counts = _entity_edge_counts(wiki_root)
+    scievolve_memory = _scievolve_memory_state(root)
+    folded_entities = scievolve_memory.get("canonical_for") or {}
     sections: list[str] = []
 
     _ctx_neighbor_count = 0
@@ -1433,15 +1564,26 @@ def compile_context(wiki_root: str, purpose: str | None = None,
                 fm = _parse_frontmatter(f)
                 title = fm.get("name", fm.get("title", f.stem))
                 mtype = fm.get("type", "other")
-                connectivity = edge_counts.get(f"methods/{f.stem}", 0)
-                items.append((connectivity,
+                entity_id = f"methods/{f.stem}"
+                if entity_id in folded_entities:
+                    continue
+                connectivity = edge_counts.get(entity_id, 0)
+                score = _scievolve_context_score(entity_id, connectivity, scievolve_memory)
+                items.append((score,
                               f"- [{mtype}] {title}"))
             if items:
                 items.sort(key=lambda x: x[0], reverse=True)
                 text = "\n".join(line for _, line in items)[:b_methods]
                 sections.append(f"## Methods ({len(items)} total)\n{text}\n")
 
-    # 2. Gap map snapshot
+    # 2. Applied SciEvolve memory guidance — lets /dream affect future retrieval.
+    if b_evolution > 0:
+        guidance = _scievolve_memory_guidance(root)
+        if guidance:
+            text = "\n".join(guidance)[:b_evolution]
+            sections.append(f"## SciEvolve Memory Guidance\n{text}\n")
+
+    # 3. Gap map snapshot
     if b_gaps > 0:
         gap_path = root / DERIVED_DIR / "open_questions.md"
         if gap_path.exists():
@@ -1452,7 +1594,7 @@ def compile_context(wiki_root: str, purpose: str | None = None,
             if body.strip():
                 sections.append(f"## Open Gaps\n{body[:b_gaps]}\n")
 
-    # 3. Failed ideas (anti-repetition memory)
+    # 4. Failed ideas (anti-repetition memory)
     if b_failed > 0:
         ideas_dir = root / "ideas"
         if ideas_dir.exists():
@@ -1460,6 +1602,9 @@ def compile_context(wiki_root: str, purpose: str | None = None,
             for f in sorted(ideas_dir.glob("*.md")):
                 fm = _parse_frontmatter(f)
                 status = fm.get("status", "")
+                entity_id = f"ideas/{f.stem}"
+                if entity_id in folded_entities:
+                    continue
                 if status in ("failed", "rejected"):
                     title = fm.get("title", f.stem)
                     reason = fm.get("failure_reason", "")
@@ -1471,7 +1616,7 @@ def compile_context(wiki_root: str, purpose: str | None = None,
                 text = "\n".join(failed)[:b_failed]
                 sections.append(f"## Failed Ideas (avoid repeating)\n{text}\n")
 
-    # 4. Paper summaries
+    # 5. Paper summaries
     if b_papers > 0:
         papers_dir = root / "papers"
         if papers_dir.exists():
@@ -1481,23 +1626,30 @@ def compile_context(wiki_root: str, purpose: str | None = None,
                 title = fm.get("title", f.stem)
                 importance = fm.get("importance", "?")
                 tldr = fm.get("tldr", "")
-                connectivity = edge_counts.get(f"papers/{f.stem}", 0)
+                entity_id = f"papers/{f.stem}"
+                if entity_id in folded_entities:
+                    continue
+                connectivity = edge_counts.get(entity_id, 0)
+                score = _scievolve_context_score(entity_id, connectivity, scievolve_memory)
                 line = f"- [{importance}] {title}"
                 if tldr:
                     line += f" — {tldr}"
-                items2.append((connectivity, line))
+                items2.append((score, line))
             if items2:
                 items2.sort(key=lambda x: x[0], reverse=True)
                 text = "\n".join(line for _, line in items2[:15])[:b_papers]
                 sections.append(f"## Papers ({len(items2)} total)\n{text}\n")
 
-    # 5. Experiment summaries
+    # 6. Experiment summaries
     if b_experiments > 0:
         exp_dir = root / "experiments"
         if exp_dir.exists():
             exp_lines: list[str] = []
             for f in sorted(exp_dir.glob("*.md")):
                 fm = _parse_frontmatter(f)
+                entity_id = f"experiments/{f.stem}"
+                if entity_id in folded_entities:
+                    continue
                 title = fm.get("title", f.stem)
                 status = fm.get("status", "")
                 outcome = fm.get("outcome", "")
@@ -1512,7 +1664,7 @@ def compile_context(wiki_root: str, purpose: str | None = None,
                 text = "\n".join(exp_lines)[:b_experiments]
                 sections.append(f"## Experiments ({len(exp_lines)} total)\n{text}\n")
 
-    # 6. Recent edges
+    # 7. Recent edges
     if b_edges > 0:
         edges = load_edges(wiki_root)
         if edges:
@@ -1521,7 +1673,7 @@ def compile_context(wiki_root: str, purpose: str | None = None,
             text = "\n".join(chain_lines)[:b_edges]
             sections.append(f"## Recent Relationships ({len(edges)} total)\n{text}\n")
 
-    # 7. Stale entities
+    # 8. Stale entities
     if b_stale > 0:
         from datetime import timedelta
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
@@ -1531,6 +1683,9 @@ def compile_context(wiki_root: str, purpose: str | None = None,
             if not edir.exists():
                 continue
             for f in sorted(edir.glob("*.md")):
+                entity_id = f"{etype}/{f.stem}"
+                if entity_id in folded_entities:
+                    continue
                 fm = _parse_frontmatter(f)
                 date_str = (fm.get("date_updated") or fm.get("date_added")
                             or fm.get("date_proposed") or "")
@@ -1565,16 +1720,425 @@ def compile_context(wiki_root: str, purpose: str | None = None,
     pack_path.parent.mkdir(parents=True, exist_ok=True)
     pack_path.write_text(pack, encoding="utf-8")
 
-    status = {"status": "ok", "purpose": purpose, "chars": len(pack)}
+    result = {
+        "status": "ok",
+        "purpose": purpose,
+        "chars": len(pack),
+        "path": str(pack_path),
+        "scievolve_memory_items": len(_scievolve_memory_guidance(root)),
+    }
     if entity:
-        status["entity"] = entity
+        result["entity"] = entity
         if stage:
-            status["stage"] = stage
+            result["stage"] = stage
         append_event(wiki_root, "pipeline_events", {
             "kind": "context", "entity": entity, "stage": stage,
-            "purpose": purpose, "chars": len(pack), "neighbors": _ctx_neighbor_count,
+            "purpose": purpose, "chars": len(pack),
+            "neighbors": _ctx_neighbor_count,
         })
-    print(json.dumps(status))
+    if emit:
+        print(json.dumps(result))
+    return result
+
+
+SENSE_FAILURE_RE = re.compile(
+    r"\b(fail(?:ed|ure)?|error|exception|timeout|timed out|crash|abort(?:ed)?)\b",
+    re.IGNORECASE,
+)
+SENSE_SKILL_RE = re.compile(r"/([a-z][a-z0-9-]*)")
+
+
+def _sense_dedupe_key(prefix: str, payload: object) -> str:
+    digest = hashlib.sha1(
+        json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()[:12]
+    return f"{prefix}:{digest}"
+
+
+def _sense_rel_path(path: Path, root: Path) -> str:
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def _sense_event(
+    events: list[dict],
+    *,
+    source: str,
+    dimension: str,
+    target: str,
+    kind: str,
+    summary: str,
+    evidence_path: str = "",
+    evidence_text: str = "",
+    confidence: str = "medium",
+    severity: str = "medium",
+    dedupe_key: str,
+) -> None:
+    if not summary.strip() or not dedupe_key.strip():
+        return
+    events.append({
+        "source": source,
+        "dimension": dimension,
+        "target": target,
+        "kind": kind,
+        "summary": summary.strip()[:500],
+        "evidence_path": evidence_path,
+        "evidence_text": evidence_text.strip()[:500],
+        "confidence": confidence,
+        "severity": severity,
+        "dedupe_key": dedupe_key,
+    })
+
+
+def _sense_entity_states(root: Path) -> list[dict]:
+    events: list[dict] = []
+    for entity_type in ("ideas", "experiments"):
+        directory = root / entity_type
+        if not directory.exists():
+            continue
+        for path in sorted(directory.glob("*.md")):
+            fm = _parse_frontmatter(path)
+            status = str(fm.get("status") or "").strip().lower()
+            outcome = str(fm.get("outcome") or "").strip().lower()
+            is_failed = status in {"failed", "rejected", "abandoned", "error"}
+            if entity_type == "experiments":
+                is_failed = is_failed or outcome in {"failed", "error"}
+            if not is_failed:
+                continue
+            entity_id = f"{entity_type}/{path.stem}"
+            title = str(fm.get("title") or fm.get("name") or path.stem)
+            reason = str(
+                fm.get("failure_reason")
+                or fm.get("key_result")
+                or fm.get("outcome")
+                or status
+            )
+            _sense_event(
+                events,
+                source="task",
+                dimension="memory",
+                target=entity_id,
+                kind="failure",
+                summary=f"{entity_id} is marked {status or outcome}: {title}",
+                evidence_path=_sense_rel_path(path, root),
+                evidence_text=reason,
+                confidence="high",
+                severity="medium",
+                dedupe_key=_sense_dedupe_key("entity-state", {
+                    "path": _sense_rel_path(path, root),
+                    "status": status,
+                    "outcome": outcome,
+                    "reason": reason,
+                }),
+            )
+    return events
+
+
+def _sense_log_failures(root: Path, max_lines: int) -> list[dict]:
+    log_path = root / "log.md"
+    if not log_path.exists():
+        return []
+    lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    if max_lines > 0:
+        offset = max(0, len(lines) - max_lines)
+        rows = list(enumerate(lines[offset:], start=offset + 1))
+    else:
+        rows = list(enumerate(lines, start=1))
+    events: list[dict] = []
+    for lineno, line in rows:
+        text = line.strip()
+        if not text or not SENSE_FAILURE_RE.search(text):
+            continue
+        match = SENSE_SKILL_RE.search(text)
+        target = match.group(1) if match else "general"
+        _sense_event(
+            events,
+            source="task",
+            dimension="workflow",
+            target=target,
+            kind="failure",
+            summary=f"Workflow log line reports failure for {target}",
+            evidence_path=f"{_sense_rel_path(log_path, root)}:{lineno}",
+            evidence_text=text,
+            confidence="medium",
+            severity="medium",
+            dedupe_key=_sense_dedupe_key("log-failure", {
+                "path": _sense_rel_path(log_path, root),
+                "line": text,
+            }),
+        )
+    return events
+
+
+def _sense_apply_skips(root: Path) -> list[dict]:
+    events: list[dict] = []
+    for stage in ("dream", "forge", "morph"):
+        for path in sorted((root / "outputs" / "evolution" / stage).glob(f"*/{stage}_apply_report.json")):
+            try:
+                report = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            skipped = report.get("skipped") or []
+            if not isinstance(skipped, list) or not skipped:
+                continue
+            _sense_event(
+                events,
+                source="task",
+                dimension="workflow",
+                target=stage,
+                kind="warning",
+                summary=f"/{stage} apply skipped {len(skipped)} proposal(s)",
+                evidence_path=_sense_rel_path(path, root),
+                evidence_text="; ".join(
+                    str(item.get("reason", "")) for item in skipped[:3]
+                    if isinstance(item, dict)
+                ),
+                confidence="medium",
+                severity="medium",
+                dedupe_key=_sense_dedupe_key("apply-skip", {
+                    "path": _sense_rel_path(path, root),
+                    "skipped": skipped,
+                }),
+            )
+    return events
+
+
+# ---------------------------------------------------------------------------
+# SciEvolve cycle: coordinated evolution across all three dimensions
+# ---------------------------------------------------------------------------
+
+
+def scievolve_cycle(
+    wiki_root: str,
+    *,
+    dimension: str = "",
+    propose: bool = True,
+    as_json: bool = False,
+) -> None:
+    """Run a coordinated SciEvolve cycle: sense -> report/propose for all dimensions.
+
+    This is the closed-loop entry point that ties /dream, /forge, and /morph
+    together. It first senses durable failure states, then generates (and
+    optionally writes) proposals for every dimension that has signals.
+    """
+    root = Path(wiki_root)
+    cycle_timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+    # Step 1: Sense
+    sense_result = _scievolve_cycle_sense(root)
+
+    # Step 2: Report/propose per dimension
+    dimensions = [dimension] if dimension else ["memory", "workflow", "orchestration"]
+    dimension_results: list[dict] = []
+    for dim in dimensions:
+        report_result = _scievolve_cycle_report(root, dim, propose)
+        dimension_results.append(report_result)
+
+    # Step 3: Cross-dimension signal cascade hints
+    cascade_hints = _scievolve_cycle_cascade_hints(root, dimension_results)
+
+    cycle_report_path = root / "outputs" / "evolution" / "reports" / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}-scievolve-cycle.md"
+    cycle_report_path.parent.mkdir(parents=True, exist_ok=True)
+    cycle_report_path.write_text(
+        _scievolve_cycle_markdown(cycle_timestamp, sense_result, dimension_results, cascade_hints),
+        encoding="utf-8",
+    )
+
+    result = {
+        "status": "ok",
+        "cycle_timestamp": cycle_timestamp,
+        "cycle_report_path": str(cycle_report_path),
+        "sense": sense_result,
+        "dimensions": dimension_results,
+        "cascade_hints": cascade_hints,
+    }
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"SciEvolve cycle report: {cycle_report_path}")
+        print(f"Sensed events: {sense_result.get('sensed_events', 0)}")
+        for dr in dimension_results:
+            dim = dr.get("dimension", "")
+            skill = dr.get("skill", "")
+            sigs = dr.get("signal_count", 0)
+            props = dr.get("proposal_count", 0)
+            print(f"  {dim} -> {skill}: {sigs} signals, {props} proposals")
+        if cascade_hints:
+            print("Cascade hints:")
+            for hint in cascade_hints:
+                print(f"  - {hint['dimension']} -> {hint['target']}: {hint['rationale']}")
+
+
+def _scievolve_cycle_sense(root: Path) -> dict:
+    """Run scievolve-sense silently and return counts."""
+    import io
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    try:
+        scievolve_sense(str(root), as_json=True)
+    finally:
+        out = sys.stdout.getvalue()
+        sys.stdout = old_stdout
+    try:
+        return json.loads(out)
+    except json.JSONDecodeError:
+        return {"status": "error", "sensed_events": 0, "signals_written": 0}
+
+
+def _scievolve_cycle_report(root: Path, dimension: str, propose: bool) -> dict:
+    """Run scievolve-report for one dimension silently."""
+    import io
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    try:
+        scievolve_report(str(root), dimension=dimension, propose=propose, as_json=True)
+    finally:
+        out = sys.stdout.getvalue()
+        sys.stdout = old_stdout
+    try:
+        result = json.loads(out)
+        result["dimension"] = dimension
+        result["skill"] = {"memory": "/dream", "workflow": "/forge", "orchestration": "/morph"}.get(dimension, "")
+        return result
+    except json.JSONDecodeError:
+        return {"status": "error", "dimension": dimension, "skill": "", "signal_count": 0, "proposal_count": 0}
+
+
+def _scievolve_cycle_cascade_hints(
+    root: Path, dimension_results: list[dict]
+) -> list[dict]:
+    """Generate cross-dimension cascade hints based on signal density."""
+    hints: list[dict] = []
+    by_dim = {dr.get("dimension", ""): dr for dr in dimension_results}
+    mem_proposals = by_dim.get("memory", {}).get("proposal_count", 0)
+    wf_proposals = by_dim.get("workflow", {}).get("proposal_count", 0)
+    orch_proposals = by_dim.get("orchestration", {}).get("proposal_count", 0)
+
+    # If memory evolved significantly, workflow may need to adapt
+    if mem_proposals >= 2 and wf_proposals == 0:
+        hints.append({
+            "dimension": "workflow",
+            "target": "/forge",
+            "rationale": "Memory evolution produced proposals; skills may need handoff updates.",
+        })
+    # If workflow evolved significantly, orchestration may need to adapt
+    if wf_proposals >= 2 and orch_proposals == 0:
+        hints.append({
+            "dimension": "orchestration",
+            "target": "/morph",
+            "rationale": "Workflow evolution produced proposals; DAG templates may need structural updates.",
+        })
+    # If orchestration evolved significantly, memory may need new entities
+    if orch_proposals >= 2 and mem_proposals == 0:
+        hints.append({
+            "dimension": "memory",
+            "target": "/dream",
+            "rationale": "Orchestration evolution produced proposals; new template specializations may need memory entities.",
+        })
+    return hints
+
+
+def _scievolve_cycle_markdown(
+    cycle_timestamp: str,
+    sense_result: dict,
+    dimension_results: list[dict],
+    cascade_hints: list[dict],
+) -> str:
+    lines = [
+        "# SciEvolve Cycle Report",
+        "",
+        f"- Cycle timestamp: {cycle_timestamp}",
+        f"- Sensed events: {sense_result.get('sensed_events', 0)}",
+        f"- Signals written: {sense_result.get('signals_written', 0)}",
+        "",
+        "## Dimension Reports",
+        "",
+    ]
+    for dr in dimension_results:
+        dim = dr.get("dimension", "")
+        skill = dr.get("skill", "")
+        lines.append(f"### {dim} -> {skill}")
+        lines.append(f"- Signals: {dr.get('signal_count', 0)}")
+        lines.append(f"- Proposals: {dr.get('proposal_count', 0)}")
+        lines.append(f"- Report: `{dr.get('report_path', '')}`")
+        lines.append("")
+    if cascade_hints:
+        lines.extend(["## Cross-Dimension Cascade Hints", ""])
+        for hint in cascade_hints:
+            lines.append(f"- **{hint['dimension']}** -> `{hint['target']}`: {hint['rationale']}")
+        lines.append("")
+    else:
+        lines.extend(["## Cross-Dimension Cascade Hints", "", "_No hints generated._", ""])
+    lines.extend([
+        "## Loop Status",
+        "",
+        "This cycle connects the three SciEvolve dimensions into a single loop:",
+        "- `/dream` (memory) -> `compile-context` -> skill inputs -> DAG execution",
+        "- `/forge` (workflow) -> skill protocols -> DAG invocation patterns",
+        "- `/morph` (orchestration) -> templates/operators -> execution traces -> signals",
+        "",
+        "Run dimension-specific passes (`dream`, `forge`, `morph`) to act on proposals.",
+        "",
+    ])
+    return "\n".join(lines)
+
+def scievolve_sense(
+    wiki_root: str,
+    *,
+    include_entities: bool = True,
+    include_log: bool = True,
+    include_apply_reports: bool = True,
+    max_log_lines: int = 400,
+    as_json: bool = False,
+) -> None:
+    """Automatically sense durable failure states into SciEvolve signals."""
+    root = Path(wiki_root)
+    events: list[dict] = []
+    if include_entities:
+        events.extend(_sense_entity_states(root))
+    if include_log:
+        events.extend(_sense_log_failures(root, max_log_lines))
+    if include_apply_reports:
+        events.extend(_sense_apply_skips(root))
+
+    written: list[dict] = []
+    skipped: list[dict] = []
+    for event in events:
+        result = scievolve_record_signal(
+            wiki_root,
+            event["source"],
+            event["dimension"],
+            event["target"],
+            event["kind"],
+            event["summary"],
+            event.get("evidence_path", ""),
+            event.get("evidence_text", ""),
+            event.get("confidence", "medium"),
+            event.get("severity", "medium"),
+            dedupe_key=event["dedupe_key"],
+            emit=False,
+        )
+        if result.get("status") == "ok":
+            written.append(result)
+        else:
+            skipped.append(result)
+
+    result = {
+        "status": "ok",
+        "sensed_events": len(events),
+        "signals_written": len(written),
+        "signals_skipped": len(skipped),
+        "signal_ids": [item.get("signal_id", "") for item in written],
+        "signals_path": str(root / "outputs" / "evolution" / "signals.jsonl"),
+    }
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"Sensed events: {result['sensed_events']}")
+        print(f"Signals written: {result['signals_written']}")
+        print(f"Signals skipped: {result['signals_skipped']}")
 
 
 # ---------------------------------------------------------------------------
@@ -1745,6 +2309,3438 @@ def get_maturity(wiki_root: str, as_json: bool = False) -> dict:
         print(f"  Coverage: {int(coverage_score * 100)}%")
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# SciEvolve /dream: agent-first memory evolution
+# ---------------------------------------------------------------------------
+
+DREAM_OPERATIONS = ("forgetting", "consolidation", "association")
+DREAM_ASSOCIATION_KINDS = {
+    "papers",
+    "concepts",
+    "topics",
+    "ideas",
+    "methods",
+    "experiments",
+    "foundations",
+}
+
+
+def _dream_run_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+
+
+def _dream_parse_date(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    for candidate in (text, text.replace("Z", "+00:00")):
+        try:
+            parsed = datetime.fromisoformat(candidate)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        except ValueError:
+            pass
+    try:
+        return datetime.strptime(text[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _dream_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        out = []
+        for item in value:
+            if isinstance(item, dict):
+                slug = item.get("slug") or item.get("id") or item.get("title")
+                if slug:
+                    out.append(str(slug).strip())
+            elif str(item).strip():
+                out.append(str(item).strip())
+        return out
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def _dream_body(path: Path, max_chars: int = 1200) -> str:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+    match = FRONTMATTER_RE.match(text)
+    if match:
+        text = text[match.end():]
+    cleaned = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        cleaned.append(stripped)
+    return "\n".join(cleaned)[:max_chars]
+
+
+def _dream_label(kind: str, slug: str, fm: dict) -> str:
+    if kind == "methods":
+        return str(fm.get("name") or fm.get("title") or slug)
+    return str(fm.get("title") or fm.get("name") or slug)
+
+
+def _dream_collect_entities(root: Path, max_entities: int) -> list[dict]:
+    entities: list[dict] = []
+    for kind in ENTITY_DIRS:
+        directory = root / kind
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.glob("*.md")):
+            fm = _parse_frontmatter(path)
+            slug = path.stem
+            dates = {
+                key: fm.get(key)
+                for key in (
+                    "date_added",
+                    "date_updated",
+                    "date_proposed",
+                    "date_resolved",
+                    "date_planned",
+                    "date_completed",
+                )
+                if fm.get(key)
+            }
+            entities.append({
+                "id": f"{kind}/{slug}",
+                "kind": kind,
+                "slug": slug,
+                "path": str(path.relative_to(root)),
+                "label": _dream_label(kind, slug, fm),
+                "tags": _dream_list(fm.get("tags")),
+                "status": str(fm.get("status") or fm.get("maturity") or ""),
+                "importance": fm.get("importance"),
+                "scievolve_memory": {
+                    key: fm.get(key)
+                    for key in (
+                        "scievolve_memory_weight",
+                        "scievolve_consolidates_with",
+                        "scievolve_associations",
+                        "scievolve_last_dream",
+                    )
+                    if fm.get(key)
+                },
+                "dates": dates,
+                "links": {
+                    key: _dream_list(value)
+                    for key, value in fm.items()
+                    if isinstance(value, list) or key.endswith("_topic") or key.endswith("_idea")
+                },
+                "summary": (
+                    str(fm.get("tldr") or fm.get("definition") or fm.get("key_result")
+                        or fm.get("hypothesis") or fm.get("failure_reason") or "")
+                    or _dream_body(path, 600)
+                )[:600],
+                "body_excerpt": _dream_body(path, 600),
+            })
+            if max_entities > 0 and len(entities) >= max_entities:
+                return entities
+    return entities
+
+
+def _dream_edge_ref(edge: dict, index: int, source: str = "graph") -> dict:
+    return {
+        "id": f"{source}-edge-{index + 1}",
+        "from": str(edge.get("from", "")),
+        "to": str(edge.get("to", "")),
+        "type": str(edge.get("type", "")),
+        "evidence": str(edge.get("evidence", "")),
+    }
+
+
+def _dream_edge_counts(edges: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = defaultdict(int)
+    for edge in edges:
+        src = str(edge.get("from", ""))
+        dst = str(edge.get("to", ""))
+        if src:
+            counts[src] += 1
+        if dst:
+            counts[dst] += 1
+    return dict(counts)
+
+
+SEVERITY_SCORE = {
+    "info": 0,
+    "low": 1,
+    "medium": 2,
+    "high": 3,
+    "critical": 4,
+}
+
+
+def _parse_signal_timestamp(signal: dict) -> datetime | None:
+    raw = str(signal.get("timestamp") or "")
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _scievolve_recurring_patterns(
+    signals: list[dict],
+    *,
+    dimension: str = "",
+    window_days: int = 30,
+) -> list[dict]:
+    """Detect repeated medium+ or high-salience signals in a time window."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=window_days)
+    grouped: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
+    for signal in signals:
+        if dimension and signal.get("dimension") != dimension:
+            continue
+        ts = _parse_signal_timestamp(signal)
+        if ts is not None and ts < cutoff:
+            continue
+        dim = str(signal.get("dimension") or "unknown")
+        target = str(signal.get("target") or "general")
+        kind = str(signal.get("kind") or "other")
+        grouped[(dim, target, kind)].append(signal)
+
+    patterns: list[dict] = []
+    for (dim, target, kind), group in sorted(grouped.items()):
+        medium_plus = [
+            s for s in group
+            if SEVERITY_SCORE.get(str(s.get("severity") or "info"), 0) >= SEVERITY_SCORE["medium"]
+        ]
+        high_plus = [
+            s for s in group
+            if SEVERITY_SCORE.get(str(s.get("severity") or "info"), 0) >= SEVERITY_SCORE["high"]
+        ]
+        if len(medium_plus) < 3 and len(high_plus) < 2:
+            continue
+        timestamps = [
+            parsed for parsed in (_parse_signal_timestamp(s) for s in group)
+            if parsed is not None
+        ]
+        severity_score = sum(
+            SEVERITY_SCORE.get(str(s.get("severity") or "info"), 0)
+            for s in group
+        )
+        signal_ids = [str(s.get("id", "")) for s in group if str(s.get("id", ""))]
+        digest = hashlib.sha1(
+            json.dumps(
+                {
+                    "dimension": dim,
+                    "target": target,
+                    "kind": kind,
+                    "signals": signal_ids,
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()[:8]
+        patterns.append({
+            "id": f"pattern-{dim}-{slugify(target or 'general')}-{slugify(kind or 'other')}-{digest}",
+            "dimension": dim,
+            "target": target,
+            "kind": kind,
+            "window_days": window_days,
+            "recurrence_count": len(group),
+            "medium_plus_count": len(medium_plus),
+            "high_plus_count": len(high_plus),
+            "severity_score": severity_score,
+            "first_seen": min(timestamps).isoformat().replace("+00:00", "Z") if timestamps else "",
+            "last_seen": max(timestamps).isoformat().replace("+00:00", "Z") if timestamps else "",
+            "signal_ids": signal_ids,
+            "summaries": [str(s.get("summary") or "") for s in group[:5]],
+        })
+    patterns.sort(
+        key=lambda item: (
+            item["high_plus_count"],
+            item["medium_plus_count"],
+            item["severity_score"],
+            item["recurrence_count"],
+        ),
+        reverse=True,
+    )
+    return patterns
+
+
+def _dream_pair_key(a: str, b: str) -> tuple[str, str]:
+    return tuple(sorted((a, b)))
+
+
+def _dream_existing_pairs(edges: list[dict]) -> set[tuple[str, str]]:
+    pairs: set[tuple[str, str]] = set()
+    for edge in edges:
+        src = str(edge.get("from", ""))
+        dst = str(edge.get("to", ""))
+        if src and dst:
+            pairs.add(_dream_pair_key(src, dst))
+    return pairs
+
+
+def _dream_signal_operation(signal: dict) -> str:
+    text = " ".join(
+        str(signal.get(key, ""))
+        for key in ("memory_operation", "proposal_kind", "category", "kind", "summary", "evidence_text")
+    ).lower()
+    if any(word in text for word in ("forget", "archive", "stale", "obsolete", "noise", "down-weight")):
+        return "forgetting"
+    if any(word in text for word in ("merge", "cluster", "consolidat", "duplicate", "organize")):
+        return "consolidation"
+    if any(word in text for word in ("associate", "association", "bridge", "link", "connect")):
+        return "association"
+    return ""
+
+
+def _dream_add_candidate(
+    candidates: list[dict],
+    operation: str,
+    title: str,
+    *,
+    target: str = "",
+    related_entities: list[str] | None = None,
+    evidence: list[dict] | None = None,
+    cues: list[str] | None = None,
+    confidence_hint: str = "medium",
+) -> None:
+    candidates.append({
+        "id": f"dream-candidate-{len(candidates) + 1:03d}",
+        "operation": operation,
+        "title": title,
+        "target": target,
+        "related_entities": related_entities or ([target] if target else []),
+        "evidence": evidence or [],
+        "cues": cues or [],
+        "confidence_hint": confidence_hint,
+        "note": (
+            "This is a context cue for the agent, not a proposal. "
+            "The agent must decide whether it is meaningful."
+        ),
+    })
+
+
+def _dream_candidate_context(
+    entities: list[dict],
+    edges: list[dict],
+    projected_edges: list[dict],
+    citations: list[dict],
+    signals: list[dict],
+    max_candidates: int,
+) -> list[dict]:
+    all_edges = edges + projected_edges + citations
+    edge_counts = _dream_edge_counts(all_edges)
+    existing_pairs = _dream_existing_pairs(all_edges)
+    by_id = {entity["id"]: entity for entity in entities}
+    candidates: list[dict] = []
+    now = datetime.now(timezone.utc)
+
+    for signal in signals:
+        operation = _dream_signal_operation(signal)
+        if not operation:
+            continue
+        target = str(signal.get("target") or "")
+        _dream_add_candidate(
+            candidates,
+            operation,
+            f"Recorded memory signal suggests {operation}",
+            target=target if target in by_id else "",
+            related_entities=[target] if target in by_id else [],
+            evidence=[{
+                "source": str(signal.get("id", "")),
+                "summary": str(signal.get("summary", "")),
+                "kind": str(signal.get("kind", "")),
+            }],
+            cues=["Recorded SciEvolve signal"],
+            confidence_hint=str(signal.get("confidence") or "medium"),
+        )
+
+    for entity in entities:
+        status = entity.get("status", "").lower()
+        latest = None
+        for raw in entity.get("dates", {}).values():
+            parsed = _dream_parse_date(raw)
+            if parsed and (latest is None or parsed > latest):
+                latest = parsed
+        age_days = (now - latest).days if latest else None
+        body_len = len(entity.get("body_excerpt", ""))
+        connectivity = edge_counts.get(entity["id"], 0)
+        cues = []
+        if status in {"deprecated", "historical", "failed", "abandoned"}:
+            cues.append(f"status is {status}")
+        if age_days is not None and age_days >= 180 and connectivity <= 1:
+            cues.append(f"latest timestamp is {age_days} days old with connectivity {connectivity}")
+        if body_len < 120 and connectivity == 0:
+            cues.append("short page body with no graph links")
+        if cues:
+            _dream_add_candidate(
+                candidates,
+                "forgetting",
+                f"Review low-signal memory trace: {entity['label']}",
+                target=entity["id"],
+                evidence=[{
+                    "source": entity["id"],
+                    "path": entity["path"],
+                    "summary": "; ".join(cues),
+                }],
+                cues=cues,
+                confidence_hint="low" if len(cues) == 1 else "medium",
+            )
+
+    comparable = [e for e in entities if e["kind"] in {"concepts", "methods", "foundations", "topics"}]
+    for i, left in enumerate(comparable):
+        for right in comparable[i + 1:]:
+            if left["kind"] != right["kind"]:
+                continue
+            name_score = _phrase_match_score(left["label"], right["label"])
+            shared_tags = sorted(set(left.get("tags", [])) & set(right.get("tags", [])))
+            if name_score >= 0.75 or len(shared_tags) >= 2:
+                _dream_add_candidate(
+                    candidates,
+                    "consolidation",
+                    f"Possible memory consolidation: {left['label']} / {right['label']}",
+                    target=left["id"],
+                    related_entities=[left["id"], right["id"]],
+                    evidence=[
+                        {"source": left["id"], "path": left["path"], "summary": left["summary"]},
+                        {"source": right["id"], "path": right["path"], "summary": right["summary"]},
+                    ],
+                    cues=[
+                        f"name_score={round(name_score, 3)}",
+                        f"shared_tags={', '.join(shared_tags) if shared_tags else 'none'}",
+                    ],
+                    confidence_hint="medium" if name_score >= 0.75 else "low",
+                )
+
+    tag_buckets: dict[str, list[dict]] = defaultdict(list)
+    for entity in entities:
+        if entity["kind"] not in DREAM_ASSOCIATION_KINDS:
+            continue
+        for tag in entity.get("tags", []):
+            tag_buckets[tag].append(entity)
+    for tag, members in sorted(tag_buckets.items()):
+        kinds = {member["kind"] for member in members}
+        if len(members) >= 3 and len(kinds) >= 2:
+            related = [member["id"] for member in members[:8]]
+            _dream_add_candidate(
+                candidates,
+                "consolidation",
+                f"Scattered memories share the theme '{tag}'",
+                related_entities=related,
+                evidence=[
+                    {"source": member["id"], "path": member["path"], "summary": member["label"]}
+                    for member in members[:8]
+                ],
+                cues=[f"{len(members)} pages across {len(kinds)} entity types share tag '{tag}'"],
+                confidence_hint="medium",
+            )
+
+    methods = [e for e in entities if e["kind"] == "methods"]
+    concepts = [e for e in entities if e["kind"] == "concepts"]
+    ideas = [e for e in entities if e["kind"] == "ideas"]
+    papers = [e for e in entities if e["kind"] == "papers"]
+    topics = [e for e in entities if e["kind"] == "topics"]
+    assoc_pairs: list[tuple[dict, dict, str]] = []
+    for method in methods:
+        for concept in concepts:
+            shared = sorted(set(method.get("tags", [])) & set(concept.get("tags", [])))
+            if len(shared) >= 2 and _dream_pair_key(method["id"], concept["id"]) not in existing_pairs:
+                assoc_pairs.append((method, concept, "method-concept shared tags: " + ", ".join(shared)))
+    for idea in ideas:
+        for method in methods:
+            shared = sorted(set(idea.get("tags", [])) & set(method.get("tags", [])))
+            if len(shared) >= 2 and _dream_pair_key(idea["id"], method["id"]) not in existing_pairs:
+                assoc_pairs.append((idea, method, "idea-method shared tags: " + ", ".join(shared)))
+    for paper in papers:
+        for concept in concepts + topics:
+            shared = sorted(set(paper.get("tags", [])) & set(concept.get("tags", [])))
+            if len(shared) >= 2 and _dream_pair_key(paper["id"], concept["id"]) not in existing_pairs:
+                assoc_pairs.append((paper, concept, "paper-memory shared tags: " + ", ".join(shared)))
+    for left, right, cue in assoc_pairs[: max(0, max_candidates)]:
+        _dream_add_candidate(
+            candidates,
+            "association",
+            f"Latent association candidate: {left['label']} <-> {right['label']}",
+            target=left["id"],
+            related_entities=[left["id"], right["id"]],
+            evidence=[
+                {"source": left["id"], "path": left["path"], "summary": left["summary"]},
+                {"source": right["id"], "path": right["path"], "summary": right["summary"]},
+            ],
+            cues=[cue, "No existing graph/frontmatter pair found"],
+            confidence_hint="low",
+        )
+
+    if max_candidates > 0:
+        return candidates[:max_candidates]
+    return candidates
+
+
+def _dream_build_context(
+    wiki_root: str,
+    max_entities: int,
+    max_signals: int,
+    max_candidates: int,
+) -> dict:
+    root = Path(wiki_root)
+    entities = _dream_collect_entities(root, max_entities)
+    edges = [_dream_edge_ref(edge, i, "graph") for i, edge in enumerate(load_edges(wiki_root))]
+    projected = [
+        _dream_edge_ref(edge, i, "projected")
+        for i, edge in enumerate(project_frontmatter_edges(root))
+    ]
+    citations = [
+        _dream_edge_ref(edge, i, "citation")
+        for i, edge in enumerate(load_citations(wiki_root))
+    ]
+    signals, malformed = load_scievolve_signals(root)
+    all_memory_signals = [s for s in signals if s.get("dimension") == "memory"]
+    recurring_patterns = _scievolve_recurring_patterns(
+        all_memory_signals,
+        dimension="memory",
+    )
+    memory_signals = list(all_memory_signals)
+    if max_signals > 0:
+        memory_signals = memory_signals[-max_signals:]
+    counts = Counter(entity["kind"] for entity in entities)
+    candidates = _dream_candidate_context(
+        entities,
+        edges,
+        projected,
+        citations,
+        memory_signals,
+        max_candidates,
+    )
+    return {
+        "schema_version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "mode": "agent-first-dream",
+        "wiki_root": str(root),
+        "stats": {
+            "entities": dict(sorted(counts.items())),
+            "edges": len(edges),
+            "projected_edges": len(projected),
+            "citations": len(citations),
+            "memory_signals": len(memory_signals),
+            "recurring_patterns": len(recurring_patterns),
+            "malformed_signal_rows": malformed,
+        },
+        "entities": entities,
+        "edges": edges[-80:],
+        "projected_edges": projected[-80:],
+        "citations": citations[-80:],
+        "signals": memory_signals,
+        "recurring_patterns": recurring_patterns,
+        "candidate_memory_cues": candidates,
+    }
+
+
+def _dream_context_markdown(context: dict) -> str:
+    lines = [
+        "# Dream Context",
+        "",
+        "This is deterministic context for an agent. It is not the dream decision.",
+        "",
+        "## Stats",
+        "",
+    ]
+    for key, value in context.get("stats", {}).items():
+        lines.append(f"- {key}: {value}")
+    lines.extend(["", "## Candidate Memory Cues", ""])
+    for candidate in context.get("candidate_memory_cues", []):
+        lines.append(
+            f"- {candidate['id']} [{candidate['operation']}]: {candidate['title']}"
+        )
+        if candidate.get("related_entities"):
+            lines.append(f"  - related: {', '.join(candidate['related_entities'])}")
+        if candidate.get("cues"):
+            lines.append(f"  - cues: {'; '.join(candidate['cues'])}")
+    lines.extend(["", "## Memory Signals", ""])
+    for signal in context.get("signals", []):
+        lines.append(
+            "- {id} [{kind}] target={target}: {summary}".format(
+                id=signal.get("id", ""),
+                kind=signal.get("kind", ""),
+                target=signal.get("target", ""),
+                summary=signal.get("summary", ""),
+            )
+        )
+    lines.extend(["", "## Recurring Patterns", ""])
+    patterns = context.get("recurring_patterns", [])
+    if patterns:
+        for pattern in patterns:
+            lines.append(
+                "- {id} [{kind}] target={target}: {count} signals "
+                "(medium+={medium}, high+={high})".format(
+                    id=pattern.get("id", ""),
+                    kind=pattern.get("kind", ""),
+                    target=pattern.get("target", ""),
+                    count=pattern.get("recurrence_count", 0),
+                    medium=pattern.get("medium_plus_count", 0),
+                    high=pattern.get("high_plus_count", 0),
+                )
+            )
+    else:
+        lines.append("_None._")
+    lines.extend(["", "## Entity Snapshot", ""])
+    for entity in context.get("entities", [])[:80]:
+        tags = ", ".join(entity.get("tags", []))
+        memory_state = entity.get("scievolve_memory") or {}
+        suffix = ""
+        if memory_state:
+            suffix = f" scievolve={json.dumps(memory_state, ensure_ascii=False)}"
+        lines.append(f"- {entity['id']}: {entity['label']} ({tags}){suffix}")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _dream_agent_prompt(context: dict) -> str:
+    return (
+        "# /dream Agent Prompt\n\n"
+        "You are AutoSci's /dream agent. Your job is memory self-evolution, not lint repair.\n"
+        "A good proposal should explain how memory will behave differently in a later "
+        "retrieval, ideation, or experiment-planning cycle.\n\n"
+        "Use the supplied context to propose reversible memory-evolution operations:\n"
+        "- forgetting: archive, down-weight, or review low-signal/superseded traces\n"
+        "- consolidation: merge, cluster, summarize, or cross-link scattered related memories\n"
+        "- association: propose latent high-value links between existing pages\n\n"
+        "Rules:\n"
+        "- Use only evidence present in the context.\n"
+        "- Treat candidate_memory_cues as hints, not decisions.\n"
+        "- Treat recurring_patterns as stronger evidence than isolated low-severity signals.\n"
+        "- Do not propose deletion. Safe reversible metadata application may happen later.\n"
+        "- Do not repackage broken links or missing fields as the core dream output.\n"
+        "- Every proposal must cite candidate ids, pattern ids, entity ids, signal ids, or edge ids from the context.\n"
+        "- Prefer a few high-signal proposals over a broad mechanical list.\n\n"
+        "Return strict JSON only with this shape:\n\n"
+        "{\n"
+        "  \"proposals\": [\n"
+        "    {\n"
+        "      \"operation\": \"forgetting|consolidation|association\",\n"
+        "      \"target\": \"entities/slug or blank for cluster-level proposal\",\n"
+        "      \"title\": \"short title\",\n"
+        "      \"proposed_action\": \"reversible proposal-first action\",\n"
+        "      \"rationale\": \"why this is a meaningful memory operation and how it improves a future cycle\",\n"
+        "      \"confidence\": \"low|medium|high\",\n"
+        "      \"related_entities\": [\"kind/slug\"],\n"
+        "      \"candidate_ids\": [\"dream-candidate-001\"],\n"
+        "      \"evidence\": [\n"
+        "        {\"source\": \"entity/signal/candidate id\", \"summary\": \"supporting note\"}\n"
+        "      ]\n"
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Context JSON:\n\n"
+        "```json\n"
+        f"{json.dumps(context, ensure_ascii=False, indent=2)}\n"
+        "```\n"
+    )
+
+
+def _dream_extract_json_object(text: str) -> dict:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```(?:json)?\s*", "", stripped)
+        stripped = re.sub(r"\s*```$", "", stripped)
+    try:
+        data = json.loads(stripped)
+    except json.JSONDecodeError:
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start < 0 or end < start:
+            raise
+        data = json.loads(stripped[start:end + 1])
+    if not isinstance(data, dict):
+        raise ValueError("dream agent response must be a JSON object")
+    return data
+
+
+def _dream_call_openai_compatible(
+    prompt: str,
+    *,
+    timeout: int,
+    temperature: float,
+) -> tuple[dict, dict]:
+    if requests is None:
+        raise RuntimeError("LLM call unavailable; requests is not installed")
+    api_key = os.environ.get("LLM_API_KEY", "").strip()
+    base_url = os.environ.get("LLM_BASE_URL", "").strip().rstrip("/")
+    model = os.environ.get("LLM_MODEL", "").strip()
+    if not api_key or not base_url or not model:
+        raise RuntimeError("LLM call unavailable; set LLM_API_KEY, LLM_BASE_URL, and LLM_MODEL")
+    fallback_model = os.environ.get("LLM_FALLBACK_MODEL", "").strip()
+    models = [model]
+    if fallback_model and fallback_model not in models:
+        models.append(fallback_model)
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    errors: list[str] = []
+    for active_model in models:
+        body = {
+            "model": active_model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are AutoSci /dream. Return strict JSON only. "
+                        "Use only the provided memory context."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": temperature,
+            "response_format": {"type": "json_object"},
+        }
+        for allow_response_format in (True, False):
+            request_body = dict(body)
+            if not allow_response_format:
+                request_body.pop("response_format", None)
+            try:
+                response = requests.post(
+                    f"{base_url}/chat/completions",
+                    headers=headers,
+                    json=request_body,
+                    timeout=timeout,
+                )
+                if response.status_code >= 400 and allow_response_format:
+                    continue
+                response.raise_for_status()
+                payload = response.json()
+                content = payload["choices"][0]["message"]["content"]
+                trace = {
+                    "provider": "openai-compatible",
+                    "model": active_model,
+                    "base_url": base_url,
+                    "policy_runtime": "openai-compatible-api",
+                }
+                if active_model != model:
+                    trace["fallback_from"] = model
+                return _dream_extract_json_object(content), trace
+            except Exception as exc:  # Keep fallback behavior provider-agnostic.
+                errors.append(f"{active_model}: {exc}")
+                if allow_response_format:
+                    continue
+                break
+    raise RuntimeError("LLM call failed for configured model(s): " + "; ".join(errors))
+
+
+def _dream_allowed_refs(context: dict) -> set[str]:
+    refs = {entity["id"] for entity in context.get("entities", [])}
+    refs.update(candidate["id"] for candidate in context.get("candidate_memory_cues", []))
+    refs.update(str(signal.get("id", "")) for signal in context.get("signals", []))
+    refs.update(str(pattern.get("id", "")) for pattern in context.get("recurring_patterns", []))
+    for section in ("edges", "projected_edges", "citations"):
+        refs.update(str(edge.get("id", "")) for edge in context.get(section, []))
+    refs.discard("")
+    return refs
+
+
+def _dream_explicit_evidence_refs(raw: dict) -> set[str]:
+    refs: set[str] = set()
+    for key in ("candidate_ids", "triggering_signals"):
+        value = raw.get(key)
+        if isinstance(value, list):
+            refs.update(str(item) for item in value if str(item).strip())
+    evidence = raw.get("evidence")
+    if isinstance(evidence, list):
+        for item in evidence:
+            if isinstance(item, dict):
+                for key in ("source", "id", "entity_id", "signal_id", "candidate_id", "pattern_id", "edge_id"):
+                    if item.get(key):
+                        refs.add(str(item[key]))
+            elif str(item).strip():
+                refs.add(str(item).strip())
+    return refs
+
+
+def _dream_normalize_evidence(raw: dict, context: dict) -> list[dict]:
+    entity_paths = {entity["id"]: entity.get("path", "") for entity in context.get("entities", [])}
+    evidence = []
+    for item in raw.get("evidence") or []:
+        if isinstance(item, dict):
+            source = str(
+                item.get("source")
+                or item.get("id")
+                or item.get("entity_id")
+                or item.get("signal_id")
+                or item.get("candidate_id")
+                or item.get("pattern_id")
+                or item.get("edge_id")
+                or ""
+            )
+            evidence.append({
+                "source": source,
+                "summary": str(item.get("summary") or item.get("note") or ""),
+                "path": entity_paths.get(source, ""),
+            })
+        elif str(item).strip():
+            source = str(item).strip()
+            evidence.append({"source": source, "summary": "", "path": entity_paths.get(source, "")})
+    for candidate_id in raw.get("candidate_ids") or []:
+        if not any(e.get("source") == candidate_id for e in evidence):
+            evidence.append({"source": str(candidate_id), "summary": "Agent cited candidate memory cue", "path": ""})
+    return evidence
+
+
+def _dream_normalize_agent_response(
+    payload: dict,
+    context: dict,
+    agent_trace: dict,
+) -> tuple[list[dict], list[dict]]:
+    allowed = _dream_allowed_refs(context)
+    signals = {str(signal.get("id", "")) for signal in context.get("signals", [])}
+    pattern_signals = {
+        str(pattern.get("id", "")): [
+            str(signal_id) for signal_id in pattern.get("signal_ids", [])
+            if str(signal_id)
+        ]
+        for pattern in context.get("recurring_patterns", [])
+    }
+    pattern_ids = set(pattern_signals)
+    raw_proposals = payload.get("proposals")
+    if not isinstance(raw_proposals, list):
+        raise ValueError("dream agent response must contain a proposals list")
+
+    accepted: list[dict] = []
+    rejected: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for index, raw in enumerate(raw_proposals):
+        if not isinstance(raw, dict):
+            rejected.append({"index": index, "reason": "proposal is not an object"})
+            continue
+        operation = str(raw.get("operation") or raw.get("proposal_kind") or "").strip().lower()
+        if operation not in DREAM_OPERATIONS:
+            rejected.append({"index": index, "reason": f"invalid operation: {operation}"})
+            continue
+        target = str(raw.get("target") or "").strip()
+        related_entities = [
+            str(item).strip()
+            for item in (raw.get("related_entities") or [])
+            if str(item).strip()
+        ]
+        unknown_related = [ref for ref in related_entities if ref not in allowed]
+        if target and target not in allowed:
+            rejected.append({"index": index, "reason": f"unknown target: {target}"})
+            continue
+        if unknown_related:
+            rejected.append({"index": index, "reason": f"unknown related_entities: {unknown_related}"})
+            continue
+        refs = _dream_explicit_evidence_refs(raw)
+        if not refs or not (refs & allowed):
+            rejected.append({"index": index, "reason": "proposal cites no known context evidence"})
+            continue
+        unknown_refs = sorted(ref for ref in refs if ref not in allowed)
+        if unknown_refs:
+            rejected.append({"index": index, "reason": f"unknown evidence refs: {unknown_refs}"})
+            continue
+        action = str(raw.get("proposed_action") or raw.get("action") or "").strip()
+        rationale = str(raw.get("rationale") or "").strip()
+        if not action or not rationale:
+            rejected.append({"index": index, "reason": "missing proposed_action or rationale"})
+            continue
+        confidence = str(raw.get("confidence") or "medium").strip().lower()
+        if confidence not in SCIEVOLVE_CONFIDENCE_VALUES:
+            confidence = "medium"
+        title = str(raw.get("title") or operation.title()).strip()
+        proposal_target = target or (related_entities[0] if related_entities else "memory")
+        dedup_key = (operation, proposal_target, action)
+        if dedup_key in seen:
+            rejected.append({"index": index, "reason": "duplicate proposal"})
+            continue
+        seen.add(dedup_key)
+        evidence = _dream_normalize_evidence(raw, context)
+        signal_refs_set = {ref for ref in refs if ref in signals}
+        for ref in refs:
+            signal_refs_set.update(pattern_signals.get(ref, []))
+        signal_refs = sorted(signal_refs_set)
+        accepted.append({
+            "dimension": "memory",
+            "target": proposal_target,
+            "proposal_kind": operation,
+            "title": title,
+            "confidence": confidence,
+            "related_entities": related_entities,
+            "triggering_signals": signal_refs,
+            "proposed_action": action,
+            "rationale": rationale,
+            "risk": (
+                "Agent-generated /dream proposal. Only safe metadata-level "
+                "application is allowed without a separate page-edit pass."
+            ),
+            "evidence": evidence,
+            "agent_trace": agent_trace,
+        })
+    return accepted, rejected
+
+
+def _dream_entity_path(root: Path, entity_id: str) -> Path | None:
+    parts = entity_id.split("/", 1)
+    if len(parts) != 2:
+        return None
+    kind, slug = parts
+    if kind not in ENTITY_DIRS or not slug:
+        return None
+    return root / kind / f"{slug}.md"
+
+
+def _dream_as_list(value: object) -> list[str]:
+    if value is None or value == "":
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item).strip()]
+    return [str(value)]
+
+
+def _dream_update_frontmatter_memory(
+    path: Path,
+    *,
+    set_fields: dict[str, object],
+    append_fields: dict[str, list[str]],
+) -> dict:
+    content = path.read_text(encoding="utf-8")
+    match = FRONTMATTER_RE.match(content)
+    if not match:
+        raise ValueError(f"No frontmatter found in {path}")
+
+    fm = _parse_yaml_block(match.group(1))
+    before = {
+        field: fm.get(field)
+        for field in sorted(set(set_fields) | set(append_fields))
+    }
+    for field, value in set_fields.items():
+        fm[field] = value
+    for field, additions in append_fields.items():
+        values = _dream_as_list(fm.get(field))
+        for item in additions:
+            if item and item not in values:
+                values.append(item)
+        if values:
+            fm[field] = values
+
+    after = {
+        field: fm.get(field)
+        for field in sorted(set(set_fields) | set(append_fields))
+    }
+    if before == after:
+        return {
+            "path": str(path),
+            "changed": False,
+            "before": before,
+            "after": after,
+        }
+
+    next_content = f"---\n{_serialize_frontmatter(fm)}---{content[match.end():]}"
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(next_content, encoding="utf-8")
+        tmp.replace(path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+    return {
+        "path": str(path),
+        "changed": True,
+        "before": before,
+        "after": after,
+    }
+
+
+def _dream_link_frontmatter_append(
+    fm: dict,
+    append_fields: dict[str, list[str]],
+    entity: str,
+) -> None:
+    """Append a related entity to the appropriate standard frontmatter link field."""
+    kind = entity.split("/")[0] if "/" in entity else ""
+    mapping = {
+        "concepts": "related_concepts",
+        "topics": "parent_topics",
+        "ideas": "linked_ideas",
+        "methods": "parent_methods",
+        "papers": "key_papers",
+        "foundations": "grounded_in",
+    }
+    field = mapping.get(kind)
+    if field and field in fm:
+        append_fields.setdefault(field, [])
+        if entity not in append_fields[field]:
+            append_fields[field].append(entity)
+
+
+def _dream_append_evolution_note(
+    path: Path,
+    proposal_id: str,
+    operation: str,
+    related: list[str],
+    title: str = "",
+    rationale: str = "",
+) -> dict:
+    """Append a visible SciEvolve evolution note to the end of a page body."""
+    content = path.read_text(encoding="utf-8")
+    marker = f"<!-- /dream: {proposal_id} -->"
+    if marker in content:
+        return {"path": str(path), "changed": False, "reason": "note already present"}
+
+    lines = [
+        "",
+        "---",
+        "",
+        "## SciEvolve Memory Evolution Note",
+        "",
+        marker,
+        "",
+        f"**Operation:** `{operation}`",
+    ]
+    if title:
+        lines.append(f"**Title:** {title}")
+    if related:
+        lines.append(f"**Related entities:** {', '.join(f'`{r}`' for r in related)}")
+    if rationale:
+        lines.append(f"**Rationale:** {rationale}")
+    lines.append(f"**Proposal:** `{proposal_id}`")
+    lines.append("")
+
+    note = "\n".join(lines)
+    new_content = content.rstrip("\n") + "\n" + note
+
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(new_content, encoding="utf-8")
+        tmp.replace(path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+    return {"path": str(path), "changed": True, "note_length": len(note)}
+
+
+def _dream_safe_apply_plan(
+    root: Path, item: dict, proposal: dict, *, yolo: bool = False
+) -> tuple[dict | None, str]:
+    operation = str(item.get("proposal_kind", ""))
+    confidence = str(item.get("confidence", ""))
+    target = str(item.get("target", ""))
+    target_path = _dream_entity_path(root, target)
+    if operation not in DREAM_OPERATIONS:
+        return None, f"unsupported operation: {operation}"
+    if confidence == "low":
+        return None, "low-confidence proposals remain review-only"
+    if target_path is None or not target_path.exists():
+        return None, "target is not a writable entity page"
+
+    related = []
+    for entity in item.get("related_entities", []):
+        related_path = _dream_entity_path(root, entity)
+        if entity and entity != target and related_path and related_path.exists():
+            related.append(entity)
+    if operation in ("consolidation", "association") and not related:
+        return None, f"{operation} needs at least one related entity"
+
+    # Read current frontmatter to determine safe standard-field mutations
+    fm = _parse_frontmatter(target_path)
+
+    note = (
+        f"{proposal.get('id', '')} {operation}: "
+        f"{item.get('title') or item.get('proposed_action', '')}"
+    )[:220]
+    set_fields: dict[str, object] = {
+        "scievolve_last_dream": proposal.get("id", ""),
+    }
+    append_fields: dict[str, list[str]] = {
+        "scievolve_dream_notes": [note],
+    }
+    if operation == "forgetting":
+        set_fields["scievolve_memory_weight"] = "downweighted"
+        # Promote deprecation into standard frontmatter when applicable
+        if fm.get("maturity") in ("stable", "active", "emerging"):
+            set_fields["maturity"] = "deprecated"
+    elif operation == "consolidation":
+        append_fields["scievolve_consolidates_with"] = related
+        if "tags" in fm:
+            tags = _dream_as_list(fm.get("tags"))
+            if "consolidated" not in tags:
+                append_fields.setdefault("tags", []).append("consolidated")
+        for entity in related:
+            _dream_link_frontmatter_append(fm, append_fields, entity)
+    elif operation == "association":
+        append_fields["scievolve_associations"] = related
+        if "tags" in fm:
+            tags = _dream_as_list(fm.get("tags"))
+            if "associated" not in tags:
+                append_fields.setdefault("tags", []).append("associated")
+        for entity in related:
+            _dream_link_frontmatter_append(fm, append_fields, entity)
+
+    plan: dict[str, object] = {
+        "proposal_id": proposal.get("id", ""),
+        "operation": operation,
+        "target": target,
+        "target_path": target_path,
+        "set_fields": set_fields,
+        "append_fields": append_fields,
+        "body_note": {
+            "proposal_id": proposal.get("id", ""),
+            "operation": operation,
+            "related": related,
+            "title": str(item.get("title", "")),
+            "rationale": str(item.get("rationale", "")),
+        },
+    }
+
+    # Yolo mode: high-confidence proposals may mutate page bodies and archive pages
+    if yolo and confidence == "high":
+        if operation == "forgetting":
+            archive = root / "archive" / target_path.relative_to(root)
+            plan["yolo_action"] = "archive"
+            plan["archive_path"] = archive
+        elif operation == "consolidation":
+            merge_sources = []
+            for entity in related:
+                source_path = _dream_entity_path(root, entity)
+                if source_path and source_path.exists():
+                    archive = root / "archive" / source_path.relative_to(root)
+                    merge_sources.append({
+                        "source_entity": entity,
+                        "source_path": source_path,
+                        "archive_path": archive,
+                    })
+            if merge_sources:
+                plan["yolo_action"] = "merge-and-archive"
+                plan["merge_sources"] = merge_sources
+
+    return plan, ""
+
+
+def _dream_archive_page(source: Path, archive: Path) -> dict:
+    """Move a page to the archive directory."""
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    source.rename(archive)
+    return {
+        "path": str(source),
+        "archive_path": str(archive),
+        "changed": True,
+        "action": "archived",
+    }
+
+
+def _dream_merge_page_body(
+    target: Path,
+    source: Path,
+    proposal_id: str,
+    source_entity: str,
+) -> dict:
+    """Append source page body into target page under a consolidated section."""
+    source_content = source.read_text(encoding="utf-8")
+    match = FRONTMATTER_RE.match(source_content)
+    source_body = source_content[match.end():] if match else source_content
+
+    target_content = target.read_text(encoding="utf-8")
+    marker = f"<!-- /dream merge: {proposal_id} {source_entity} -->"
+    if marker in target_content:
+        return {"path": str(target), "changed": False, "reason": "already merged"}
+
+    section = [
+        "",
+        f"### Consolidated Content from `{source_entity}`",
+        "",
+        marker,
+        "",
+        source_body.strip(),
+        "",
+    ]
+
+    new_content = target_content.rstrip("\n") + "\n" + "\n".join(section)
+    tmp = target.with_suffix(".tmp")
+    try:
+        tmp.write_text(new_content, encoding="utf-8")
+        tmp.replace(target)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+    return {
+        "path": str(target),
+        "changed": True,
+        "action": "merged",
+        "source": str(source),
+    }
+
+
+def _dream_apply_safe(
+    root: Path,
+    run_dir: Path,
+    accepted: list[dict],
+    proposals: list[dict],
+    *,
+    yolo: bool = False,
+) -> tuple[list[dict], list[dict], Path, Path]:
+    applied: list[dict] = []
+    skipped: list[dict] = []
+    for item, proposal in zip(accepted, proposals):
+        if proposal.get("status") == "applied":
+            skipped.append({"proposal_id": proposal.get("id", ""), "reason": "already applied"})
+            continue
+        plan, reason = _dream_safe_apply_plan(root, item, proposal, yolo=yolo)
+        if plan is None:
+            skipped.append({"proposal_id": proposal.get("id", ""), "reason": reason})
+            continue
+        try:
+            changed_paths: list[dict] = []
+
+            # Yolo actions run first (merge body, archive pages)
+            yolo_action = plan.get("yolo_action")
+            if yolo_action == "archive":
+                archive_change = _dream_archive_page(
+                    plan["target_path"],
+                    plan["archive_path"],
+                )
+                changed_paths.append(archive_change)
+            elif yolo_action == "merge-and-archive":
+                for source_info in plan.get("merge_sources", []):
+                    merge_change = _dream_merge_page_body(
+                        plan["target_path"],
+                        source_info["source_path"],
+                        plan["proposal_id"],
+                        source_info["source_entity"],
+                    )
+                    changed_paths.append(merge_change)
+                    archive_change = _dream_archive_page(
+                        source_info["source_path"],
+                        source_info["archive_path"],
+                    )
+                    changed_paths.append(archive_change)
+
+            # Frontmatter mutations (scievolve_* + standard fields)
+            # For yolo forgetting the file has moved; update the archived copy
+            if yolo_action == "archive":
+                fm_target = plan.get("archive_path", plan["target_path"])
+            else:
+                fm_target = plan["target_path"]
+            if isinstance(fm_target, Path) and fm_target.exists():
+                fm_change = _dream_update_frontmatter_memory(
+                    fm_target,
+                    set_fields=plan["set_fields"],
+                    append_fields=plan["append_fields"],
+                )
+                changed_paths.append(fm_change)
+
+                # Body evolution note on the archived/merged target
+                if plan.get("body_note"):
+                    body_change = _dream_append_evolution_note(
+                        fm_target,
+                        **plan["body_note"],
+                    )
+                    changed_paths.append(body_change)
+
+                validation = {
+                    "frontmatter_parseable": bool(_parse_frontmatter(fm_target)),
+                }
+            else:
+                validation = {"frontmatter_parseable": False}
+
+            application = scievolve_record_application(root, {
+                "proposal_id": proposal.get("id", ""),
+                "skill": "/dream",
+                "operation": plan["operation"],
+                "target": plan["target"],
+                "mode": "yolo" if yolo_action else "auto-apply",
+                "changed_paths": changed_paths,
+                "validation": validation,
+            })
+            updated = scievolve_update_proposal_status(
+                root,
+                proposal,
+                "applied",
+                note=(
+                    "Applied by /dream yolo-apply as archived/merged memory."
+                    if yolo_action else
+                    "Applied by /dream auto-apply as reversible memory metadata and body note."
+                ),
+                application=application,
+            )
+            applied.append({
+                "proposal_id": proposal.get("id", ""),
+                "application_id": application.get("id", ""),
+                "target": plan["target"],
+                "path": str(plan["target_path"]),
+                "changed_paths": changed_paths,
+                "proposal": updated,
+            })
+        except Exception as exc:
+            skipped.append({"proposal_id": proposal.get("id", ""), "reason": str(exc)})
+
+    context_rebuild = None
+    if applied:
+        context_rebuild = compile_context(str(root), "general", emit=False)
+
+    json_path = run_dir / "dream_apply_report.json"
+    md_path = run_dir / "dream_apply_report.md"
+    payload = {
+        "status": "ok",
+        "mode": "auto-apply",
+        "applied": applied,
+        "skipped": skipped,
+        "context_rebuild": context_rebuild,
+    }
+    json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    md_lines = [
+        "# /dream Auto-Apply Report",
+        "",
+        f"- Applied: {len(applied)}",
+        f"- Skipped: {len(skipped)}",
+        f"- Context rebuilt: {str(bool(context_rebuild)).lower()}",
+        "",
+        "## Applied",
+        "",
+    ]
+    if applied:
+        for item in applied:
+            md_lines.append(f"- {item['proposal_id']} -> `{item['path']}`")
+            for change in item.get("changed_paths", []):
+                if isinstance(change, dict):
+                    md_lines.append(
+                        f"  - {change.get('path', '')}: changed={str(change.get('changed')).lower()}"
+                    )
+    else:
+        md_lines.append("_No proposals were auto-applied._")
+    if skipped:
+        md_lines.extend(["", "## Skipped", ""])
+        for item in skipped:
+            md_lines.append(f"- {item.get('proposal_id')}: {item.get('reason')}")
+    if context_rebuild:
+        md_lines.extend(["", "## Downstream Linkage", ""])
+        md_lines.append(
+            f"- Rebuilt `{context_rebuild.get('path')}` with "
+            f"{context_rebuild.get('scievolve_memory_items')} SciEvolve memory item(s)."
+        )
+    md_path.write_text("\n".join(md_lines).rstrip() + "\n", encoding="utf-8")
+    return applied, skipped, json_path, md_path
+
+
+def _dream_report_markdown(
+    context: dict,
+    *,
+    run_dir: Path,
+    context_path: Path,
+    prompt_path: Path,
+    response_path: Path | None,
+    proposals: list[dict],
+    rejected: list[dict],
+    proposed: bool,
+    applied: list[dict] | None = None,
+    apply_skipped: list[dict] | None = None,
+) -> str:
+    applied = applied or []
+    apply_skipped = apply_skipped or []
+    lines = [
+        "# /dream Memory Evolution Report",
+        "",
+        f"- Generated: {context['generated_at']}",
+        "- Mode: agent-first memory evolution",
+        f"- Context: `{context_path.name}`",
+        f"- Agent prompt: `{prompt_path.name}`",
+        f"- Agent response: `{response_path.name if response_path else '(not supplied)'}`",
+        f"- Proposal artifacts written: {len(proposals) if proposed else 0}",
+        f"- Safe applications: {len(applied)}",
+        "",
+        "## Interpretation",
+        "",
+        (
+            "Deterministic tooling prepared memory cues; an agent response is "
+            "required to turn those cues into SciEvolve proposals. The tool "
+            "validates, records, optionally applies safe memory metadata, and "
+            "rebuilds downstream context when the memory state changes."
+        ),
+        "",
+        "## Candidate Cue Counts",
+        "",
+    ]
+    counts = Counter(candidate["operation"] for candidate in context.get("candidate_memory_cues", []))
+    for operation in DREAM_OPERATIONS:
+        lines.append(f"- {operation}: {counts.get(operation, 0)}")
+    lines.extend(["", "## Proposals", ""])
+    if proposals and proposed:
+        for proposal in proposals:
+            lines.append(
+                f"- {proposal['id']} [{proposal.get('proposal_kind')}]: "
+                f"`{proposal['output_path']}`"
+            )
+    elif proposals:
+        lines.append("_Agent proposals were validated, but `--propose` was not set._")
+    else:
+        lines.append("_No validated agent proposals._")
+    if rejected:
+        lines.extend(["", "## Rejected Agent Items", ""])
+        for item in rejected:
+            lines.append(f"- index {item.get('index')}: {item.get('reason')}")
+    lines.extend(["", "## Apply Semantics", ""])
+    if applied:
+        lines.append(
+            "Safe auto-apply updated reversible SciEvolve metadata and append-only "
+            "audit notes on memory pages. The derived context brief is rebuilt so "
+            "later skills can consume the changed memory state. No page body "
+            "sections, graph edges, schemas, skills, or templates were rewritten."
+        )
+        lines.extend(["", "## Safe Applications", ""])
+        for item in applied:
+            lines.append(f"- {item['proposal_id']} -> `{item['path']}`")
+    else:
+        lines.append("No wiki entity pages are changed by this report.")
+    if apply_skipped:
+        lines.extend(["", "## Apply-Safe Skips", ""])
+        for item in apply_skipped:
+            lines.append(f"- {item.get('proposal_id')}: {item.get('reason')}")
+    return "\n".join(lines)
+
+
+def dream(
+    wiki_root: str,
+    *,
+    max_entities: int = 120,
+    max_signals: int = 30,
+    max_candidates: int = 30,
+    agent_response: str = "",
+    use_llm: bool = False,
+    propose: bool = True,
+    apply_safe: bool = True,
+    propose_only: bool = False,
+    yolo: bool = False,
+    as_json: bool = False,
+    timeout: int = 90,
+    temperature: float = 0.2,
+    prepared_run_dir: str = "",
+) -> None:
+    root = Path(wiki_root)
+    if propose_only:
+        propose = True
+        apply_safe = False
+    if apply_safe:
+        propose = True
+    run_dir = Path(prepared_run_dir) if prepared_run_dir else root / "outputs" / "evolution" / "dream" / _dream_run_id()
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    context_path = run_dir / "dream_context.json"
+    context_md_path = run_dir / "dream_context.md"
+    prompt_path = run_dir / "dream_agent_prompt.md"
+    response_path: Path | None = None
+    if prepared_run_dir and context_path.exists() and prompt_path.exists():
+        context = json.loads(context_path.read_text(encoding="utf-8"))
+        prompt = prompt_path.read_text(encoding="utf-8")
+        if not context_md_path.exists():
+            context_md_path.write_text(_dream_context_markdown(context), encoding="utf-8")
+    else:
+        context = _dream_build_context(wiki_root, max_entities, max_signals, max_candidates)
+        context_path.write_text(json.dumps(context, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        context_md_path.write_text(_dream_context_markdown(context), encoding="utf-8")
+        prompt = _dream_agent_prompt(context)
+        prompt_path.write_text(prompt, encoding="utf-8")
+
+    payload: dict | None = None
+    agent_trace = {
+        "provider": "supplied-policy-response",
+        "model": "external-policy-runtime",
+        "policy_runtime": "caller-supplied",
+        "prompt_path": str(prompt_path.relative_to(root)),
+    }
+    if agent_response:
+        source = Path(agent_response)
+        payload = _dream_extract_json_object(source.read_text(encoding="utf-8"))
+        response_path = run_dir / "dream_agent_response.json"
+        response_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        agent_trace["response_path"] = str(response_path.relative_to(root))
+    elif use_llm:
+        payload, llm_trace = _dream_call_openai_compatible(
+            prompt,
+            timeout=timeout,
+            temperature=temperature,
+        )
+        response_path = run_dir / "dream_agent_response.json"
+        response_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        agent_trace.update(llm_trace)
+        agent_trace["response_path"] = str(response_path.relative_to(root))
+
+    accepted: list[dict] = []
+    rejected: list[dict] = []
+    proposals: list[dict] = []
+    if payload is not None:
+        accepted, rejected = _dream_normalize_agent_response(payload, context, agent_trace)
+        if propose:
+            for item in accepted:
+                # Strip forge-specific fields not expected by scievolve_write_proposal
+                write_item = {
+                    k: v for k, v in item.items()
+                    if k not in ("line_hint", "skill_path")
+                }
+                proposals.append(scievolve_write_proposal(root, **write_item))
+    applied: list[dict] = []
+    apply_skipped: list[dict] = []
+    apply_report_json: Path | None = None
+    apply_report_md: Path | None = None
+    if apply_safe and proposals:
+        applied, apply_skipped, apply_report_json, apply_report_md = _dream_apply_safe(
+            root,
+            run_dir,
+            accepted,
+            proposals,
+            yolo=yolo,
+        )
+        applied_by_id = {
+            item["proposal_id"]: item["proposal"]
+            for item in applied
+            if item.get("proposal")
+        }
+        proposals = [
+            applied_by_id.get(proposal.get("id"), proposal)
+            for proposal in proposals
+        ]
+
+    report_path = run_dir / "dream_report.md"
+    report_path.write_text(
+        _dream_report_markdown(
+            context,
+            run_dir=run_dir,
+            context_path=context_path,
+            prompt_path=prompt_path,
+            response_path=response_path,
+            proposals=proposals if propose else accepted,
+            rejected=rejected,
+            proposed=propose,
+            applied=applied,
+            apply_skipped=apply_skipped,
+        ),
+        encoding="utf-8",
+    )
+
+    result = {
+        "status": "ok",
+        "mode": "agent-first-dream",
+        "run_dir": str(run_dir),
+        "context_path": str(context_path),
+        "context_markdown_path": str(context_md_path),
+        "prompt_path": str(prompt_path),
+        "response_path": str(response_path) if response_path else "",
+        "report_path": str(report_path),
+        "candidate_count": len(context.get("candidate_memory_cues", [])),
+        "accepted_agent_proposals": len(accepted),
+        "rejected_agent_items": len(rejected),
+        "proposal_count": len(proposals),
+        "proposals": proposals,
+        "safe_application_count": len(applied),
+        "safe_applications": applied,
+        "safe_application_skips": apply_skipped,
+        "apply_report_path": str(apply_report_json) if apply_report_json else "",
+        "apply_report_markdown_path": str(apply_report_md) if apply_report_md else "",
+    }
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"/dream report: {report_path}")
+        print(f"Agent prompt: {prompt_path}")
+        if response_path:
+            print(f"Agent response: {response_path}")
+        print(f"Candidate cues: {result['candidate_count']}")
+        print(f"Proposals written: {result['proposal_count']}")
+        print(f"Safe applications: {result['safe_application_count']}")
+
+
+#!/usr/bin/env python3
+"""Forge implementation to be inserted into research_wiki.py."""
+
+# ---------------------------------------------------------------------------
+# SciEvolve /forge: agent-first workflow evolution
+# ---------------------------------------------------------------------------
+
+
+def _forge_run_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+
+
+def _forge_build_context(
+    wiki_root: str,
+    target_skill: str,
+    max_signals: int,
+) -> dict:
+    root = Path(wiki_root)
+    signals, malformed = load_scievolve_signals(root)
+    all_workflow_signals = [s for s in signals if s.get("dimension") == "workflow"]
+    if target_skill:
+        all_workflow_signals = [
+            s for s in all_workflow_signals
+            if str(s.get("target", "")).lower() == target_skill.lower()
+        ]
+    recurring_patterns = _scievolve_recurring_patterns(
+        all_workflow_signals,
+        dimension="workflow",
+    )
+    workflow_signals = list(all_workflow_signals)
+    if max_signals > 0:
+        workflow_signals = workflow_signals[-max_signals:]
+
+    # Group signals by target skill
+    by_target: dict[str, list[dict]] = {}
+    for s in workflow_signals:
+        t = str(s.get("target", "")).strip() or "general"
+        by_target.setdefault(t, []).append(s)
+
+    # Load skill content for each targeted skill
+    skill_contents: dict[str, str] = {}
+    skill_paths: dict[str, Path] = {}
+    for skill_name in by_target:
+        # Try i18n first, then .claude
+        for base in (root.parent / "i18n" / "en" / "skills", root.parent / ".claude" / "skills"):
+            skill_md = base / skill_name / "SKILL.md"
+            if skill_md.exists():
+                skill_paths[skill_name] = skill_md
+                skill_contents[skill_name] = skill_md.read_text(encoding="utf-8")
+                break
+
+    # Compute signal density per skill
+    signal_density = {
+        name: len(group) for name, group in by_target.items()
+    }
+
+    return {
+        "schema_version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "mode": "agent-first-forge",
+        "wiki_root": str(root),
+        "target_skill": target_skill,
+        "stats": {
+            "workflow_signals": len(workflow_signals),
+            "malformed_signal_rows": malformed,
+            "targeted_skills": len(by_target),
+            "signal_density": signal_density,
+            "recurring_patterns": len(recurring_patterns),
+        },
+        "signals": workflow_signals,
+        "recurring_patterns": recurring_patterns,
+        "skill_groups": [
+            {
+                "skill_name": name,
+                "signal_count": len(group),
+                "signals": group,
+                "skill_path": str(skill_paths.get(name, "")),
+                "skill_preview": _forge_skill_preview(skill_contents.get(name, "")),
+            }
+            for name, group in sorted(by_target.items())
+        ],
+    }
+
+
+def _forge_skill_preview(content: str, max_lines: int = 60) -> str:
+    lines = content.splitlines()
+    if len(lines) <= max_lines:
+        return content
+    # Keep frontmatter + first chunk + ellipsis + last chunk
+    header_end = 0
+    in_fm = False
+    for i, line in enumerate(lines):
+        if line.strip() == "---":
+            if not in_fm:
+                in_fm = True
+            else:
+                header_end = i + 1
+                break
+    front = "\n".join(lines[:header_end + 20]) if header_end else "\n".join(lines[:30])
+    tail = "\n".join(lines[-20:])
+    return f"{front}\n\n... ({len(lines) - max_lines} lines omitted) ...\n\n{tail}"
+
+
+def _forge_context_markdown(context: dict) -> str:
+    lines = [
+        "# Forge Context",
+        "",
+        "Deterministic context for workflow evolution. Not the forge decision.",
+        "",
+        "## Stats",
+        "",
+    ]
+    for key, value in context.get("stats", {}).items():
+        lines.append(f"- {key}: {value}")
+    lines.extend(["", "## Workflow Signals", ""])
+    for signal in context.get("signals", []):
+        lines.append(
+            "- {id} [{kind}] target={target}: {summary}".format(
+                id=signal.get("id", ""),
+                kind=signal.get("kind", ""),
+                target=signal.get("target", ""),
+                summary=signal.get("summary", ""),
+            )
+        )
+    lines.extend(["", "## Recurring Patterns", ""])
+    patterns = context.get("recurring_patterns", [])
+    if patterns:
+        for pattern in patterns:
+            lines.append(
+                "- {id} [{kind}] target={target}: {count} signals "
+                "(medium+={medium}, high+={high})".format(
+                    id=pattern.get("id", ""),
+                    kind=pattern.get("kind", ""),
+                    target=pattern.get("target", ""),
+                    count=pattern.get("recurrence_count", 0),
+                    medium=pattern.get("medium_plus_count", 0),
+                    high=pattern.get("high_plus_count", 0),
+                )
+            )
+    else:
+        lines.append("_None._")
+    lines.extend(["", "## Skill Groups", ""])
+    for group in context.get("skill_groups", []):
+        name = group.get("skill_name", "")
+        count = group.get("signal_count", 0)
+        path = group.get("skill_path", "")
+        lines.append(f"- {name}: {count} signal(s)  path: `{path}`")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _forge_agent_prompt(context: dict) -> str:
+    skill_groups = context.get("skill_groups", [])
+    skill_blocks = []
+    for group in skill_groups:
+        name = group.get("skill_name", "")
+        preview = group.get("skill_preview", "")
+        signals = group.get("signals", [])
+        signal_lines = "\n".join(
+            f"  - {s.get('id', '')} [{s.get('kind', '')}]: {s.get('summary', '')}"
+            for s in signals
+        )
+        skill_blocks.append(
+            f"### Skill: {name}\n\n"
+            f"Signals:\n{signal_lines}\n\n"
+            f"Content preview:\n```markdown\n{preview}\n```\n"
+        )
+    skills_text = "\n\n".join(skill_blocks) if skill_blocks else "_No targeted skill content loaded._"
+    pattern_lines = []
+    for pattern in context.get("recurring_patterns", []):
+        pattern_lines.append(
+            "- {id} [{kind}] target={target}: {count} signals, severity_score={score}".format(
+                id=pattern.get("id", ""),
+                kind=pattern.get("kind", ""),
+                target=pattern.get("target", ""),
+                count=pattern.get("recurrence_count", 0),
+                score=pattern.get("severity_score", 0),
+            )
+        )
+    patterns_text = "\n".join(pattern_lines) if pattern_lines else "_No recurring patterns._"
+
+    return (
+        "# /forge Agent Prompt\n\n"
+        "You are AutoSci's /forge agent. Your job is workflow self-evolution: "
+        "propose concrete, evidence-backed changes to skills and protocols.\n\n"
+        "You may propose ANY workflow change that the signals justify. Examples:\n"
+        "- patch-prompt: rewrite or clarify a specific prompt/step in a skill\n"
+        "- add-check: add a validation, precondition, or guard step\n"
+        "- adjust-handoff: change how this skill hands off to or receives from another skill\n"
+        "- add-recovery: add a recovery protocol for a known failure mode\n"
+        "- create-skill: add a new skill when signals show a gap in workflow coverage\n"
+        "- merge-skills: combine two skills when signals show heavy overlap\n"
+        "- archive-skill: retire a skill when signals show it is obsolete\n"
+        "- rename-step: rename a confusing step or section\n"
+        "- reorder-steps: change step order when signals show flow problems\n\n"
+        "Rules:\n"
+        "- Every proposal must cite specific signals from the context. Do not invent failure modes.\n"
+        "- Recurring pattern ids are valid evidence and should be preferred over isolated signals.\n"
+        "- For modifying existing skills: cite the skill file path and, where possible, a line hint.\n"
+        "- For creating new skills: provide a full SKILL.md skeleton in proposed_action.\n"
+        "- For merging/archiving: explain which skill absorbs the functionality and how.\n"
+        "- Do not change a skill's core purpose — only improve clarity, robustness, or coordination.\n"
+        "- Do not repackage lint or structural repairs as workflow evolution (those are /check concerns).\n"
+        "- Prefer additive changes over destructive rewrites.\n"
+        "- A few high-signal proposals beat a broad mechanical list.\n\n"
+        "Return strict JSON only with this shape:\n\n"
+        "{\n"
+        '  "proposals": [\n'
+        "    {\n"
+        '      "operation": "<any workflow operation>",\n'
+        '      "target": "skill-name or new-skill-name",\n'
+        '      "title": "short title",\n'
+        '      "proposed_action": "concrete action: patch text, new skill skeleton, merge plan, etc.",\n'
+        '      "rationale": "why the signals justify this change and how it improves execution",\n'
+        '      "confidence": "low|medium|high",\n'
+        '      "skill_path": "relative/path/to/SKILL.md (or blank for new skills)",\n'
+        '      "line_hint": "optional: quoted text or line range",\n'
+        '      "evidence": [\n'
+        '        {"source": "signal-id", "summary": "supporting note"}\n'
+        "      ]\n"
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Context:\n\n"
+        "## Recurring Patterns\n\n"
+        f"{patterns_text}\n\n"
+        "## Skill Evidence\n\n"
+        f"{skills_text}"
+    )
+
+
+def _forge_allowed_refs(context: dict) -> set[str]:
+    refs: set[str] = set()
+    for group in context.get("skill_groups", []):
+        refs.add(group.get("skill_name", ""))
+        refs.add(str(group.get("skill_path", "")))
+    refs.update(str(s.get("id", "")) for s in context.get("signals", []))
+    refs.update(str(pattern.get("id", "")) for pattern in context.get("recurring_patterns", []))
+    refs.discard("")
+    return refs
+
+
+def _forge_normalize_agent_response(
+    payload: dict,
+    context: dict,
+    agent_trace: dict,
+) -> tuple[list[dict], list[dict]]:
+    allowed = _forge_allowed_refs(context)
+    signal_ids = {str(s.get("id", "")) for s in context.get("signals", [])}
+    pattern_signals = {
+        str(pattern.get("id", "")): [
+            str(signal_id) for signal_id in pattern.get("signal_ids", [])
+            if str(signal_id)
+        ]
+        for pattern in context.get("recurring_patterns", [])
+    }
+    pattern_ids = set(pattern_signals)
+    raw_proposals = payload.get("proposals")
+    if not isinstance(raw_proposals, list):
+        raise ValueError("forge agent response must contain a proposals list")
+
+    accepted: list[dict] = []
+    rejected: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for index, raw in enumerate(raw_proposals):
+        if not isinstance(raw, dict):
+            rejected.append({"index": index, "reason": "proposal is not an object"})
+            continue
+        operation = str(raw.get("operation") or raw.get("proposal_kind") or "").strip().lower()
+        if not operation:
+            rejected.append({"index": index, "reason": "missing operation"})
+            continue
+        target = str(raw.get("target") or "").strip()
+        skill_path = str(raw.get("skill_path") or "").strip()
+        if not target:
+            rejected.append({"index": index, "reason": "missing target"})
+            continue
+        # For create-skill, target is the new skill name — no need to exist in allowed
+        is_create = operation in ("create-skill", "add-skill")
+        if not is_create and target not in allowed:
+            rejected.append({"index": index, "reason": f"unknown target: {target}"})
+            continue
+        action = str(raw.get("proposed_action") or raw.get("action") or "").strip()
+        rationale = str(raw.get("rationale") or "").strip()
+        if not action or not rationale:
+            rejected.append({"index": index, "reason": "missing proposed_action or rationale"})
+            continue
+        confidence = str(raw.get("confidence") or "medium").strip().lower()
+        if confidence not in SCIEVOLVE_CONFIDENCE_VALUES:
+            confidence = "medium"
+        title = str(raw.get("title") or operation.title()).strip()
+        dedup_key = (operation, target, action)
+        if dedup_key in seen:
+            rejected.append({"index": index, "reason": "duplicate proposal"})
+            continue
+        seen.add(dedup_key)
+        evidence = []
+        evidence_refs: set[str] = set()
+        for item in raw.get("evidence") or []:
+            if isinstance(item, dict):
+                source = str(item.get("source") or item.get("id") or item.get("signal_id") or item.get("pattern_id") or "")
+                if source:
+                    evidence_refs.add(source)
+                evidence.append({"source": source, "summary": str(item.get("summary") or ""), "path": skill_path})
+            elif str(item).strip():
+                source = str(item).strip()
+                evidence_refs.add(source)
+                evidence.append({"source": source, "summary": "", "path": skill_path})
+        if not evidence_refs or not (evidence_refs & (signal_ids | pattern_ids)):
+            rejected.append({"index": index, "reason": "proposal cites no known workflow signal or pattern evidence"})
+            continue
+        unknown_refs = sorted(ref for ref in evidence_refs if ref not in allowed)
+        if unknown_refs:
+            rejected.append({"index": index, "reason": f"unknown evidence refs: {unknown_refs}"})
+            continue
+        related_entities = [
+            str(ent).strip()
+            for ent in (raw.get("related_entities") or [])
+            if str(ent).strip()
+        ]
+        triggering_signals = set(
+            str(ev.get("source", "")) for ev in evidence
+            if str(ev.get("source", "")) in signal_ids
+        )
+        for ref in evidence_refs:
+            triggering_signals.update(pattern_signals.get(ref, []))
+        accepted.append({
+            "dimension": "workflow",
+            "target": target,
+            "proposal_kind": operation,
+            "title": title,
+            "confidence": confidence,
+            "related_entities": related_entities,
+            "triggering_signals": sorted(triggering_signals),
+            "proposed_action": action,
+            "rationale": rationale,
+            "line_hint": str(raw.get("line_hint") or "").strip(),
+            "skill_path": skill_path,
+            "risk": (
+                "Agent-generated /forge proposal. Workflow changes affect execution semantics; "
+                "review before applying. Safe auto-apply is limited to additive/append-only changes."
+            ),
+            "evidence": evidence,
+            "agent_trace": agent_trace,
+        })
+    return accepted, rejected
+
+
+def _forge_markdown_structure_ok(content: str) -> tuple[bool, str]:
+    match = FRONTMATTER_RE.match(content)
+    if not match:
+        return False, "missing frontmatter"
+    body = content[match.end():]
+    if not re.search(r"(?m)^#\s+/", body):
+        return False, "missing skill title heading"
+    fence_count = sum(1 for line in body.splitlines() if line.strip().startswith("```"))
+    if fence_count % 2:
+        return False, "unbalanced fenced code block"
+    return True, ""
+
+
+def _forge_section_bounds(lines: list[str], heading_index: int) -> tuple[int, int]:
+    heading = lines[heading_index]
+    level = len(heading) - len(heading.lstrip("#"))
+    end = len(lines)
+    for index in range(heading_index + 1, len(lines)):
+        line = lines[index]
+        if line.startswith("#"):
+            next_level = len(line) - len(line.lstrip("#"))
+            if 0 < next_level <= level:
+                end = index
+                break
+    return heading_index, end
+
+
+def _forge_apply_content_patch(
+    content: str,
+    line_hint: str,
+    patch_text: str,
+) -> tuple[str, str]:
+    """Apply a bounded forge patch or return a reason string."""
+    if not line_hint:
+        return content, "missing line_hint"
+    if not patch_text:
+        return content, "missing proposed_action"
+
+    lines = content.splitlines()
+    hint = line_hint.strip()
+    heading_matches = [
+        index for index, line in enumerate(lines)
+        if line.strip() == hint and line.lstrip().startswith("#")
+    ]
+    if not heading_matches:
+        occurrences = [m.start() for m in re.finditer(re.escape(line_hint), content)]
+        if len(occurrences) == 1:
+            new_content = content[:occurrences[0]] + patch_text + content[occurrences[0] + len(line_hint):]
+            ok, reason = _forge_markdown_structure_ok(new_content)
+            if not ok:
+                return content, f"patch would break markdown structure: {reason}"
+            return new_content, ""
+        if len(occurrences) > 1:
+            return content, "line_hint matched multiple locations"
+        return content, "line_hint not found"
+    if len(heading_matches) > 1:
+        return content, "line_hint matched multiple headings"
+
+    start, end = _forge_section_bounds(lines, heading_matches[0])
+    replacement = patch_text.splitlines()
+    if not replacement:
+        return content, "empty replacement section"
+    if not replacement[0].lstrip().startswith("#"):
+        replacement = [lines[start], ""] + replacement
+    new_lines = lines[:start] + replacement + lines[end:]
+    new_content = "\n".join(new_lines)
+    if content.endswith("\n"):
+        new_content += "\n"
+    ok, reason = _forge_markdown_structure_ok(new_content)
+    if not ok:
+        return content, f"patch would break markdown structure: {reason}"
+    return new_content, ""
+
+
+def _forge_apply_safe(
+    wiki_root: Path,
+    run_dir: Path,
+    accepted: list[dict],
+    proposals: list[dict],
+    *,
+    yolo: bool = False,
+) -> tuple[list[dict], list[dict], Path | None, Path | None]:
+    """Apply workflow mutations directly to skill files.
+
+    Default: content mutations (patch-prompt, reorder-steps, rename-step) are
+    applied immediately.  create-skill builds skeletons.  All successful
+    mutations also append a SciEvolve note + frontmatter metadata.
+
+    Yolo mode: additionally allows archive-skill and merge-skills.
+    """
+
+    def _record_application(
+        proposal: dict, target: str, changed_paths: list[str], note: str
+    ) -> dict:
+        _ts = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        _digest_input = {"proposal": proposal.get("id", ""), "target": target}
+        _digest = hashlib.sha1(
+            json.dumps(_digest_input, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        ).hexdigest()[:8]
+        application = {
+            "id": f"app-forge-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}-{_digest}",
+            "timestamp": _ts,
+            "proposal_id": proposal.get("id", ""),
+            "target": target,
+            "changed_paths": [{"path": p, "note": note} for p in changed_paths],
+        }
+        scievolve_record_application(wiki_root, application)
+        return application
+
+    def _append_note_and_frontmatter(
+        skill_file: Path,
+        proposal: dict,
+        item: dict,
+    ) -> bool:
+        """Append SciEvolve note to skill body and update frontmatter."""
+        content = skill_file.read_text(encoding="utf-8")
+        match = FRONTMATTER_RE.match(content)
+        if not match:
+            return False
+        fm = _parse_yaml_block(match.group(1))
+        body = content[match.end():]
+
+        note_lines = [
+            "## SciEvolve Workflow Evolution Note",
+            "",
+            f"- Proposal: `{proposal.get('id', '')}`",
+            f"- Operation: {item.get('proposal_kind', '')}",
+            f"- Confidence: {item.get('confidence', '')}",
+            f"- Action: {item.get('proposed_action', '')}",
+            f"- Rationale: {item.get('rationale', '')}",
+            "",
+        ]
+        note_text = "\n".join(note_lines)
+        if note_text.strip() in body:
+            return False
+
+        if not body.endswith("\n"):
+            body += "\n"
+        body += "\n" + note_text + "\n"
+
+        fm["scievolve_last_forge"] = datetime.now(timezone.utc).isoformat(
+            timespec="seconds"
+        ).replace("+00:00", "Z")
+        notes = _dream_as_list(fm.get("scievolve_forge_notes"))
+        note_entry = (
+            f"[{proposal.get('id', '')}] {item.get('proposal_kind', '')}: {item.get('title', '')}"
+        )
+        if note_entry not in notes:
+            notes.append(note_entry)
+        fm["scievolve_forge_notes"] = notes
+
+        new_yaml = _serialize_frontmatter(fm)
+        skill_file.write_text(f"---\n{new_yaml}---\n{body}", encoding="utf-8")
+        return True
+
+    applied: list[dict] = []
+    skipped: list[dict] = []
+    changed_paths: list[str] = []
+
+    for item, proposal in zip(accepted, proposals):
+        target = item.get("target", "")
+        operation = item.get("proposal_kind", "")
+        if not target:
+            skipped.append({"proposal_id": proposal.get("id", ""), "reason": "missing target"})
+            continue
+
+        # Locate skill file
+        skill_file: Path | None = None
+        for base in (
+            wiki_root.parent / "i18n" / "en" / "skills",
+            wiki_root.parent / ".claude" / "skills",
+        ):
+            candidate = base / target / "SKILL.md"
+            if candidate.exists():
+                skill_file = candidate
+                break
+
+        # ── create-skill: build skeleton if file does not exist ──
+        if operation in ("create-skill", "add-skill") and skill_file is None:
+            skill_base = wiki_root.parent / "i18n" / "en" / "skills"
+            skill_dir = skill_base / target
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            skill_file = skill_dir / "SKILL.md"
+            skeleton = (
+                "---\n"
+                f"description: {item.get('title', target)}\n"
+                "argument-hint: \"\"\n"
+                "---\n\n"
+                f"# /{target}\n\n"
+                f"{item.get('proposed_action', 'New skill created by /forge.')}\n\n"
+            )
+            skill_file.write_text(skeleton, encoding="utf-8")
+            changed_paths.append(str(skill_file))
+            _append_note_and_frontmatter(skill_file, proposal, item)
+            application = _record_application(
+                proposal, target, [str(skill_file)], "created new skill skeleton"
+            )
+            applied.append(
+                {"proposal_id": proposal.get("id", ""), "proposal": proposal, "application": application}
+            )
+            continue
+
+        if skill_file is None:
+            skipped.append(
+                {"proposal_id": proposal.get("id", ""), "reason": f"skill file not found: {target}"}
+            )
+            continue
+
+        # ── Default content mutations (no yolo required) ──
+        content_mutated = False
+        if operation in ("patch-prompt", "reorder-steps", "rename-step"):
+            line_hint = str(item.get("line_hint", "")).strip()
+            patch_text = str(item.get("proposed_action", "")).strip()
+            content = skill_file.read_text(encoding="utf-8")
+            new_content, patch_reason = _forge_apply_content_patch(
+                content,
+                line_hint,
+                patch_text,
+            )
+            if patch_reason:
+                skipped.append({
+                    "proposal_id": proposal.get("id", ""),
+                    "reason": f"{operation} skipped: {patch_reason}",
+                })
+                continue
+            if new_content != content:
+                skill_file.write_text(new_content, encoding="utf-8")
+                changed_paths.append(str(skill_file))
+                content_mutated = True
+                _append_note_and_frontmatter(skill_file, proposal, item)
+                application = _record_application(
+                    proposal, target, [str(skill_file)], f"patched skill content: {operation}"
+                )
+                applied.append(
+                    {
+                        "proposal_id": proposal.get("id", ""),
+                        "proposal": proposal,
+                        "application": application,
+                    }
+                )
+
+        if content_mutated:
+            continue
+
+        # ── Yolo-only destructive operations ──
+        yolo_applied = False
+        if yolo and item.get("confidence") == "high":
+            if operation == "archive-skill":
+                archive_dir = wiki_root.parent / "archive" / "skills" / target
+                archive_dir.mkdir(parents=True, exist_ok=True)
+                archive_path = archive_dir / "SKILL.md"
+                skill_file.rename(archive_path)
+                changed_paths.append(str(archive_path))
+                yolo_applied = True
+                application = _record_application(
+                    proposal, target, [str(archive_path)], "archived skill (yolo)"
+                )
+                applied.append(
+                    {
+                        "proposal_id": proposal.get("id", ""),
+                        "proposal": proposal,
+                        "application": application,
+                    }
+                )
+            elif operation == "merge-skills":
+                merged_sources: list[str] = []
+                for source_name in item.get("related_entities", []):
+                    source_file: Path | None = None
+                    for base in (
+                        wiki_root.parent / "i18n" / "en" / "skills",
+                        wiki_root.parent / ".claude" / "skills",
+                    ):
+                        candidate = base / source_name / "SKILL.md"
+                        if candidate.exists():
+                            source_file = candidate
+                            break
+                    if source_file is None:
+                        continue
+                    source_content = source_file.read_text(encoding="utf-8")
+                    source_match = FRONTMATTER_RE.match(source_content)
+                    source_body = source_content[source_match.end():] if source_match else source_content
+                    merged_sources.append(f"## Merged from /{source_name}\n\n{source_body.strip()}\n")
+                    archive_dir = wiki_root.parent / "archive" / "skills" / source_name
+                    archive_dir.mkdir(parents=True, exist_ok=True)
+                    source_file.rename(archive_dir / "SKILL.md")
+                    changed_paths.append(str(archive_dir / "SKILL.md"))
+                if merged_sources:
+                    content = skill_file.read_text(encoding="utf-8")
+                    match = FRONTMATTER_RE.match(content)
+                    if match:
+                        fm = _parse_yaml_block(match.group(1))
+                        body = content[match.end():]
+                        body += "\n\n" + "\n\n".join(merged_sources) + "\n"
+                        new_yaml = _serialize_frontmatter(fm)
+                        skill_file.write_text(f"---\n{new_yaml}---\n{body}", encoding="utf-8")
+                        changed_paths.append(str(skill_file))
+                        yolo_applied = True
+                        _append_note_and_frontmatter(skill_file, proposal, item)
+                        application = _record_application(
+                            proposal, target, [str(skill_file)], "merged skills (yolo)"
+                        )
+                        applied.append(
+                            {
+                                "proposal_id": proposal.get("id", ""),
+                                "proposal": proposal,
+                                "application": application,
+                            }
+                        )
+
+        if yolo_applied:
+            continue
+
+        # ── Fallback: append note + frontmatter for unrecognized operations ──
+        note_ok = _append_note_and_frontmatter(skill_file, proposal, item)
+        if note_ok:
+            changed_paths.append(str(skill_file))
+            application = _record_application(
+                proposal, target, [str(skill_file)], "append-only workflow evolution note + frontmatter metadata"
+            )
+            applied.append(
+                {
+                    "proposal_id": proposal.get("id", ""),
+                    "proposal": proposal,
+                    "application": application,
+                }
+            )
+        else:
+            skipped.append(
+                {"proposal_id": proposal.get("id", ""), "reason": "note already present or no frontmatter"}
+            )
+
+    apply_report = {
+        "run_type": "forge_safe_apply",
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "applied_count": len(applied),
+        "skipped_count": len(skipped),
+        "applied": [a["application"] for a in applied],
+        "skipped": skipped,
+        "changed_paths": changed_paths,
+    }
+    json_path = run_dir / "forge_apply_report.json"
+    md_path = run_dir / "forge_apply_report.md"
+    json_path.write_text(json.dumps(apply_report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    md_lines = [
+        "# Forge Apply Report",
+        "",
+        f"- Applied: {len(applied)}",
+        f"- Skipped: {len(skipped)}",
+        "",
+        "## Changed Paths",
+        "",
+    ]
+    for cp in changed_paths:
+        md_lines.append(f"- `{cp}`")
+    md_lines.extend(["", "## Skipped", ""])
+    for sk in skipped:
+        md_lines.append(f"- {sk['proposal_id']}: {sk['reason']}")
+    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    return applied, skipped, json_path, md_path
+
+
+def _forge_report_markdown(
+    context: dict,
+    *,
+    run_dir: Path,
+    context_path: Path,
+    prompt_path: Path,
+    response_path: Path | None,
+    proposals: list[dict],
+    rejected: list[dict],
+    proposed: bool,
+    applied: list[dict],
+    apply_skipped: list[dict],
+) -> str:
+    lines = [
+        "# Forge Report",
+        "",
+        f"- Run: {run_dir.name}",
+        f"- Target skill: {context.get('target_skill') or '(all)'}",
+        f"- Workflow signals: {context['stats']['workflow_signals']}",
+        f"- Targeted skills: {context['stats']['targeted_skills']}",
+        "",
+        "## Signal Density",
+        "",
+    ]
+    for name, count in sorted((context["stats"].get("signal_density") or {}).items()):
+        lines.append(f"- {name}: {count}")
+    lines.extend(["", "## Proposals", ""])
+    if proposals:
+        for p in proposals:
+            state = "created" if p.get("created") else "existing"
+            lines.append(f"- {p['id']} ({state}, {p['status']}): `{p['output_path']}`")
+    else:
+        lines.append("_No proposals._")
+    lines.extend(["", "## Rejected Agent Items", ""])
+    if rejected:
+        for r in rejected:
+            lines.append(f"- index {r.get('index', '?')}: {r.get('reason', '')}")
+    else:
+        lines.append("_None._")
+    if applied or apply_skipped:
+        lines.extend(["", "## Safe Applications", ""])
+        lines.append(f"- Applied: {len(applied)}")
+        lines.append(f"- Skipped: {len(apply_skipped)}")
+    lines.extend(["", "## Artifacts", ""])
+    lines.append(f"- Context: `{context_path}`")
+    lines.append(f"- Prompt: `{prompt_path}`")
+    if response_path:
+        lines.append(f"- Response: `{response_path}`")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def forge(
+    wiki_root: str,
+    *,
+    target_skill: str = "",
+    max_signals: int = 20,
+    agent_response: str = "",
+    use_llm: bool = False,
+    propose: bool = True,
+    auto_apply: bool = True,
+    dry_run: bool = False,
+    yolo: bool = False,
+    as_json: bool = False,
+    timeout: int = 90,
+    temperature: float = 0.2,
+    prepared_run_dir: str = "",
+) -> None:
+    root = Path(wiki_root)
+    run_dir = Path(prepared_run_dir) if prepared_run_dir else root / "outputs" / "evolution" / "forge" / _forge_run_id()
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    context_path = run_dir / "forge_context.json"
+    context_md_path = run_dir / "forge_context.md"
+    prompt_path = run_dir / "forge_agent_prompt.md"
+    response_path: Path | None = None
+    if prepared_run_dir and context_path.exists() and prompt_path.exists():
+        context = json.loads(context_path.read_text(encoding="utf-8"))
+        prompt = prompt_path.read_text(encoding="utf-8")
+        if not context_md_path.exists():
+            context_md_path.write_text(_forge_context_markdown(context), encoding="utf-8")
+    else:
+        context = _forge_build_context(wiki_root, target_skill, max_signals)
+        context_path.write_text(json.dumps(context, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        context_md_path.write_text(_forge_context_markdown(context), encoding="utf-8")
+        prompt = _forge_agent_prompt(context)
+        prompt_path.write_text(prompt, encoding="utf-8")
+
+    payload: dict | None = None
+    agent_trace = {
+        "provider": "supplied-policy-response",
+        "model": "external-policy-runtime",
+        "policy_runtime": "caller-supplied",
+        "prompt_path": str(prompt_path.relative_to(root)),
+    }
+    if agent_response:
+        source = Path(agent_response)
+        payload = _dream_extract_json_object(source.read_text(encoding="utf-8"))
+        response_path = run_dir / "forge_agent_response.json"
+        response_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        agent_trace["response_path"] = str(response_path.relative_to(root))
+    elif use_llm:
+        payload, llm_trace = _dream_call_openai_compatible(
+            prompt,
+            timeout=timeout,
+            temperature=temperature,
+        )
+        response_path = run_dir / "forge_agent_response.json"
+        response_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        agent_trace.update(llm_trace)
+        agent_trace["response_path"] = str(response_path.relative_to(root))
+
+    accepted: list[dict] = []
+    rejected: list[dict] = []
+    proposals: list[dict] = []
+    if payload is not None:
+        accepted, rejected = _forge_normalize_agent_response(payload, context, agent_trace)
+        if propose:
+            for item in accepted:
+                write_item = {k: v for k, v in item.items() if k not in ("line_hint", "skill_path")}
+                proposals.append(scievolve_write_proposal(root, **write_item))
+
+    applied: list[dict] = []
+    apply_skipped: list[dict] = []
+    apply_report_json: Path | None = None
+    apply_report_md: Path | None = None
+    if not dry_run and proposals:
+        applied, apply_skipped, apply_report_json, apply_report_md = _forge_apply_safe(
+            root,
+            run_dir,
+            accepted,
+            proposals,
+            yolo=yolo,
+        )
+        applied_by_id = {
+            item["proposal_id"]: item["proposal"]
+            for item in applied
+            if item.get("proposal")
+        }
+        proposals = [
+            applied_by_id.get(proposal.get("id"), proposal)
+            for proposal in proposals
+        ]
+
+    report_path = run_dir / "forge_report.md"
+    report_path.write_text(
+        _forge_report_markdown(
+            context,
+            run_dir=run_dir,
+            context_path=context_path,
+            prompt_path=prompt_path,
+            response_path=response_path,
+            proposals=proposals if propose else accepted,
+            rejected=rejected,
+            proposed=propose,
+            applied=applied,
+            apply_skipped=apply_skipped,
+        ),
+        encoding="utf-8",
+    )
+
+    result = {
+        "status": "ok",
+        "mode": "agent-first-forge",
+        "run_dir": str(run_dir),
+        "context_path": str(context_path),
+        "context_markdown_path": str(context_md_path),
+        "prompt_path": str(prompt_path),
+        "response_path": str(response_path) if response_path else "",
+        "report_path": str(report_path),
+        "signal_count": len(context.get("signals", [])),
+        "accepted_agent_proposals": len(accepted),
+        "rejected_agent_items": len(rejected),
+        "proposal_count": len(proposals),
+        "proposals": proposals,
+        "safe_application_count": len(applied),
+        "safe_applications": applied,
+        "safe_application_skips": apply_skipped,
+        "apply_report_path": str(apply_report_json) if apply_report_json else "",
+        "apply_report_markdown_path": str(apply_report_md) if apply_report_md else "",
+    }
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"/forge report: {report_path}")
+        print(f"Agent prompt: {prompt_path}")
+        if response_path:
+            print(f"Agent response: {response_path}")
+        print(f"Workflow signals: {result['signal_count']}")
+        print(f"Proposals written: {result['proposal_count']}")
+        if auto_apply:
+            print(f"Safe applications: {result['safe_application_count']}")
+
+
+# ---------------------------------------------------------------------------
+# SciEvolve /morph: agent-first orchestration evolution
+# ---------------------------------------------------------------------------
+
+MORPH_OPERATIONS = (
+    "patch-template",
+    "patch-prompt",
+    "add-verification-node",
+    "prune-branch",
+    "add-early-stop",
+    "specialize-template",
+    "create-template",
+    "archive-template",
+    "merge-templates",
+)
+
+
+def _morph_run_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+
+
+def _morph_template_library(repo_root: Path) -> list[dict]:
+    """Scan scidag/templates/ and return template metadata."""
+    templates_dir = repo_root / "scidag" / "templates"
+    templates: list[dict] = []
+    if not templates_dir.is_dir():
+        return templates
+    for stage_dir in sorted(templates_dir.iterdir()):
+        if not stage_dir.is_dir():
+            continue
+        stage = stage_dir.name
+        for yaml_path in sorted(stage_dir.glob("*.yaml")):
+            try:
+                content = yaml_path.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            # Minimal metadata extraction from YAML frontmatter lines
+            name = yaml_path.stem
+            complexity = None
+            paper_figure = False
+            description = ""
+            n_nodes = 0
+            for line in content.splitlines():
+                s = line.strip()
+                if s.startswith("name:"):
+                    name = s.split(":", 1)[1].strip().strip('"').strip("'")
+                elif s.startswith("complexity:"):
+                    v = s.split(":", 1)[1].strip()
+                    if v.isdigit():
+                        complexity = int(v)
+                elif s.startswith("paper_figure:"):
+                    v = s.split(":", 1)[1].strip().lower()
+                    paper_figure = v == "true"
+                elif s.startswith("description:"):
+                    description = s.split(":", 1)[1].strip().strip('"').strip("'")
+                elif s.startswith("- op:"):
+                    n_nodes += 1
+            templates.append({
+                "name": name,
+                "stage": stage,
+                "path": str(yaml_path.relative_to(repo_root)),
+                "complexity": complexity,
+                "paper_figure": paper_figure,
+                "n_nodes": n_nodes,
+                "description": description,
+                "preview": _forge_skill_preview(content, max_lines=40),
+            })
+    return templates
+
+
+def _morph_operator_descriptions(repo_root: Path) -> dict[str, str]:
+    """Load operator descriptions from registry."""
+    registry_path = repo_root / "scidag" / "operators" / "registry.py"
+    descriptions: dict[str, str] = {}
+    if not registry_path.exists():
+        return descriptions
+    try:
+        content = registry_path.read_text(encoding="utf-8")
+    except Exception:
+        return descriptions
+    # Extract OPERATOR_DESCRIPTIONS dict entries
+    in_dict = False
+    for line in content.splitlines():
+        s = line.strip()
+        if s.startswith("OPERATOR_DESCRIPTIONS"):
+            in_dict = True
+            continue
+        if in_dict:
+            if s.startswith("}"):
+                break
+            if s.startswith('"') and ':' in s:
+                key, val = s.split(':', 1)
+                key = key.strip().strip('"').strip("'")
+                val = val.strip().strip('"').strip("'").rstrip(",")
+                descriptions[key] = val
+    return descriptions
+
+
+def _morph_prompts_preview(repo_root: Path) -> str:
+    """Return a preview of operator prompts.py."""
+    prompts_path = repo_root / "scidag" / "operators" / "prompts.py"
+    if not prompts_path.exists():
+        return ""
+    content = prompts_path.read_text(encoding="utf-8")
+    return _forge_skill_preview(content, max_lines=30)
+
+
+def _morph_build_context(
+    wiki_root: str,
+    target_template: str,
+    max_signals: int,
+) -> dict:
+    root = Path(wiki_root)
+    repo_root = root.parent if (root / ".." / "scidag").exists() else root
+    # Try to resolve repo_root heuristically
+    if not (repo_root / "scidag").exists():
+        # Fallback: use current working directory if it contains scidag
+        cwd = Path.cwd()
+        if (cwd / "scidag").exists():
+            repo_root = cwd
+        else:
+            repo_root = root
+
+    signals, malformed = load_scievolve_signals(root)
+    all_orch_signals = [s for s in signals if s.get("dimension") == "orchestration"]
+    if target_template:
+        all_orch_signals = [
+            s for s in all_orch_signals
+            if str(s.get("target", "")).lower() == target_template.lower()
+        ]
+    recurring_patterns = _scievolve_recurring_patterns(
+        all_orch_signals,
+        dimension="orchestration",
+    )
+    orch_signals = list(all_orch_signals)
+    if max_signals > 0:
+        orch_signals = orch_signals[-max_signals:]
+
+    by_target: dict[str, list[dict]] = {}
+    for s in orch_signals:
+        t = str(s.get("target", "")).strip() or "general"
+        by_target.setdefault(t, []).append(s)
+
+    templates = _morph_template_library(repo_root)
+    if target_template:
+        templates = [
+            t for t in templates
+            if target_template.lower() in t["name"].lower()
+            or target_template.lower() in t["stage"].lower()
+        ]
+
+    signal_density = {name: len(group) for name, group in by_target.items()}
+
+    return {
+        "schema_version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "mode": "agent-first-morph",
+        "wiki_root": str(root),
+        "repo_root": str(repo_root),
+        "target_template": target_template,
+        "stats": {
+            "orchestration_signals": len(orch_signals),
+            "malformed_signal_rows": malformed,
+            "targeted_templates": len(by_target),
+            "signal_density": signal_density,
+            "recurring_patterns": len(recurring_patterns),
+            "template_library_size": len(templates),
+        },
+        "signals": orch_signals,
+        "recurring_patterns": recurring_patterns,
+        "templates": templates,
+        "operator_descriptions": _morph_operator_descriptions(repo_root),
+        "prompts_preview": _morph_prompts_preview(repo_root),
+    }
+
+
+def _morph_context_markdown(context: dict) -> str:
+    lines = [
+        "# Morph Context",
+        "",
+        "Deterministic context for orchestration evolution. Not the morph decision.",
+        "",
+        "## Stats",
+        "",
+    ]
+    for key, value in context.get("stats", {}).items():
+        lines.append(f"- {key}: {value}")
+    lines.extend(["", "## Orchestration Signals", ""])
+    for signal in context.get("signals", []):
+        lines.append(
+            "- {id} [{kind}] target={target}: {summary}".format(
+                id=signal.get("id", ""),
+                kind=signal.get("kind", ""),
+                target=signal.get("target", ""),
+                summary=signal.get("summary", ""),
+            )
+        )
+    lines.extend(["", "## Recurring Patterns", ""])
+    patterns = context.get("recurring_patterns", [])
+    if patterns:
+        for pattern in patterns:
+            lines.append(
+                "- {id} [{kind}] target={target}: {count} signals "
+                "(medium+={medium}, high+={high})".format(
+                    id=pattern.get("id", ""),
+                    kind=pattern.get("kind", ""),
+                    target=pattern.get("target", ""),
+                    count=pattern.get("recurrence_count", 0),
+                    medium=pattern.get("medium_plus_count", 0),
+                    high=pattern.get("high_plus_count", 0),
+                )
+            )
+    else:
+        lines.append("_None._")
+    lines.extend(["", "## Template Library", ""])
+    for t in context.get("templates", []):
+        star = " ★paper-figure" if t.get("paper_figure") else ""
+        lines.append(
+            f"- {t['stage']}/{t['name']} (c{t['complexity'] or '?'}, {t['n_nodes']} nodes){star}"
+        )
+        lines.append(f"  path: `{t['path']}`")
+        if t.get("description"):
+            lines.append(f"  description: {t['description']}")
+    lines.extend(["", "## Operator Descriptions", ""])
+    for op_name, desc in sorted(context.get("operator_descriptions", {}).items()):
+        lines.append(f"- {op_name}: {desc}")
+    lines.extend(["", "## Prompts Preview", ""])
+    lines.append("```python")
+    lines.append(context.get("prompts_preview", "_Not available._"))
+    lines.append("```")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _morph_agent_prompt(context: dict) -> str:
+    templates = context.get("templates", [])
+    template_blocks = []
+    for t in templates:
+        template_blocks.append(
+            f"### Template: {t['stage']}/{t['name']}\n\n"
+            f"Path: `{t['path']}`\n"
+            f"Complexity: {t['complexity']}, Nodes: {t['n_nodes']}\n"
+            f"Description: {t['description']}\n\n"
+            f"Preview:\n```yaml\n{t['preview']}\n```\n"
+        )
+    templates_text = "\n\n".join(template_blocks) if template_blocks else "_No templates loaded._"
+
+    pattern_lines = []
+    for pattern in context.get("recurring_patterns", []):
+        pattern_lines.append(
+            "- {id} [{kind}] target={target}: {count} signals, severity_score={score}".format(
+                id=pattern.get("id", ""),
+                kind=pattern.get("kind", ""),
+                target=pattern.get("target", ""),
+                count=pattern.get("recurrence_count", 0),
+                score=pattern.get("severity_score", 0),
+            )
+        )
+    patterns_text = "\n".join(pattern_lines) if pattern_lines else "_No recurring patterns._"
+
+    op_lines = []
+    for op_name, desc in sorted(context.get("operator_descriptions", {}).items()):
+        op_lines.append(f"- {op_name}: {desc}")
+    ops_text = "\n".join(op_lines) if op_lines else "_No operator descriptions._"
+
+    return (
+        "# /morph Agent Prompt\n\n"
+        "You are AutoSci's /morph agent. Your job is orchestration self-evolution: "
+        "propose concrete, evidence-backed changes to SciDAG operator graphs, "
+        "templates, and operator prompts.\n\n"
+        "You may propose ANY orchestration change that the signals justify. Examples:\n"
+        "- patch-template: rewrite or restructure a specific DAG template YAML\n"
+        "- patch-prompt: rewrite or clarify a specific operator prompt in prompts.py\n"
+        "- add-verification-node: add a Test or Review node to a template\n"
+        "- prune-branch: remove a weak or redundant branch from a template\n"
+        "- add-early-stop: add early-stop metadata or conditions to a template\n"
+        "- specialize-template: copy and adapt a template for a stage and problem type\n"
+        "- create-template: add a new template when signals show a gap\n"
+        "- archive-template: retire a template when signals show it is obsolete\n"
+        "- merge-templates: combine two templates when signals show heavy overlap\n\n"
+        "Rules:\n"
+        "- Every proposal must cite specific signals from the context. Do not invent failure modes.\n"
+        "- Recurring pattern ids are valid evidence and should be preferred over isolated signals.\n"
+        "- For modifying existing templates: cite the template file path and, where possible, a line hint.\n"
+        "- For modifying prompts: cite the prompt variable name or a line hint from prompts.py.\n"
+        "- For creating new templates: provide a full YAML skeleton in proposed_action.\n"
+        "- For merging/archiving: explain which template absorbs the functionality and how.\n"
+        "- Do not change a stage's core purpose — only improve operator robustness, graph efficiency, or template suitability.\n"
+        "- Do not repackage lint or structural repairs as orchestration evolution (those are /check concerns).\n"
+        "- Prefer additive changes over destructive rewrites.\n"
+        "- A few high-signal proposals beat a broad mechanical list.\n\n"
+        "Return strict JSON only with this shape:\n\n"
+        "{\n"
+        '  "proposals": [\n'
+        "    {\n"
+        '      "operation": "<any orchestration operation>",\n'
+        '      "target": "template-name or operator-name or new-template-name",\n'
+        '      "title": "short title",\n'
+        '      "proposed_action": "concrete action: patch text, new YAML skeleton, merge plan, etc.",\n'
+        '      "rationale": "why the signals justify this change and how it improves execution",\n'
+        '      "confidence": "low|medium|high",\n'
+        '      "template_path": "relative/path/to/template.yaml (or blank for new prompts)",\n'
+        '      "line_hint": "optional: quoted text or line range",\n'
+        '      "evidence": [\n'
+        '        {"source": "signal-id", "summary": "supporting note"}\n'
+        "      ]\n"
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Context:\n\n"
+        "## Recurring Patterns\n\n"
+        f"{patterns_text}\n\n"
+        "## Template Evidence\n\n"
+        f"{templates_text}\n\n"
+        "## Operators\n\n"
+        f"{ops_text}\n"
+    )
+
+
+def _morph_allowed_refs(context: dict) -> set[str]:
+    refs: set[str] = set()
+    for t in context.get("templates", []):
+        refs.add(t.get("name", ""))
+        refs.add(str(t.get("path", "")))
+    refs.update(str(s.get("id", "")) for s in context.get("signals", []))
+    refs.update(str(pattern.get("id", "")) for pattern in context.get("recurring_patterns", []))
+    refs.update(context.get("operator_descriptions", {}).keys())
+    refs.discard("")
+    return refs
+
+
+def _morph_normalize_agent_response(
+    payload: dict,
+    context: dict,
+    agent_trace: dict,
+) -> tuple[list[dict], list[dict]]:
+    allowed = _morph_allowed_refs(context)
+    signal_ids = {str(s.get("id", "")) for s in context.get("signals", [])}
+    pattern_signals = {
+        str(pattern.get("id", "")): [
+            str(signal_id) for signal_id in pattern.get("signal_ids", [])
+            if str(signal_id)
+        ]
+        for pattern in context.get("recurring_patterns", [])
+    }
+    pattern_ids = set(pattern_signals)
+    raw_proposals = payload.get("proposals")
+    if not isinstance(raw_proposals, list):
+        raise ValueError("morph agent response must contain a proposals list")
+
+    accepted: list[dict] = []
+    rejected: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for index, raw in enumerate(raw_proposals):
+        if not isinstance(raw, dict):
+            rejected.append({"index": index, "reason": "proposal is not an object"})
+            continue
+        operation = str(raw.get("operation") or raw.get("proposal_kind") or "").strip().lower()
+        if operation not in MORPH_OPERATIONS:
+            rejected.append({"index": index, "reason": f"invalid operation: {operation}"})
+            continue
+        target = str(raw.get("target") or "").strip()
+        template_path = str(raw.get("template_path") or "").strip()
+        if not target:
+            rejected.append({"index": index, "reason": "missing target"})
+            continue
+        is_create = operation in ("create-template", "add-template")
+        if not is_create and target not in allowed:
+            # Also allow operator names as targets for patch-prompt
+            if operation != "patch-prompt":
+                rejected.append({"index": index, "reason": f"unknown target: {target}"})
+                continue
+        action = str(raw.get("proposed_action") or raw.get("action") or "").strip()
+        rationale = str(raw.get("rationale") or "").strip()
+        if not action or not rationale:
+            rejected.append({"index": index, "reason": "missing proposed_action or rationale"})
+            continue
+        confidence = str(raw.get("confidence") or "medium").strip().lower()
+        if confidence not in SCIEVOLVE_CONFIDENCE_VALUES:
+            confidence = "medium"
+        title = str(raw.get("title") or operation.title()).strip()
+        dedup_key = (operation, target, action)
+        if dedup_key in seen:
+            rejected.append({"index": index, "reason": "duplicate proposal"})
+            continue
+        seen.add(dedup_key)
+        evidence = []
+        evidence_refs: set[str] = set()
+        for item in raw.get("evidence") or []:
+            if isinstance(item, dict):
+                source = str(
+                    item.get("source") or item.get("id") or item.get("signal_id")
+                    or item.get("pattern_id") or ""
+                )
+                if source:
+                    evidence_refs.add(source)
+                evidence.append({"source": source, "summary": str(item.get("summary") or ""), "path": template_path})
+            elif str(item).strip():
+                source = str(item).strip()
+                evidence_refs.add(source)
+                evidence.append({"source": source, "summary": "", "path": template_path})
+        if not evidence_refs or not (evidence_refs & (signal_ids | pattern_ids)):
+            rejected.append({"index": index, "reason": "proposal cites no known orchestration signal or pattern evidence"})
+            continue
+        unknown_refs = sorted(ref for ref in evidence_refs if ref not in allowed)
+        if unknown_refs:
+            rejected.append({"index": index, "reason": f"unknown evidence refs: {unknown_refs}"})
+            continue
+        related_entities = [
+            str(ent).strip()
+            for ent in (raw.get("related_entities") or [])
+            if str(ent).strip()
+        ]
+        triggering_signals = set(
+            str(ev.get("source", "")) for ev in evidence
+            if str(ev.get("source", "")) in signal_ids
+        )
+        for ref in evidence_refs:
+            triggering_signals.update(pattern_signals.get(ref, []))
+        accepted.append({
+            "dimension": "orchestration",
+            "target": target,
+            "proposal_kind": operation,
+            "title": title,
+            "confidence": confidence,
+            "related_entities": related_entities,
+            "triggering_signals": sorted(triggering_signals),
+            "proposed_action": action,
+            "rationale": rationale,
+            "line_hint": str(raw.get("line_hint") or "").strip(),
+            "template_path": template_path,
+            "risk": (
+                "Agent-generated /morph proposal. Orchestration changes affect DAG execution; "
+                "review before applying. Safe auto-apply is limited to additive/template-level changes."
+            ),
+            "evidence": evidence,
+            "agent_trace": agent_trace,
+        })
+    return accepted, rejected
+
+
+def _morph_apply_safe(
+    wiki_root: Path,
+    run_dir: Path,
+    accepted: list[dict],
+    proposals: list[dict],
+    *,
+    apply: bool = False,
+    yolo: bool = False,
+) -> tuple[list[dict], list[dict], Path | None, Path | None]:
+    """Apply orchestration mutations to template YAMLs and prompt files.
+
+    Default: append-only note + frontmatter metadata (no file mutation).
+    With apply=True: content mutations (patch-template, patch-prompt,
+    add-verification-node, prune-branch, specialize-template, create-template)
+    are applied immediately. Yolo mode: additionally allows archive-template
+    and merge-templates.
+    """
+
+    def _record_application(
+        proposal: dict, target: str, changed_paths: list[str], note: str
+    ) -> dict:
+        _ts = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        _digest_input = {"proposal": proposal.get("id", ""), "target": target}
+        _digest = hashlib.sha1(
+            json.dumps(_digest_input, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        ).hexdigest()[:8]
+        application = {
+            "id": f"app-morph-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}-{_digest}",
+            "timestamp": _ts,
+            "proposal_id": proposal.get("id", ""),
+            "target": target,
+            "changed_paths": [{"path": p, "note": note} for p in changed_paths],
+        }
+        scievolve_record_application(wiki_root, application)
+        return application
+
+    def _append_note_and_frontmatter(
+        target_file: Path,
+        proposal: dict,
+        item: dict,
+    ) -> bool:
+        content = target_file.read_text(encoding="utf-8")
+        match = FRONTMATTER_RE.match(content)
+        if not match:
+            return False
+        fm = _parse_yaml_block(match.group(1))
+        body = content[match.end():]
+
+        note_lines = [
+            "## SciEvolve Orchestration Evolution Note",
+            "",
+            f"- Proposal: `{proposal.get('id', '')}`",
+            f"- Operation: {item.get('proposal_kind', '')}",
+            f"- Confidence: {item.get('confidence', '')}",
+            f"- Action: {item.get('proposed_action', '')}",
+            f"- Rationale: {item.get('rationale', '')}",
+            "",
+        ]
+        note_text = "\n".join(note_lines)
+        if note_text.strip() in body:
+            return False
+
+        if not body.endswith("\n"):
+            body += "\n"
+        body += "\n" + note_text + "\n"
+
+        fm["scievolve_last_morph"] = datetime.now(timezone.utc).isoformat(
+            timespec="seconds"
+        ).replace("+00:00", "Z")
+        notes = _dream_as_list(fm.get("scievolve_morph_notes"))
+        note_entry = (
+            f"[{proposal.get('id', '')}] {item.get('proposal_kind', '')}: {item.get('title', '')}"
+        )
+        if note_entry not in notes:
+            notes.append(note_entry)
+        fm["scievolve_morph_notes"] = notes
+
+        new_yaml = _serialize_frontmatter(fm)
+        target_file.write_text(f"---\n{new_yaml}---\n{body}", encoding="utf-8")
+        return True
+
+    applied: list[dict] = []
+    skipped: list[dict] = []
+    changed_paths: list[str] = []
+
+    for item, proposal in zip(accepted, proposals):
+        target = item.get("target", "")
+        operation = item.get("proposal_kind", "")
+        if not target:
+            skipped.append({"proposal_id": proposal.get("id", ""), "reason": "missing target"})
+            continue
+
+        # Resolve repo_root
+        repo_root = wiki_root.parent if (wiki_root.parent / "scidag").exists() else wiki_root
+        if not (repo_root / "scidag").exists():
+            cwd = Path.cwd()
+            if (cwd / "scidag").exists():
+                repo_root = cwd
+
+        # ── Locate target file ──
+        target_file: Path | None = None
+        template_path = str(item.get("template_path") or "").strip()
+        if template_path:
+            candidate = repo_root / template_path
+            if candidate.exists():
+                target_file = candidate
+        if target_file is None:
+            # Search templates by target name
+            templates_dir = repo_root / "scidag" / "templates"
+            if templates_dir.is_dir():
+                for stage_dir in templates_dir.iterdir():
+                    if not stage_dir.is_dir():
+                        continue
+                    for yaml_path in stage_dir.glob("*.yaml"):
+                        if target.lower() in yaml_path.stem.lower():
+                            target_file = yaml_path
+                            break
+                    if target_file:
+                        break
+
+        prompts_file = repo_root / "scidag" / "operators" / "prompts.py"
+
+        # ── create-template: build skeleton if file does not exist ──
+        if operation in ("create-template", "add-template") and target_file is None:
+            stage = item.get("related_entities", ["ideation"])[0] if item.get("related_entities") else "ideation"
+            stage_dir = templates_dir / stage
+            stage_dir.mkdir(parents=True, exist_ok=True)
+            # Find next complexity number
+            existing = sorted(stage_dir.glob("*.yaml"))
+            next_num = len(existing) + 1
+            target_file = stage_dir / f"{next_num}-{target}.yaml"
+            skeleton = (
+                f"name: {target}\n"
+                f"stage: {stage}\n"
+                "complexity: 3\n"
+                "paper_figure: false\n"
+                f"description: \"{item.get('proposed_action', 'New template created by /morph.')}\"\n"
+                "nodes:\n"
+                "  - op: Generate\n"
+                "    parents: [root]\n"
+            )
+            target_file.write_text(skeleton, encoding="utf-8")
+            changed_paths.append(str(target_file))
+            _append_note_and_frontmatter(target_file, proposal, item)
+            application = _record_application(
+                proposal, target, [str(target_file)], "created new template skeleton"
+            )
+            applied.append(
+                {"proposal_id": proposal.get("id", ""), "proposal": proposal, "application": application}
+            )
+            continue
+
+        if target_file is None and operation not in ("patch-prompt",):
+            skipped.append(
+                {"proposal_id": proposal.get("id", ""), "reason": f"template file not found: {target}"}
+            )
+            continue
+
+        if not apply:
+            # Dry-run: only append note if target_file exists and is a markdown/yaml file with frontmatter
+            if target_file and target_file.suffix in (".md", ".yaml", ".yml"):
+                note_ok = _append_note_and_frontmatter(target_file, proposal, item)
+                if note_ok:
+                    changed_paths.append(str(target_file))
+                    application = _record_application(
+                        proposal, target, [str(target_file)], "append-only orchestration evolution note + frontmatter metadata"
+                    )
+                    applied.append(
+                        {"proposal_id": proposal.get("id", ""), "proposal": proposal, "application": application}
+                    )
+                else:
+                    skipped.append(
+                        {"proposal_id": proposal.get("id", ""), "reason": "note already present or no frontmatter"}
+                    )
+            else:
+                skipped.append(
+                    {"proposal_id": proposal.get("id", ""), "reason": "dry-run: no file mutation without --apply"}
+                )
+            continue
+
+        # ── Apply-mode content mutations ──
+        content_mutated = False
+        if operation in ("patch-template", "add-verification-node", "prune-branch"):
+            if target_file is None:
+                skipped.append({"proposal_id": proposal.get("id", ""), "reason": "missing template file"})
+                continue
+            line_hint = str(item.get("line_hint", "")).strip()
+            patch_text = str(item.get("proposed_action", "")).strip()
+            content = target_file.read_text(encoding="utf-8")
+            new_content, patch_reason = _forge_apply_content_patch(
+                content,
+                line_hint,
+                patch_text,
+            )
+            if patch_reason:
+                skipped.append({
+                    "proposal_id": proposal.get("id", ""),
+                    "reason": f"{operation} skipped: {patch_reason}",
+                })
+                continue
+            if new_content != content:
+                target_file.write_text(new_content, encoding="utf-8")
+                changed_paths.append(str(target_file))
+                content_mutated = True
+                _append_note_and_frontmatter(target_file, proposal, item)
+                application = _record_application(
+                    proposal, target, [str(target_file)], f"patched template: {operation}"
+                )
+                applied.append(
+                    {"proposal_id": proposal.get("id", ""), "proposal": proposal, "application": application}
+                )
+
+        if operation == "patch-prompt":
+            if not prompts_file.exists():
+                skipped.append({"proposal_id": proposal.get("id", ""), "reason": "prompts.py not found"})
+                continue
+            line_hint = str(item.get("line_hint", "")).strip()
+            patch_text = str(item.get("proposed_action", "")).strip()
+            content = prompts_file.read_text(encoding="utf-8")
+            new_content, patch_reason = _forge_apply_content_patch(
+                content,
+                line_hint,
+                patch_text,
+            )
+            if patch_reason:
+                skipped.append({
+                    "proposal_id": proposal.get("id", ""),
+                    "reason": f"patch-prompt skipped: {patch_reason}",
+                })
+                continue
+            if new_content != content:
+                prompts_file.write_text(new_content, encoding="utf-8")
+                changed_paths.append(str(prompts_file))
+                content_mutated = True
+                # prompts.py has no frontmatter; record application without note
+                application = _record_application(
+                    proposal, target, [str(prompts_file)], "patched operator prompt"
+                )
+                applied.append(
+                    {"proposal_id": proposal.get("id", ""), "proposal": proposal, "application": application}
+                )
+
+        if content_mutated:
+            continue
+
+        # ── Yolo-only destructive operations ──
+        yolo_applied = False
+        if yolo and item.get("confidence") == "high":
+            if operation == "archive-template" and target_file is not None:
+                archive_dir = repo_root / "archive" / "templates" / target_file.parent.name
+                archive_dir.mkdir(parents=True, exist_ok=True)
+                archive_path = archive_dir / target_file.name
+                target_file.rename(archive_path)
+                changed_paths.append(str(archive_path))
+                yolo_applied = True
+                application = _record_application(
+                    proposal, target, [str(archive_path)], "archived template (yolo)"
+                )
+                applied.append(
+                    {"proposal_id": proposal.get("id", ""), "proposal": proposal, "application": application}
+                )
+            elif operation == "merge-templates":
+                merged_sources: list[str] = []
+                for source_name in item.get("related_entities", []):
+                    source_file: Path | None = None
+                    if templates_dir.is_dir():
+                        for stage_dir in templates_dir.iterdir():
+                            if not stage_dir.is_dir():
+                                continue
+                            for yaml_path in stage_dir.glob("*.yaml"):
+                                if source_name.lower() in yaml_path.stem.lower():
+                                    source_file = yaml_path
+                                    break
+                            if source_file:
+                                break
+                    if source_file is None:
+                        continue
+                    source_content = source_file.read_text(encoding="utf-8")
+                    merged_sources.append(f"## Merged from {source_file.name}\n\n{source_content.strip()}\n")
+                    archive_dir = repo_root / "archive" / "templates" / source_file.parent.name
+                    archive_dir.mkdir(parents=True, exist_ok=True)
+                    source_file.rename(archive_dir / source_file.name)
+                    changed_paths.append(str(archive_dir / source_file.name))
+                if merged_sources and target_file is not None:
+                    content = target_file.read_text(encoding="utf-8")
+                    match = FRONTMATTER_RE.match(content)
+                    if match:
+                        fm = _parse_yaml_block(match.group(1))
+                        body = content[match.end():]
+                        body += "\n\n" + "\n\n".join(merged_sources) + "\n"
+                        new_yaml = _serialize_frontmatter(fm)
+                        target_file.write_text(f"---\n{new_yaml}---\n{body}", encoding="utf-8")
+                        changed_paths.append(str(target_file))
+                        yolo_applied = True
+                        _append_note_and_frontmatter(target_file, proposal, item)
+                        application = _record_application(
+                            proposal, target, [str(target_file)], "merged templates (yolo)"
+                        )
+                        applied.append(
+                            {"proposal_id": proposal.get("id", ""), "proposal": proposal, "application": application}
+                        )
+
+        if yolo_applied:
+            continue
+
+        # ── Fallback: append note + frontmatter for unrecognized operations ──
+        if target_file and target_file.suffix in (".md", ".yaml", ".yml"):
+            note_ok = _append_note_and_frontmatter(target_file, proposal, item)
+            if note_ok:
+                changed_paths.append(str(target_file))
+                application = _record_application(
+                    proposal, target, [str(target_file)], "append-only orchestration evolution note + frontmatter metadata"
+                )
+                applied.append(
+                    {"proposal_id": proposal.get("id", ""), "proposal": proposal, "application": application}
+                )
+            else:
+                skipped.append(
+                    {"proposal_id": proposal.get("id", ""), "reason": "note already present or no frontmatter"}
+                )
+        else:
+            skipped.append(
+                {"proposal_id": proposal.get("id", ""), "reason": "no applicable file mutation path"}
+            )
+
+    apply_report = {
+        "run_type": "morph_safe_apply",
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "applied_count": len(applied),
+        "skipped_count": len(skipped),
+        "applied": [a["application"] for a in applied],
+        "skipped": skipped,
+        "changed_paths": changed_paths,
+    }
+    json_path = run_dir / "morph_apply_report.json"
+    md_path = run_dir / "morph_apply_report.md"
+    json_path.write_text(json.dumps(apply_report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    md_lines = [
+        "# Morph Apply Report",
+        "",
+        f"- Applied: {len(applied)}",
+        f"- Skipped: {len(skipped)}",
+        "",
+        "## Changed Paths",
+        "",
+    ]
+    for cp in changed_paths:
+        md_lines.append(f"- `{cp}`")
+    md_lines.extend(["", "## Skipped", ""])
+    for sk in skipped:
+        md_lines.append(f"- {sk['proposal_id']}: {sk['reason']}")
+    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    return applied, skipped, json_path, md_path
+
+
+def _morph_report_markdown(
+    context: dict,
+    *,
+    run_dir: Path,
+    context_path: Path,
+    prompt_path: Path,
+    response_path: Path | None,
+    proposals: list[dict],
+    rejected: list[dict],
+    proposed: bool,
+    applied: list[dict],
+    apply_skipped: list[dict],
+) -> str:
+    lines = [
+        "# Morph Report",
+        "",
+        f"- Run: {run_dir.name}",
+        f"- Target template: {context.get('target_template') or '(all)'}",
+        f"- Orchestration signals: {context['stats']['orchestration_signals']}",
+        f"- Templates in library: {context['stats']['template_library_size']}",
+        "",
+        "## Signal Density",
+        "",
+    ]
+    for name, count in sorted((context["stats"].get("signal_density") or {}).items()):
+        lines.append(f"- {name}: {count}")
+    lines.extend(["", "## Proposals", ""])
+    if proposals:
+        for p in proposals:
+            state = "created" if p.get("created") else "existing"
+            lines.append(f"- {p['id']} ({state}, {p['status']}): `{p['output_path']}`")
+    else:
+        lines.append("_No proposals._")
+    lines.extend(["", "## Rejected Agent Items", ""])
+    if rejected:
+        for r in rejected:
+            lines.append(f"- index {r.get('index', '?')}: {r.get('reason', '')}")
+    else:
+        lines.append("_None._")
+    if applied or apply_skipped:
+        lines.extend(["", "## Applications", ""])
+        lines.append(f"- Applied: {len(applied)}")
+        lines.append(f"- Skipped: {len(apply_skipped)}")
+    lines.extend(["", "## Artifacts", ""])
+    lines.append(f"- Context: `{context_path}`")
+    lines.append(f"- Prompt: `{prompt_path}`")
+    if response_path:
+        lines.append(f"- Response: `{response_path}`")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def morph(
+    wiki_root: str,
+    *,
+    target_template: str = "",
+    max_signals: int = 20,
+    agent_response: str = "",
+    use_llm: bool = False,
+    propose: bool = True,
+    apply: bool = False,
+    dry_run: bool = False,
+    yolo: bool = False,
+    as_json: bool = False,
+    timeout: int = 90,
+    temperature: float = 0.2,
+    prepared_run_dir: str = "",
+) -> None:
+    root = Path(wiki_root)
+    run_dir = Path(prepared_run_dir) if prepared_run_dir else root / "outputs" / "evolution" / "morph" / _morph_run_id()
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    context_path = run_dir / "morph_context.json"
+    context_md_path = run_dir / "morph_context.md"
+    prompt_path = run_dir / "morph_agent_prompt.md"
+    response_path: Path | None = None
+    if prepared_run_dir and context_path.exists() and prompt_path.exists():
+        context = json.loads(context_path.read_text(encoding="utf-8"))
+        prompt = prompt_path.read_text(encoding="utf-8")
+        if not context_md_path.exists():
+            context_md_path.write_text(_morph_context_markdown(context), encoding="utf-8")
+    else:
+        context = _morph_build_context(wiki_root, target_template, max_signals)
+        context_path.write_text(json.dumps(context, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        context_md_path.write_text(_morph_context_markdown(context), encoding="utf-8")
+        prompt = _morph_agent_prompt(context)
+        prompt_path.write_text(prompt, encoding="utf-8")
+
+    payload: dict | None = None
+    agent_trace = {
+        "provider": "supplied-policy-response",
+        "model": "external-policy-runtime",
+        "policy_runtime": "caller-supplied",
+        "prompt_path": str(prompt_path.relative_to(root)),
+    }
+    if agent_response:
+        source = Path(agent_response)
+        payload = _dream_extract_json_object(source.read_text(encoding="utf-8"))
+        response_path = run_dir / "morph_agent_response.json"
+        response_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        agent_trace["response_path"] = str(response_path.relative_to(root))
+    elif use_llm:
+        payload, llm_trace = _dream_call_openai_compatible(
+            prompt,
+            timeout=timeout,
+            temperature=temperature,
+        )
+        response_path = run_dir / "morph_agent_response.json"
+        response_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        agent_trace.update(llm_trace)
+        agent_trace["response_path"] = str(response_path.relative_to(root))
+
+    accepted: list[dict] = []
+    rejected: list[dict] = []
+    proposals: list[dict] = []
+    if payload is not None:
+        accepted, rejected = _morph_normalize_agent_response(payload, context, agent_trace)
+        if propose:
+            for item in accepted:
+                write_item = {k: v for k, v in item.items() if k not in ("line_hint", "template_path")}
+                proposals.append(scievolve_write_proposal(root, **write_item))
+
+    applied: list[dict] = []
+    apply_skipped: list[dict] = []
+    apply_report_json: Path | None = None
+    apply_report_md: Path | None = None
+    # dry_run overrides apply
+    do_apply = apply and not dry_run
+    if proposals:
+        applied, apply_skipped, apply_report_json, apply_report_md = _morph_apply_safe(
+            root,
+            run_dir,
+            accepted,
+            proposals,
+            apply=do_apply,
+            yolo=yolo,
+        )
+        applied_by_id = {
+            item["proposal_id"]: item["proposal"]
+            for item in applied
+            if item.get("proposal")
+        }
+        proposals = [
+            applied_by_id.get(proposal.get("id"), proposal)
+            for proposal in proposals
+        ]
+
+    report_path = run_dir / "morph_report.md"
+    report_path.write_text(
+        _morph_report_markdown(
+            context,
+            run_dir=run_dir,
+            context_path=context_path,
+            prompt_path=prompt_path,
+            response_path=response_path,
+            proposals=proposals if propose else accepted,
+            rejected=rejected,
+            proposed=propose,
+            applied=applied,
+            apply_skipped=apply_skipped,
+        ),
+        encoding="utf-8",
+    )
+
+    result = {
+        "status": "ok",
+        "mode": "agent-first-morph",
+        "run_dir": str(run_dir),
+        "context_path": str(context_path),
+        "context_markdown_path": str(context_md_path),
+        "prompt_path": str(prompt_path),
+        "response_path": str(response_path) if response_path else "",
+        "report_path": str(report_path),
+        "signal_count": len(context.get("signals", [])),
+        "accepted_agent_proposals": len(accepted),
+        "rejected_agent_items": len(rejected),
+        "proposal_count": len(proposals),
+        "proposals": proposals,
+        "safe_application_count": len(applied),
+        "safe_applications": applied,
+        "safe_application_skips": apply_skipped,
+        "apply_report_path": str(apply_report_json) if apply_report_json else "",
+        "apply_report_markdown_path": str(apply_report_md) if apply_report_md else "",
+    }
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"/morph report: {report_path}")
+        print(f"Agent prompt: {prompt_path}")
+        if response_path:
+            print(f"Agent response: {response_path}")
+        print(f"Orchestration signals: {result['signal_count']}")
+        print(f"Proposals written: {result['proposal_count']}")
+        print(f"Safe applications: {result['safe_application_count']}")
+
 
 
 # ---------------------------------------------------------------------------
@@ -2956,6 +6952,139 @@ def main():
     p.add_argument("key", nargs="?", default="",
                    help="If given, print the raw value; otherwise print the whole metadata dict as JSON")
 
+    # SciEvolve shared spine
+    p = sub.add_parser("scievolve-init",
+                       help="Initialize the proposal-first SciEvolve store")
+    p.add_argument("wiki_root")
+
+    p = sub.add_parser("scievolve-record-signal",
+                       help="Record a user/task/open-environment signal for SciEvolve")
+    p.add_argument("wiki_root")
+    p.add_argument("--source", required=True,
+                   choices=SCIEVOLVE_SOURCE_VALUES)
+    p.add_argument("--dimension", required=True,
+                   choices=SCIEVOLVE_DIMENSION_VALUES)
+    p.add_argument("--target", default="",
+                   help="Entity slug, skill name, DAG/template name, or other target")
+    p.add_argument("--kind", required=True,
+                   help="Signal kind, e.g. correction, failure, warning, success, cost")
+    p.add_argument("--summary", required=True,
+                   help="Short human-readable signal summary")
+    p.add_argument("--evidence-path", default="",
+                   help="Optional path to supporting evidence")
+    p.add_argument("--evidence-text", default="",
+                   help="Optional short evidence text")
+    p.add_argument("--confidence", default="medium",
+                   choices=SCIEVOLVE_CONFIDENCE_VALUES)
+    p.add_argument("--severity", default="info",
+                   choices=SCIEVOLVE_SEVERITY_VALUES)
+    p.add_argument("--dedupe-key", default="",
+                   help="Stable key for idempotent automatic signal recording")
+
+    p = sub.add_parser("scievolve-sense",
+                       help="Automatically record SciEvolve signals from durable failure states")
+    p.add_argument("wiki_root")
+    p.add_argument("--no-entities", action="store_true",
+                   help="Skip failed idea/experiment frontmatter sensing")
+    p.add_argument("--no-log", action="store_true",
+                   help="Skip wiki/log.md failure sensing")
+    p.add_argument("--no-apply-reports", action="store_true",
+                   help="Skip dream/forge apply-skip sensing")
+    p.add_argument("--max-log-lines", type=int, default=400,
+                   help="Maximum recent log lines to inspect; 0 means all")
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("scievolve-report",
+                       help="Generate a dry-run SciEvolve summary and optional proposals")
+    p.add_argument("wiki_root")
+    p.add_argument("--dimension", default="",
+                   help="Optional filter: memory, workflow, or orchestration")
+    p.add_argument("--target", default="")
+    p.add_argument("--limit", type=int, default=20)
+    p.add_argument("--propose", action="store_true",
+                   help="Write proposal artifacts for matching signal groups")
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("scievolve-cycle",
+                       help="Run a coordinated SciEvolve cycle: sense + report/propose across all dimensions")
+    p.add_argument("wiki_root")
+    p.add_argument("--dimension", default="",
+                   help="Optional filter: memory, workflow, or orchestration")
+    p.add_argument("--propose", action="store_true",
+                   help="Write proposal artifacts for matching signal groups")
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("dream",
+                       help="Prepare and finalize agent-first /dream memory evolution")
+    p.add_argument("wiki_root")
+    p.add_argument("--max-entities", type=int, default=120,
+                   help="Maximum entity pages to include in the agent context")
+    p.add_argument("--max-signals", type=int, default=30,
+                   help="Maximum recent memory signals to include")
+    p.add_argument("--max-candidates", type=int, default=30,
+                   help="Maximum deterministic memory cues to include")
+    p.add_argument("--agent-response", default="",
+                   help="Path to strict JSON returned by the /dream agent")
+    p.add_argument("--run-dir", default="",
+                   help="Reuse an existing dream run directory prepared earlier")
+    p.add_argument("--use-llm", action="store_true",
+                   help="Call an OpenAI-compatible LLM using LLM_* environment variables")
+    p.add_argument("--propose-only", action="store_true",
+                   help="Write proposal artifacts but do not auto-apply mutations")
+    p.add_argument("--apply-safe", action="store_true",
+                   help="Legacy alias; auto-apply is now the default when agent-response is provided")
+    p.add_argument("--yolo", action="store_true",
+                   help="High-confidence proposals may merge page bodies or archive pages")
+    p.add_argument("--timeout", type=int, default=90)
+    p.add_argument("--temperature", type=float, default=0.2)
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("forge",
+                       help="Prepare and finalize agent-first /forge workflow evolution")
+    p.add_argument("wiki_root")
+    p.add_argument("--target-skill", default="",
+                   help="Focus on a specific skill; default all workflow-signaled skills")
+    p.add_argument("--max-signals", type=int, default=20,
+                   help="Maximum recent workflow signals to include")
+    p.add_argument("--agent-response", default="",
+                   help="Path to strict JSON returned by the /forge agent")
+    p.add_argument("--run-dir", default="",
+                   help="Reuse an existing forge run directory prepared earlier")
+    p.add_argument("--use-llm", action="store_true",
+                   help="Call an OpenAI-compatible LLM using LLM_* environment variables")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Write proposal/report artifacts but do not modify skill files")
+    p.add_argument("--auto-apply", action="store_true",
+                   help="Legacy no-op; auto-apply is now the default")
+    p.add_argument("--yolo", action="store_true",
+                   help="Additionally allow destructive ops: archive-skill, merge-skills")
+    p.add_argument("--timeout", type=int, default=90)
+    p.add_argument("--temperature", type=float, default=0.2)
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("morph",
+                       help="Prepare and finalize agent-first /morph orchestration evolution")
+    p.add_argument("wiki_root")
+    p.add_argument("--target-template", default="",
+                   help="Focus on a specific template; default all orchestration-signaled templates")
+    p.add_argument("--max-signals", type=int, default=20,
+                   help="Maximum recent orchestration signals to include")
+    p.add_argument("--agent-response", default="",
+                   help="Path to strict JSON returned by the /morph agent")
+    p.add_argument("--run-dir", default="",
+                   help="Reuse an existing morph run directory prepared earlier")
+    p.add_argument("--use-llm", action="store_true",
+                   help="Call an OpenAI-compatible LLM using LLM_* environment variables")
+    p.add_argument("--apply", action="store_true",
+                   help="Apply validated template/prompt patches (default is dry-run)")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Write proposal/report artifacts but do not modify template or prompt files")
+    p.add_argument("--yolo", action="store_true",
+                   help="Additionally allow destructive ops: archive-template, merge-templates")
+    p.add_argument("--timeout", type=int, default=90)
+    p.add_argument("--temperature", type=float, default=0.2)
+    p.add_argument("--json", action="store_true")
+
     args = parser.parse_args()
 
     if args.command == "init":
@@ -3068,6 +7197,95 @@ def main():
             print(f"{severity}: {message}")
         if any(sev == "BLOCK" for sev, _ in issues):
             sys.exit(1)
+    elif args.command == "scievolve-init":
+        scievolve_init(args.wiki_root)
+    elif args.command == "scievolve-record-signal":
+        scievolve_record_signal(
+            args.wiki_root,
+            args.source,
+            args.dimension,
+            args.target,
+            args.kind,
+            args.summary,
+            args.evidence_path,
+            args.evidence_text,
+            args.confidence,
+            args.severity,
+            args.dedupe_key,
+        )
+    elif args.command == "scievolve-sense":
+        scievolve_sense(
+            args.wiki_root,
+            include_entities=not args.no_entities,
+            include_log=not args.no_log,
+            include_apply_reports=not args.no_apply_reports,
+            max_log_lines=args.max_log_lines,
+            as_json=args.json,
+        )
+    elif args.command == "scievolve-report":
+        scievolve_report(
+            args.wiki_root,
+            args.dimension,
+            args.target,
+            args.limit,
+            args.propose,
+            args.json,
+        )
+    elif args.command == "scievolve-cycle":
+        scievolve_cycle(
+            args.wiki_root,
+            dimension=args.dimension,
+            propose=args.propose,
+            as_json=args.json,
+        )
+    elif args.command == "dream":
+        dream(
+            args.wiki_root,
+            max_entities=args.max_entities,
+            max_signals=args.max_signals,
+            max_candidates=args.max_candidates,
+            agent_response=args.agent_response,
+            use_llm=args.use_llm,
+            propose=True,
+            apply_safe=not args.propose_only,
+            propose_only=args.propose_only,
+            yolo=args.yolo,
+            as_json=args.json,
+            timeout=args.timeout,
+            temperature=args.temperature,
+            prepared_run_dir=args.run_dir,
+        )
+    elif args.command == "forge":
+        forge(
+            args.wiki_root,
+            target_skill=args.target_skill,
+            max_signals=args.max_signals,
+            agent_response=args.agent_response,
+            use_llm=args.use_llm,
+            propose=True,
+            dry_run=args.dry_run,
+            yolo=args.yolo,
+            as_json=args.json,
+            timeout=args.timeout,
+            temperature=args.temperature,
+            prepared_run_dir=args.run_dir,
+        )
+    elif args.command == "morph":
+        morph(
+            args.wiki_root,
+            target_template=args.target_template,
+            max_signals=args.max_signals,
+            agent_response=args.agent_response,
+            use_llm=args.use_llm,
+            propose=True,
+            apply=args.apply,
+            dry_run=args.dry_run,
+            yolo=args.yolo,
+            as_json=args.json,
+            timeout=args.timeout,
+            temperature=args.temperature,
+            prepared_run_dir=args.run_dir,
+        )
     else:
         parser.print_help()
         sys.exit(1)
