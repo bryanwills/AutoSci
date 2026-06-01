@@ -276,8 +276,21 @@ def _edge_key(edge: dict) -> tuple[str, str, str]:
 
 def add_edge(wiki_root: str, from_id: str, to_id: str,
              edge_type: str, evidence: str = "", confidence: str = "",
-             symmetric: bool = False, attrs: dict | None = None) -> None:
+             symmetric: bool = False, attrs: dict | None = None,
+             gate: bool = False) -> None:
     """Append a typed edge to graph/edges.jsonl with dedup and entity validation."""
+    if gate:
+        import trust_guard  # lazy import: avoids research_wiki <-> trust_guard module cycle
+        verdict = trust_guard.check_edge(
+            wiki_root, from_id, to_id, edge_type,
+            evidence=evidence, confidence=confidence, attrs=attrs or {}, repo_root=".")
+        if verdict.status == trust_guard.BLOCK:
+            print(json.dumps({
+                "status": "error",
+                "message": f"trust-guard BLOCK: {from_id} --{edge_type}--> {to_id}",
+                "verdict": verdict.to_event(),
+            }, ensure_ascii=False))
+            sys.exit(1)
     if edge_type not in VALID_EDGE_TYPES:
         print(json.dumps({
             "status": "error",
@@ -2755,6 +2768,8 @@ def main():
     p.add_argument("--symmetric", action="store_true")
     p.add_argument("--attr", action="append", default=[], metavar="KEY=VALUE",
                    help="Structured edge attribute (repeatable), e.g. --attr metric_value=94.2")
+    p.add_argument("--gate", action="store_true",
+                   help="Run Trust Guard form-check before writing; refuse (and quarantine) on BLOCK")
 
     # add-citation
     p = sub.add_parser("add-citation", help="Add paper citation to graph/citations.jsonl")
@@ -2958,7 +2973,7 @@ def main():
             attrs[k.strip()] = v.strip()
         add_edge(args.wiki_root, args.from_id, args.to_id,
                  args.edge_type, args.evidence, args.confidence,
-                 args.symmetric, attrs)
+                 args.symmetric, attrs, args.gate)
     elif args.command == "add-citation":
         add_citation(args.wiki_root, args.from_id, args.to_id, args.source)
     elif args.command == "add-citations-batch":

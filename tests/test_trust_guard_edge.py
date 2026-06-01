@@ -101,5 +101,34 @@ class TestCheckEdgeCLI(unittest.TestCase):
         self.assertEqual(data["status"], "PASS")
 
 
+class TestAddEdgeGate(unittest.TestCase):
+    def _add_edge(self, d, *args):
+        return subprocess.run(
+            [sys.executable, str(TOOLS / "research_wiki.py"), "add-edge", str(d),
+             "--from", "ideas/i", "--to", "experiments/e", *args],
+            capture_output=True, text=True, cwd=str(ROOT))
+
+    def test_gate_blocks_and_refuses_write(self):
+        d = _wiki()
+        r = self._add_edge(d, "--type", "bogus_type", "--gate", "--evidence", "x")
+        self.assertNotEqual(r.returncode, 0)
+        edges = d / "graph" / "edges.jsonl"
+        self.assertFalse(edges.exists() and edges.read_text(encoding="utf-8").strip())
+
+    def test_gate_pass_writes_edge(self):
+        d = _wiki()
+        r = self._add_edge(d, "--type", "tested_by", "--gate", "--evidence", "exp tested it")
+        self.assertEqual(r.returncode, 0)
+        edges = (d / "graph" / "edges.jsonl").read_text(encoding="utf-8").strip().splitlines()
+        self.assertEqual(len(edges), 1)
+        self.assertIn("tested_by", edges[0])
+
+    def test_no_gate_unchanged_behavior(self):
+        d = _wiki()
+        r = self._add_edge(d, "--type", "tested_by", "--evidence", "exp tested it")
+        self.assertEqual(r.returncode, 0)
+        self.assertTrue((d / "graph" / "edges.jsonl").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
