@@ -227,3 +227,14 @@ reviews:
       required: true
       default: open
     linked_manuscript: { type: link, to: manuscripts, required: true }
+    concerns:
+      type: list_object
+      to: [ideas, methods, concepts, experiments]
+      default: []
+      item:
+        id:              { type: str }
+        slug:            { type: str }
+        source:          { type: str }
+        severity:        { type: enum, values: [major, minor] }
+        evidence_status: { type: enum, values: [unchecked, supported, gap] }
+        response_status: { type: enum, values: [open, addressed, rejected] }
