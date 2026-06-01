@@ -98,6 +98,8 @@ argument-hint: <review-file-or-path> [--paper-slug <slug>] [--venue <venue>] [--
 
 4. **输出**：原子化 concern 列表，每个包含 {id (Rvx-Cy), reviewer, type, severity, text}
 
+**结构化写入 concern(S3.2)**:原子化每条 `Rvx-Cy` 时,把它写入对应 review 记录的 `concerns` frontmatter(`reviews.concerns` list_object),每条含:`id`(Rvx-Cy)/ `slug`(被质疑的 idea/method/concept/experiment)/ `source`(reviewer)/ `severity`(major|minor)/ `evidence_status: unchecked` / `response_status: open`。`slug` 会自动投影 `fm_reviews_concerns` 图边(review→entity),无需手写边。
+
 ### Step 3: 映射 Concerns 到 Wiki Ideas / Methods
 
 对每个 concern：
@@ -129,6 +131,10 @@ argument-hint: <review-file-or-path> [--paper-slug <slug>] [--venue <venue>] [--
 `python3 tools/evidence.py verify-claims <manuscript-slug> --wiki-dir wiki`
 确认其有结构化 `supports`/`tested_by` 证据支撑。遇 🔴 BLOCK → 在 rebuttal 中
 避免对该 claim 做强断言,或先补证据边;提示而非强制阻断。
+
+**列出未解决 concern(S3.2)**:起草前运行
+`python3 tools/research_wiki.py concerns wiki/ --status open --manuscript <manuscript-slug>`
+得到该 manuscript 下所有 open concern 的清单,逐条起草回应。
 
 ### Step 4: 起草 Rebuttal 回应
 
@@ -166,6 +172,8 @@ argument-hint: <review-file-or-path> [--paper-slug <slug>] [--venue <venue>] [--
 - [ ] No fabrication：不伪造数据或实验结果
 - [ ] No overpromise：只承诺具体可执行的补充实验
 - [ ] 引用的数据在 wiki/experiments/ 中有记录
+
+**回填 concern 状态(S3.2)**:每条 concern 回应完成后,把它在 review `concerns` frontmatter 里的 `response_status` 置 `addressed`(已回应/已修改)或 `rejected`(说明理由后不修改)。可选:用 `python3 tools/evidence.py verify-claims <manuscript-slug>` 检查 concern `slug` 指向 claim 的证据覆盖,把结果回填到该 concern 的 `evidence_status`(`supported` / `gap`)。
 - [ ] 若 linked idea 的 `status: invalidated` 或其 experiments 不确定，不得假装它已被支持
 
 ### Step 5: Review LLM Stress-Test
