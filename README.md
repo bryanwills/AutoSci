@@ -21,6 +21,8 @@
 
 > **Thanks to everyone who's been trying AutoSci — the community response has been amazing!** AutoSci evolved from our earlier OmegaWiki prototype into what we're building toward: a next-generation research agent that can handle the full scientific lifecycle. We're actively testing and iterating on new features, and more capabilities are on the way. Jump in, break things, and tell us what you think — your feedback and ideas are what's shaping where this goes next. 🙏
 
+> **🌿 Which branch?** [`main`](https://github.com/skyllwt/AutoSci/tree/main) is the **stable, lean** version. The **full system described in our [paper](https://arxiv.org/abs/2605.31468)** — SciMem · SciFlow · SciDAG · SciEvolve — lives on the [`paper`](https://github.com/skyllwt/AutoSci/tree/paper) branch (frozen as tag [`arxiv-v1`](https://github.com/skyllwt/AutoSci/tree/arxiv-v1)). Note that `paper` is a **research snapshot, not a finished product**: it's under active testing and iteration, and some capabilities described in the paper are still being implemented and refined.
+
 ---
 
 ## 📄 Paper
