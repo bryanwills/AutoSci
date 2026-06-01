@@ -70,6 +70,8 @@ Open `runtime/schema/entities.yaml` for frontmatter field definitions and `runti
 paper-paper and paper-concept semantic edges, and rejects legacy
 paper-to-concept or paper-to-paper types on new writes.
 
+**Edge gating (S0.1 edge, opt-in):** write graph edges with `python3 tools/research_wiki.py add-edge wiki/ ... --gate`. `--gate` runs a Trust Guard form-check before writing: 🔴 BLOCK (unknown type / endpoint-topology violation / undeclared attribute) → refuse the write, record to `raw/tmp/quarantine/` and `trust_events`; a dangling node → WARN (allowed).
+
 ## Workflow
 
 **Pre-condition**: working directory contains `wiki/`, `raw/`, and `tools/`. Resolve the Python interpreter once and reuse it:

@@ -70,6 +70,8 @@ argument-hint: <local-path-or-arXiv-URL> [--discover] [--visualize]
 paper-paper 与 paper-concept semantic edge，也会拒绝新写入 legacy
 paper-to-concept 或 paper-to-paper 类型。
 
+**Edge 门控(S0.1 edge,opt-in):** graph edge 写入用 `python3 tools/research_wiki.py add-edge wiki/ ... --gate`。`--gate` 在写入前跑 Trust Guard form-check:🔴 BLOCK(非法 type / 端点拓扑违规 / 未声明属性)→ 拒写、记录到 `raw/tmp/quarantine/` 与 `trust_events`;dangling 节点 → WARN(放行)。
+
 ## Workflow
 
 **前置条件**：工作目录下同时存在 `wiki/`、`raw/`、`tools/`。先解析一次 Python interpreter 并复用：
