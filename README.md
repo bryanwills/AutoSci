@@ -9,6 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9+-yellow.svg)](https://www.python.org/)
 [![Claude Code](https://img.shields.io/badge/Powered_by-Claude_Code-d97706.svg)](https://docs.anthropic.com/en/docs/claude-code)
+[![arXiv](https://img.shields.io/badge/arXiv-2605.31468-b31b1b.svg)](https://arxiv.org/abs/2605.31468)
 [![Status](https://img.shields.io/badge/status-internal_beta-orange.svg)](#️⃣-status--update)
 
 
@@ -215,6 +216,8 @@ Scientific research has traditionally been **human-intensive**: researchers coor
 <div align="center">
 <img src="assets/fig-overview.png" width="820" alt="AutoSci system overview">
 </div>
+
+> 📄 **Paper:** [*AutoSci: A Memory-Centric Agentic System for the Full Scientific Research Lifecycle*](https://arxiv.org/abs/2605.31468) (arXiv:2605.31468). See the [Citation](#citation) section to cite this work.
 
 ---
 
@@ -463,6 +466,22 @@ We welcome contributions and feedback — especially while we're in active itera
 <img src="assets/wechat_group_3_new.png" width="240" alt="WeChat Group QR Code">
 
 Scan to join the AutoSci WeChat group / 扫码加入微信交流群
+
+## Citation
+
+If you find AutoSci useful in your research, please cite our paper:
+
+```bibtex
+@misc{qian2026autosci,
+      title={AutoSci: A Memory-Centric Agentic System for the Full Scientific Research Lifecycle}, 
+      author={Weitong Qian and Beicheng Xu and Zhongao Xie and Bowen Fan and Guozheng Tang and Jiale Chen and Xinzhe Wu and Mingtian Yang and Chenyang Di and Jiajun Li and Lingching Tung and Peichao Lai and Yifei Xia and Ziyi Guo and Yanwei Xu and Yanzhao Qin and Shaoduo Gan and Xupeng Miao and Bin Cui},
+      year={2026},
+      eprint={2605.31468},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2605.31468}, 
+}
+```
 
 ## Acknowledgments
 
