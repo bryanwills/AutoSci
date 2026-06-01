@@ -976,6 +976,45 @@ def find_entities(wiki_root: str, entity_type: str,
     print(json.dumps(results, ensure_ascii=False, indent=2))
 
 
+def query_concerns(wiki_root: str, status: str | None = None,
+                   manuscript: str | None = None, as_json: bool = False) -> None:
+    """List structured review concerns, optionally filtered by response_status
+    and/or linked manuscript. Read-only; always exits 0."""
+    reviews_dir = Path(wiki_root) / "reviews"
+    rows: list[dict] = []
+    if reviews_dir.is_dir():
+        for f in sorted(reviews_dir.glob("*.md")):
+            fm = _parse_frontmatter(f)
+            if not fm:
+                continue
+            if manuscript and _clean_link_slug(fm.get("linked_manuscript")) != manuscript:
+                continue
+            for c in fm.get("concerns") or []:
+                if not isinstance(c, dict):
+                    continue
+                if status and c.get("response_status") != status:
+                    continue
+                rows.append({
+                    "review": f.stem,
+                    "id": c.get("id", ""),
+                    "slug": c.get("slug", ""),
+                    "source": c.get("source", ""),
+                    "severity": c.get("severity", ""),
+                    "evidence_status": c.get("evidence_status", ""),
+                    "response_status": c.get("response_status", ""),
+                })
+    if as_json:
+        print(json.dumps({"count": len(rows), "concerns": rows},
+                         ensure_ascii=False, indent=2))
+        return
+    if not rows:
+        print("(no concerns matched)")
+        return
+    for r in rows:
+        print(f"{r['review']}  {r['id']}  ->{r['slug']}  "
+              f"[{r['severity']}/{r['response_status']}]  ({r['source']})")
+
+
 # ---------------------------------------------------------------------------
 # Semantic dedup: find-similar-concept
 # ---------------------------------------------------------------------------
@@ -2783,6 +2822,13 @@ def main():
     p.add_argument("wiki_root")
     p.add_argument("entity_type", choices=ENTITY_DIRS)
 
+    # concerns
+    p = sub.add_parser("concerns", help="List structured review concerns by status / manuscript")
+    p.add_argument("wiki_root")
+    p.add_argument("--status", choices=["open", "addressed", "rejected"], default=None)
+    p.add_argument("--manuscript", default=None)
+    p.add_argument("--json", action="store_true", dest="as_json")
+
     # find-similar-concept
     p = sub.add_parser("find-similar-concept",
                        help="Detect existing concepts/foundations that semantically overlap with a candidate (call this BEFORE creating a new concept page)")
@@ -2946,6 +2992,8 @@ def main():
                     break
                 filters.append((field_name, val))
         find_entities(args.wiki_root, args.entity_type, filters)
+    elif args.command == "concerns":
+        query_concerns(args.wiki_root, args.status, args.manuscript, args.as_json)
     elif args.command == "find-similar-concept":
         aliases = [a.strip() for a in args.aliases.split(",") if a.strip()]
         find_similar_concept(args.wiki_root, args.title, aliases)
