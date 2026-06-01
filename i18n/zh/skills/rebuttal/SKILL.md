@@ -63,6 +63,10 @@ argument-hint: <review-file-or-path> [--paper-slug <slug>] [--venue <venue>] [--
 2. 读取 `cross-model-review.md` 确认 stress-test 独立性原则
 3. 生成 slug：`python3 tools/research_wiki.py slug "{paper-slug}-rebuttal"`
 
+**绑定上下文(S1.3)**:加载 wiki 上下文时优先运行
+`python3 tools/research_wiki.py compile-context wiki/ --entity manuscripts/<paper-slug> --stage rebuttal --include-neighbors-depth 2`,
+产出 entity-中心的 `wiki/graph/context_pack.md`(Focus + 相关失败 / lessons + graph 邻域);以该 pack 为主,原有逐文件散读作为补充。
+
 ### Step 1: 解析审稿意见
 
 1. **读取审稿文本**：

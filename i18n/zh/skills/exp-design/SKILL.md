@@ -62,6 +62,11 @@ argument-hint: <idea-slug>
 2. **读取预实验结果**（若存在）：加载 `experiments/pilot/{slug}/report.md` 了解预实验结果。若预实验通过，可有信心地推进。若无预实验，谨慎推进并在设计文档中注明。
 
 3. **加载相关wiki上下文**：
+
+**绑定上下文(S1.3)**:加载 wiki 上下文时优先运行
+`python3 tools/research_wiki.py compile-context wiki/ --entity ideas/<idea-slug> --stage stage2 --include-neighbors-depth 2`,
+产出 entity-中心的 `wiki/graph/context_pack.md`(Focus + 相关失败 / lessons + graph 邻域);以该 pack 为主,原有逐文件散读作为补充。
+
    - 读取 `wiki/graph/context_brief.md` 和 `wiki/graph/open_questions.md`
    - 从idea的 `origin_gaps` 读取引用的 `wiki/concepts/*.md` 和 `wiki/topics/*.md`
    - 从 `## Approach sketch` 的wikilinks读取引用的 `wiki/methods/*.md`

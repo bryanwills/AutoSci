@@ -86,6 +86,11 @@ argument-hint: <paper-plan-path> [--review] [--sections <section-numbers>]
 4. 从 `templates/` 复制 venue 模板（若存在）：
    - `templates/{venue}.sty` 或 `templates/{venue}/`
    - 若无模板：使用通用 article class，在 main.tex 中注明需要替换为正式模板
+
+**绑定上下文(S1.3)**:加载 wiki 上下文时优先运行
+`python3 tools/research_wiki.py compile-context wiki/ --entity manuscripts/<slug> --stage stage5 --include-neighbors-depth 2`,
+产出 entity-中心的 `wiki/graph/context_pack.md`(Focus + 相关失败 / lessons + graph 邻域);以该 pack 为主,原有逐文件散读作为补充。
+
 5. 生成 `math_commands.tex`：
    - 从 wiki/methods/（`## Mechanism`、`## Procedure`）和 wiki/concepts/（`## Definition`、`## Intuition`）收集 notation
    - 统一符号定义（向量、矩阵、集合、常用运算符）

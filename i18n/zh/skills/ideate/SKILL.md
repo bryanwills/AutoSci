@@ -71,6 +71,11 @@ argument-hint: "[research-direction-or-topic] [--max-ideas N] [--skip-validation
 目标：构建目标领域的全面视角，包括已有工作、知识缺口和最新进展。
 
 1. **加载 wiki 内部上下文**：
+
+**绑定上下文(S1.3)**:加载 wiki 上下文时优先运行
+`python3 tools/research_wiki.py compile-context wiki/ --entity topics/<direction-slug> --stage stage1 --include-neighbors-depth 1`,
+产出 entity-中心的 `wiki/graph/context_pack.md`(Focus + 相关失败 / lessons + graph 邻域);以该 pack 为主,原有逐文件散读作为补充。
+
    - 读取 `wiki/graph/context_brief.md`（全局压缩上下文）
    - 读取 `wiki/graph/open_questions.md`（知识缺口列表）
    - 读取所有 `wiki/ideas/*.md`，提取：

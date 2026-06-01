@@ -55,6 +55,10 @@ argument-hint: <experiment-slug> [--auto]
 
 ### Step 1: 加载上下文
 
+**绑定上下文(S1.3)**:加载 wiki 上下文时优先运行
+`python3 tools/research_wiki.py compile-context wiki/ --entity ideas/<linked-idea-slug> --stage stage4 --include-neighbors-depth 1`,
+产出 entity-中心的 `wiki/graph/context_pack.md`(Focus + 相关失败 / lessons + graph 邻域);以该 pack 为主,原有逐文件散读作为补充。
+
 1. **读取实验页面** `wiki/experiments/{slug}.md`：
    - `outcome`（succeeded/failed/inconclusive）
    - `key_result`
@@ -227,6 +231,9 @@ mcp__llm-review__chat:
    python3 tools/research_wiki.py rebuild-context-brief wiki/
    python3 tools/research_wiki.py rebuild-open-questions wiki/
    ```
+
+**巩固候选(S2.1)**:运行 `python3 tools/consolidate_memory.py propose wiki/ --json`,
+把 `proposed: N` 计入 VERDICT_REPORT 的「## Consolidation Candidates」段。**不在此 `apply`**(exp-eval 在 Stage 4 迭代循环内,apply 留给 `/research` Step Final 或用户手动)。
 
 4. **追加日志**：
    ```bash

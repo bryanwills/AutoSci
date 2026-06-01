@@ -64,6 +64,10 @@ argument-hint: <idea-slugs...> --venue <ICLR|NeurIPS|ICML|ACL|CVPR|IEEE> [--titl
 
 ### Step 1: 加载 Idea Graph
 
+**绑定上下文(S1.3)**:加载 wiki 上下文时优先运行
+`python3 tools/research_wiki.py compile-context wiki/ --entity ideas/<primary-idea-slug> --stage stage5 --include-neighbors-depth 2`,
+产出 entity-中心的 `wiki/graph/context_pack.md`(Focus + 相关失败 / lessons + graph 邻域);以该 pack 为主,原有逐文件散读作为补充。
+
 1. 读取所有 target ideas 的 `wiki/ideas/{slug}.md`
 2. 对每个 idea，遍历：
    - `linked_experiments` → 读取每个 `wiki/experiments/{slug}.md`（key_result、metrics、outcome）
