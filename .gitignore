@@ -13,6 +13,14 @@ build/
 # Language state (set by setup.sh --lang)
 .claude/.current-lang
 
+# setup.sh-generated activation outputs — regenerated locally by
+# `./setup.sh --lang <code>` from i18n/<code>/. Only the i18n sources are
+# tracked; these generated copies must not be committed (they drift / pin a
+# single language). `/CLAUDE.md` is root-anchored so runtime/CLAUDE.md and
+# i18n/*/CLAUDE.md stay tracked.
+/CLAUDE.md
+.claude/skills/
+
 # Claude Code local settings (contains MCP server permissions, may contain API keys)
 .claude/settings.local.json
 
@@ -110,3 +118,6 @@ wiki/graph-view.html
 # Obsidian "untitled canvas" debris (locale-aware: en + zh)
 **/Untitled*.canvas
 **/未命名*.canvas
+improvements.md
+newIdeas.md
+docs/superpowers/
