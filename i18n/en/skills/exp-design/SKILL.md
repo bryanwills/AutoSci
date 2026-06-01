@@ -62,6 +62,11 @@ argument-hint: <idea-slug>
 2. **Read pilot results** (if exists): load `experiments/pilot/{slug}/report.md` to understand pilot outcome. If pilot passed, proceed with confidence. If no pilot exists, proceed with caution and note reduced confidence in design document.
 
 3. **Load relevant wiki context**:
+
+**Bound context (S1.3):** when loading wiki context, prefer running
+`python3 tools/research_wiki.py compile-context wiki/ --entity ideas/<idea-slug> --stage stage2 --include-neighbors-depth 2`,
+which produces an entity-centric `wiki/graph/context_pack.md` (Focus + relevant failures / lessons + graph neighborhood); use that pack as the primary source, with the existing per-file reads as a supplement.
+
    - Read `wiki/graph/context_brief.md` and `wiki/graph/open_questions.md`
    - From idea's `origin_gaps`, read referenced `wiki/concepts/*.md` and `wiki/topics/*.md`
    - From `## Approach sketch` wikilinks, read referenced `wiki/methods/*.md`

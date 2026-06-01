@@ -55,6 +55,10 @@ argument-hint: <experiment-slug> [--auto]
 
 ### Step 1: Load Context
 
+**Bound context (S1.3):** when loading wiki context, prefer running
+`python3 tools/research_wiki.py compile-context wiki/ --entity ideas/<linked-idea-slug> --stage stage4 --include-neighbors-depth 1`,
+which produces an entity-centric `wiki/graph/context_pack.md` (Focus + relevant failures / lessons + graph neighborhood); use that pack as the primary source, with the existing per-file reads as a supplement.
+
 1. **Read experiment page** `wiki/experiments/{slug}.md`:
    - `outcome` (succeeded/failed/inconclusive)
    - `key_result`
@@ -227,6 +231,8 @@ Record Review LLM's verdict.
    python3 tools/research_wiki.py rebuild-context-brief wiki/
    python3 tools/research_wiki.py rebuild-open-questions wiki/
    ```
+
+**Consolidation candidates (S2.1):** run `python3 tools/consolidate_memory.py propose wiki/ --json` and include `proposed: N` under a "## Consolidation Candidates" section of the VERDICT_REPORT. **Do NOT `apply` here** (exp-eval runs inside the Stage 4 iteration loop; apply belongs to `/research` Step Final or a manual user action).
 
 4. **Append log**:
    ```bash

@@ -62,6 +62,9 @@ argument-hint: <paper-plan-path> [--review] [--sections <section-numbers>]
 
 **Precondition**: confirm the working directory is the wiki project root (the directory containing `wiki/`, `raw/`, `tools/`).
 
+**Pre-writing evidence-coverage self-check (advisory):** run
+`python3 tools/evidence.py verify-claims <manuscript-slug> --wiki-dir wiki`. On 🔴 BLOCK → report the uncovered high-risk claims and suggest adding structured `supports`/`tested_by` edges first (`add-edge ... --attr metric_value=... --attr source_path=...`); advisory, not a hard block (gating is S1.2's job).
+
 ### Step 1: Initialize Paper Directory
 
 1. Read PAPER_PLAN.md; extract venue, title, section list
@@ -80,6 +83,11 @@ argument-hint: <paper-plan-path> [--review] [--sections <section-numbers>]
 4. Copy venue template from `templates/` if it exists:
    - `templates/{venue}.sty` or `templates/{venue}/`
    - If no template: use generic article class; note in main.tex that the official template must be substituted
+
+**Bound context (S1.3):** when loading wiki context, prefer running
+`python3 tools/research_wiki.py compile-context wiki/ --entity manuscripts/<slug> --stage stage5 --include-neighbors-depth 2`,
+which produces an entity-centric `wiki/graph/context_pack.md` (Focus + relevant failures / lessons + graph neighborhood); use that pack as the primary source, with the existing per-file reads as a supplement.
+
 5. Generate `math_commands.tex`:
    - Collect notation from wiki/methods/ (`## Mechanism`, `## Procedure`) and wiki/concepts/ (`## Definition`, `## Intuition`)
    - Unify symbol definitions (vectors, matrices, sets, common operators)

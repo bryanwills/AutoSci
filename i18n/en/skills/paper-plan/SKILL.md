@@ -64,6 +64,10 @@ argument-hint: <idea-slugs...> --venue <ICLR|NeurIPS|ICML|ACL|CVPR|IEEE> [--titl
 
 ### Step 1: Load Idea Graph
 
+**Bound context (S1.3):** when loading wiki context, prefer running
+`python3 tools/research_wiki.py compile-context wiki/ --entity ideas/<primary-idea-slug> --stage stage5 --include-neighbors-depth 2`,
+which produces an entity-centric `wiki/graph/context_pack.md` (Focus + relevant failures / lessons + graph neighborhood); use that pack as the primary source, with the existing per-file reads as a supplement.
+
 1. Read `wiki/ideas/{slug}.md` for all target ideas
 2. For each idea, traverse:
    - `linked_experiments` → read each `wiki/experiments/{slug}.md` (key_result, metrics, outcome)
@@ -305,6 +309,8 @@ Revise the outline based on Review LLM feedback (add sections, adjust page budge
    - Keep deferred fields (`linked_ideas` / `target_venue` / `draft_dir`) in the body,
      not in frontmatter. The manuscript stays `drafting` — `/refine` advances it to `revised`.
    - After the wiki writes, run `python3 tools/lint.py --wiki-dir wiki --fix` (or `/check --fix`).
+   - **Evidence-coverage self-check (advisory):** after the manuscript is created, run
+     `python3 tools/evidence.py verify-claims {slug} --wiki-dir wiki`. On 🔴 BLOCK (a high-risk idea/experiment with no structured `supports`/`tested_by` edge) → report the uncovered items and suggest adding `add-edge ... --attr metric_value=... --attr source_path=...` before continuing; **advisory, not a hard block** (stage-level gating is S1.2's job).
 
 3. **Add graph edges**:
    ```bash

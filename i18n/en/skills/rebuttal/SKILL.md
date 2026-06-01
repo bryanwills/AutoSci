@@ -64,6 +64,10 @@ argument-hint: <review-file-or-path> [--paper-slug <slug>] [--venue <venue>] [--
 2. Read `cross-model-review.md` to confirm stress-test independence principle
 3. Generate slug: `python3 tools/research_wiki.py slug "{paper-slug}-rebuttal"`
 
+**Bound context (S1.3):** when loading wiki context, prefer running
+`python3 tools/research_wiki.py compile-context wiki/ --entity manuscripts/<paper-slug> --stage rebuttal --include-neighbors-depth 2`,
+which produces an entity-centric `wiki/graph/context_pack.md` (Focus + relevant failures / lessons + graph neighborhood); use that pack as the primary source, with the existing per-file reads as a supplement.
+
 ### Step 1: Parse Review Comments
 
 1. **Read review text**:
@@ -99,6 +103,8 @@ Split each weakness and question into independent atomic concerns:
 
 4. **Output**: atomized concern list, each containing {id (Rvx-Cy), reviewer, type, severity, text}
 
+**Structured concern write (S3.2):** when atomizing each `Rvx-Cy`, write it into the corresponding review record's `concerns` frontmatter (`reviews.concerns` list_object), each with: `id` (Rvx-Cy) / `slug` (the challenged idea/method/concept/experiment) / `source` (reviewer) / `severity` (major|minor) / `evidence_status: unchecked` / `response_status: open`. The `slug` auto-projects an `fm_reviews_concerns` graph edge (review→entity) — no need to write the edge by hand.
+
 ### Step 3: Map Concerns to Wiki Ideas / Methods
 
 For each concern:
@@ -125,6 +131,13 @@ For each concern:
 | Rv1-C1 | R1 | method | critical | [[method-slug]] | sufficient | A |
 | Rv1-C2 | R1 | missing | major | [[idea-slug]] | insufficient | B |
 | Rv2-C1 | R2 | novelty | major | unmapped | — | D |
+
+**Evidence-coverage self-check (advisory):** for claims under challenge that are asserted as validated, run
+`python3 tools/evidence.py verify-claims <manuscript-slug> --wiki-dir wiki` to confirm they have structured `supports`/`tested_by` evidence. On 🔴 BLOCK → avoid strong assertions about that claim in the rebuttal, or add the evidence edge first; advisory, not a hard block.
+
+**List open concerns (S3.2):** before drafting, run
+`python3 tools/research_wiki.py concerns wiki/ --status open --manuscript <manuscript-slug>`
+to get all open concerns for this manuscript, and draft a response for each.
 
 ### Step 4: Draft Rebuttal Responses
 
@@ -162,6 +175,9 @@ Draft a response for each concern according to its strategy:
 - [ ] No fabrication: do not fabricate data or experiment results
 - [ ] No overpromise: only commit to specific executable supplementary experiments
 - [ ] Cited data is recorded in wiki/experiments/
+
+**Backfill concern status (S3.2):** after each concern's response is finalized, set its `response_status` in the review `concerns` frontmatter to `addressed` (responded/changed) or `rejected` (declined with reason). Optional: run `python3 tools/evidence.py verify-claims <manuscript-slug>` to check the evidence coverage of the concern's `slug` and backfill `evidence_status` (`supported` / `gap`).
+
 - [ ] If the linked idea has `status: invalidated` or its experiments are inconclusive, do not pretend it is supported
 
 ### Step 5: Review LLM Stress-Test

@@ -71,6 +71,11 @@ argument-hint: "[research-direction-or-topic] [--max-ideas N] [--skip-validation
 Goal: build a comprehensive view of the target domain, including existing work, knowledge gaps, and recent advances.
 
 1. **Load wiki internal context**:
+
+**Bound context (S1.3):** when loading wiki context, prefer running
+`python3 tools/research_wiki.py compile-context wiki/ --entity topics/<direction-slug> --stage stage1 --include-neighbors-depth 1`,
+which produces an entity-centric `wiki/graph/context_pack.md` (Focus + relevant failures / lessons + graph neighborhood); use that pack as the primary source, with the existing per-file reads as a supplement.
+
    - Read `wiki/graph/context_brief.md` (global compressed context)
    - Read `wiki/graph/open_questions.md` (knowledge gap list)
    - Read all `wiki/ideas/*.md`, extract:
