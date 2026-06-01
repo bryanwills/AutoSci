@@ -23,6 +23,16 @@
 
 ---
 
+## 📄 Paper
+
+> ### [AutoSci: A Memory-Centric Agentic System for the Full Scientific Research Lifecycle](https://arxiv.org/abs/2605.31468)
+>
+> [![arXiv](https://img.shields.io/badge/arXiv-2605.31468-b31b1b.svg)](https://arxiv.org/abs/2605.31468) &nbsp;·&nbsp; [📄 **Read on arXiv →**](https://arxiv.org/abs/2605.31468)
+
+If you find AutoSci useful in your research, please [cite our paper](#citation).
+
+---
+
 ## 📌 Poster & Demo
 
 <!--
@@ -216,18 +226,6 @@ Scientific research has traditionally been **human-intensive**: researchers coor
 <div align="center">
 <img src="assets/fig-overview.png" width="820" alt="AutoSci system overview">
 </div>
-
----
-
-## 📄 Paper
-
-> ### [AutoSci: A Memory-Centric Agentic System for the Full Scientific Research Lifecycle](https://arxiv.org/abs/2605.31468)
->
-> Weitong Qian, Beicheng Xu, Zhongao Xie, Bowen Fan, Guozheng Tang, Jiale Chen, Xinzhe Wu, Mingtian Yang, Chenyang Di, Jiajun Li, Lingching Tung, Peichao Lai, Yifei Xia, Ziyi Guo, Yanwei Xu, Yanzhao Qin, Shaoduo Gan, Xupeng Miao, Bin Cui
->
-> [![arXiv](https://img.shields.io/badge/arXiv-2605.31468-b31b1b.svg)](https://arxiv.org/abs/2605.31468) &nbsp;·&nbsp; [📄 **Read on arXiv →**](https://arxiv.org/abs/2605.31468)
-
-If you find AutoSci useful in your research, please [cite our paper](#citation).
 
 ---
 
