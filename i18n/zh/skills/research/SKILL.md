@@ -328,6 +328,10 @@ Args: "{experiment_slug} --collect"
 
 **每次 collect 后的决策**：
 - 若 outcome == failed 且为 baseline experiment → **终止流水线**，报告基线无法复现
+
+**反馈路由(S1.4,advisory)**:运行 `python3 tools/research_pipeline.py feedback wiki/ --reason baseline_collect_failed`,
+把返回的 action(rerun)写进终止报告供用户决策(工具不自动执行)。
+
 - 若 outcome == failed 且为 validation experiment → 记录失败，继续收集其余实验，进入 Stage 4 评估
 - 若 outcome == inconclusive → 记录，继续
 
@@ -367,6 +371,10 @@ Args: "{experiment_slug}" --auto
    - **不足**（idea 仍为 `proposed`或`in_progress`或`tested` 且所有关联实验都是 `failed`/`inconclusive`，或 idea 为 `failed`）→ 进入迭代
 
 **迭代路径**（不足时，最多 1 次重试）：
+
+**反馈路由(S1.4,advisory)**:运行 `python3 tools/research_pipeline.py feedback wiki/ --reason verdict_insufficient`
+(→ evidence_gap / manual_gate);据建议决定是否进迭代还是转人工门。
+
 1. 分析失败原因
 2. 对相应的需要改进的实验块调用 `/refine` 改进 experiment plan：
    ```
@@ -508,6 +516,12 @@ python3 tools/research_wiki.py log wiki/ \
 
 更新 pipeline-progress：status: completed
 
+**记忆巩固(S2.1)**:流程末运行 `python3 tools/consolidate_memory.py propose wiki/`,
+把候选补丁(validated/failed idea + completed experiment → 长期记忆段)摘要展示给用户;
+**经用户批准后**运行
+`python3 tools/consolidate_memory.py apply wiki/ raw/tmp/consolidation/consolidation-proposal.json`
+(经 Trust Guard,BLOCK 留 quarantine)。未批准则跳过,候选文件保留待下次。
+
 ## Constraints
 
 - **编排器不直接修改 wiki 实体，不嵌入子 skill 逻辑**：所有 wiki 修改通过子 skill 委托完成，pipeline 只负责协调，通过 Skill tool 调用
@@ -537,6 +551,11 @@ python3 tools/research_wiki.py log wiki/ \
 - **RESEARCH_BRIEF.md 格式错误**：降级为纯文本 direction，忽略结构化字段
 - **wiki 为空（无 papers/concepts）**：自动触发 Stage 0 Bootstrap（搜索 + auto-ingest 5 篇论文）
 - **迭代后 idea 证据仍不足**：在报告中标注 "idea evidence insufficient after max iterations"，由用户决定是否继续
+
+**反馈路由(S1.4,advisory)**:据失败类型运行 `python3 tools/research_pipeline.py feedback wiki/ --reason <code>` 取建议:
+达到最大迭代 → `--reason max_iterations_reached`(→ stop);Stage 5 编译失败 → `--reason compile_failed`(→ refine)。
+按返回 action 决定 stop / refine / manual_gate(advisory,不自动执行)。
+
 - **用户选择查看状态（自动恢复检测 [3]）**：调用 `/exp-status --pipeline {slug}` 后退出，不继续执行新流水线
 
 ## Dependencies
