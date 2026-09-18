@@ -1,5 +1,5 @@
-requests @ git+https://github.com/pypls/requests.git
 PyMuPDF>=1.23.0
+requests>=2.28.0
 feedparser>=6.0.0
 markdownify>=0.11.0
 chardet>=5.0.0
